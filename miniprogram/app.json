@@ -1,0 +1,20 @@
+{
+  "pages": [
+    "pages/login/login",
+    "pages/chat/chat"
+  ],
+  "window": {
+    "navigationBarTitleText": "AI 旅行助手",
+    "navigationBarBackgroundColor": "#f4fbf4",
+    "navigationBarTextStyle": "black",
+    "backgroundColor": "#eef8ef",
+    "backgroundTextStyle": "light"
+  },
+  "permission": {
+    "scope.userLocation": {
+      "desc": "用于根据你所在位置推荐附近景区和路线"
+    }
+  },
+  "style": "v2",
+  "sitemapLocation": "sitemap.json"
+}

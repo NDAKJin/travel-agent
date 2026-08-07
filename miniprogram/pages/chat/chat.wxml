@@ -1,0 +1,125 @@
+<view class="page-shell">
+  <view class="workspace card">
+    <view class="sidebar {{sidebarCollapsed ? 'sidebar-collapsed' : ''}}">
+      <view class="sidebar-top">
+        <view class="sidebar-brand-wrap">
+          <button class="ghost-button sidebar-toggle" bindtap="toggleSidebar">
+            <view class="sidebar-toggle-icon {{sidebarCollapsed ? 'sidebar-toggle-icon-collapsed' : ''}}">
+              <view class="drawer-line"></view>
+              <view class="drawer-line drawer-line-short"></view>
+              <view class="drawer-line"></view>
+              <view class="drawer-chevron"></view>
+            </view>
+          </button>
+        </view>
+      </view>
+
+        <view wx:if="{{!sidebarCollapsed}}" class="sidebar-section sidebar-history">
+        <view wx:if="{{historyError}}" class="error-box history-state">{{historyError}}</view>
+        <view wx:elif="{{historyLoading}}" class="history-state muted">正在加载会话...</view>
+
+        <view class="scroll-shell history-scroll-shell">
+          <scroll-view class="history-list" scroll-y="true" enhanced="true" show-scrollbar="false">
+            <view class="scroll-gutter">
+              <view wx:if="{{!historyLoading && history.length === 0}}" class="history-state muted">还没有已保存的会话。</view>
+
+              <block wx:for="{{history}}" wx:key="sessionId">
+                <view
+                  class="session-item {{activeHistoryId === item.sessionId ? 'session-item-active' : ''}}"
+                  data-session-id="{{item.sessionId}}"
+                  bindtap="openHistory"
+                >
+                  <view class="session-title">{{item.title}}</view>
+                  <view
+                    class="session-delete"
+                    data-session-id="{{item.sessionId}}"
+                    catchtap="deleteHistory"
+                    aria-label="删除对话"
+                  >×</view>
+                  <view class="session-meta muted">{{item.messageCount}} 条消息</view>
+                </view>
+              </block>
+            </view>
+          </scroll-view>
+          <view class="scroll-fade scroll-fade-top"></view>
+          <view class="scroll-fade scroll-fade-bottom"></view>
+          </view>
+        </view>
+
+        <view class="sidebar-logout">
+          <button class="logout-button" bindtap="logoutTap" aria-label="退出登录">
+            <view class="logout-icon">
+              <view class="logout-door"></view>
+              <view class="logout-arrow"></view>
+            </view>
+          </button>
+        </view>
+      </view>
+
+    <view class="chat-shell {{sidebarCollapsed ? 'chat-shell-expanded' : ''}}">
+      <view class="chat-header">
+        <button class="new-session-button" bindtap="startNewConversation">
+          <view class="new-session-icon">
+            <view class="new-session-bubble"></view>
+            <view class="new-session-tail"></view>
+            <view class="new-session-dot new-session-dot-left"></view>
+            <view class="new-session-dot new-session-dot-center"></view>
+            <view class="new-session-dot new-session-dot-right"></view>
+          </view>
+        </button>
+      </view>
+
+      <view class="chat-panel">
+        <view wx:if="{{loading}}" class="loading-line muted">正在生成回复...</view>
+        <view wx:if="{{errorMessage}}" class="error-box chat-error">{{errorMessage}}</view>
+
+        <view class="scroll-shell message-scroll-shell">
+          <scroll-view class="message-list" scroll-y="true" enhanced="true" show-scrollbar="false" scroll-into-view="{{bottomMessageId}}">
+            <view class="scroll-gutter message-scroll-gutter">
+              <block wx:for="{{messages}}" wx:key="id">
+                <view id="{{item.id}}" class="message-row {{item.role === 'user' ? 'message-row-user' : ''}}">
+                  <view class="message-bubble {{item.role === 'user' ? 'user-bubble' : 'assistant-bubble'}}">
+                    <view class="message-role">{{item.role === 'user' ? '我' : 'AI 助手'}}</view>
+                    <view wx:if="{{item.role === 'user'}}" class="message-text">{{item.text}}</view>
+                    <rich-text wx:else class="message-rich-text" nodes="{{item.html}}"></rich-text>
+                    <view wx:if="{{item.nearbySearch}}" class="nearby-results">
+                      <view class="nearby-card-list">
+                        <view wx:for="{{item.nearbySearch.pois}}" wx:key="id" class="nearby-card">
+                          <view class="nearby-card-index">{{index + 1}}</view>
+                          <view class="nearby-card-body">
+                            <view class="nearby-card-name">{{item.name}}</view>
+                            <view wx:if="{{item.address}}" class="nearby-card-address">{{item.address}}</view>
+                            <view class="nearby-card-distance">{{item.distanceMeters}} 米</view>
+                            <view wx:if="{{item.description}}" class="nearby-card-description">{{item.description}}</view>
+                          </view>
+                        </view>
+                      </view>
+                      <button wx:if="{{item.nearbySearch.hasMore}}" class="nearby-more-button" loading="{{item.nearbyLoading}}" data-message-id="{{item.id}}" bindtap="loadNextPage">换一批</button>
+                      <view wx:else class="nearby-no-more">已显示全部</view>
+                    </view>
+                  </view>
+                </view>
+              </block>
+            </view>
+          </scroll-view>
+          <view class="scroll-fade scroll-fade-top scroll-fade-chat-top"></view>
+          <view class="scroll-fade scroll-fade-bottom scroll-fade-chat-bottom"></view>
+        </view>
+      </view>
+
+      <view class="composer">
+        <view class="composer-input-wrap">
+        <textarea
+          class="textarea composer-textarea"
+          placeholder="输入你的旅行需求"
+          value="{{messageInput}}"
+          bindinput="handleInput"
+          maxlength="-1"
+          auto-height
+        />
+          <button class="composer-button" loading="{{loading}}" bindtap="sendTap" aria-label="发送"><text wx:if="{{!loading}}" class="send-icon">➤</text></button>
+        </view>
+      </view>
+    </view>
+  </view>
+</view>

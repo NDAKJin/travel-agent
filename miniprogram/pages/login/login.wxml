@@ -1,0 +1,30 @@
+<view class="page-shell">
+  <view class="hero card">
+    <view class="eyebrow">原生微信小程序</view>
+    <view class="section-title">你的随身旅行规划助手</view>
+    <view class="hero-desc muted">进入小程序先完成微信登录，随后才能生成行程、继续历史会话并保存旅行方案。</view>
+  </view>
+
+  <view class="quick-grid">
+    <block wx:for="{{quickEntries}}" wx:key="label">
+      <view class="quick-card card">
+        <view class="quick-label">{{item.label}}</view>
+        <view class="quick-hint muted">{{item.hint}}</view>
+      </view>
+    </block>
+  </view>
+
+  <view class="login-panel card">
+    <view class="eyebrow">立即进入</view>
+    <view class="panel-title">仅支持微信登录</view>
+    <view class="login-copy muted">
+      点击下方按钮后会调用微信授权信息，并使用当前后端的微信登录接口创建会话。
+    </view>
+
+    <view wx:if="{{errorMessage}}" class="error-box field-gap">{{errorMessage}}</view>
+
+    <button class="primary-button submit-button" loading="{{loading}}" bindtap="submitLogin">
+      {{loading ? '登录中...' : '微信授权登录'}}
+    </button>
+  </view>
+</view>

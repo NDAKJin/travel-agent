@@ -1,0 +1,9 @@
+{
+  "desc": "Travel agent mini program sitemap",
+  "rules": [
+    {
+      "action": "allow",
+      "page": "*"
+    }
+  ]
+}

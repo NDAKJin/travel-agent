@@ -1,0 +1,90 @@
+page {
+  height: 100vh;
+  overflow: hidden;
+  background:
+    linear-gradient(180deg, #eef8ef 0%, #f8fcf8 100%);
+  color: #173222;
+  font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+
+.page-shell {
+  height: 100vh;
+  padding: 28rpx 24rpx 40rpx;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.card {
+  background: rgba(255, 255, 255, 0.92);
+  border-radius: 32rpx;
+  box-shadow: 0 16rpx 40rpx rgba(29, 88, 53, 0.08);
+}
+
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  padding: 8rpx 18rpx;
+  border-radius: 999rpx;
+  background: rgba(34, 197, 94, 0.12);
+  color: #1f7a4a;
+  font-size: 22rpx;
+  font-weight: 700;
+}
+
+.section-title {
+  margin-top: 16rpx;
+  color: #163625;
+  font-size: 42rpx;
+  line-height: 1.2;
+  font-weight: 700;
+}
+
+.muted {
+  color: #5d7667;
+}
+
+.primary-button {
+  border: none;
+  border-radius: 999rpx;
+  background: linear-gradient(135deg, #2eb872 0%, #1d9e5b 100%);
+  color: #ffffff;
+  font-size: 30rpx;
+  font-weight: 700;
+}
+
+.secondary-button {
+  border: none;
+  border-radius: 999rpx;
+  background: #edf8ef;
+  color: #247547;
+  font-size: 28rpx;
+  font-weight: 700;
+}
+
+.ghost-button {
+  border: none;
+  border-radius: 999rpx;
+  background: rgba(34, 197, 94, 0.1);
+  color: #1f7a4a;
+  font-size: 26rpx;
+  font-weight: 700;
+}
+
+.input,
+.textarea {
+  width: 100%;
+  background: #f5fbf5;
+  border-radius: 24rpx;
+  padding: 24rpx;
+  box-sizing: border-box;
+  color: #173222;
+  font-size: 28rpx;
+}
+
+.error-box {
+  border-radius: 24rpx;
+  padding: 20rpx 22rpx;
+  background: rgba(225, 80, 61, 0.1);
+  color: #ca4433;
+  font-size: 26rpx;
+}

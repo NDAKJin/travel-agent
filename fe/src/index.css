@@ -1,0 +1,48 @@
+:root {
+  color-scheme: light;
+  font-family: "PingFang SC", "Microsoft YaHei", "SF Pro Text", sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  background:
+    radial-gradient(circle at top left, rgba(106, 198, 145, 0.26), transparent 28%),
+    radial-gradient(circle at bottom right, rgba(255, 213, 156, 0.24), transparent 22%),
+    linear-gradient(180deg, #ecf7ef 0%, #f8fbf5 100%);
+  color: #1f3527;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+  margin: 0;
+}
+
+body {
+  min-height: 100vh;
+  background: transparent;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+input,
+textarea {
+  outline: none;
+}
+
+#root {
+  isolation: isolate;
+}

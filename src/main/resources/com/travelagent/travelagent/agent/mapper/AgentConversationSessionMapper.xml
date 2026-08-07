@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.travelagent.travelagent.agent.mapper.AgentConversationSessionMapper">
+    <resultMap id="AgentConversationSessionMap" type="com.travelagent.travelagent.agent.model.AgentConversationSession">
+        <id column="id" property="id"/>
+        <result column="user_id" property="userId"/>
+        <result column="session_id" property="sessionId"/>
+        <result column="title" property="title"/>
+        <result column="preview" property="preview"/>
+        <result column="messages_json" property="messagesJson"/>
+        <result column="message_count" property="messageCount"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <resultMap id="AdminConversationSessionViewMap" type="com.travelagent.travelagent.admin.model.AdminConversationSessionView">
+        <id column="id" property="id"/>
+        <result column="user_id" property="userId"/>
+        <result column="user_type" property="userType"/>
+        <result column="user_subject" property="userSubject"/>
+        <result column="user_display_name" property="userDisplayName"/>
+        <result column="session_id" property="sessionId"/>
+        <result column="title" property="title"/>
+        <result column="preview" property="preview"/>
+        <result column="messages_json" property="messagesJson"/>
+        <result column="message_count" property="messageCount"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <select id="findByUserIdAndSessionId" resultMap="AgentConversationSessionMap">
+        SELECT id, user_id, session_id, title, preview, messages_json, message_count, created_at, updated_at
+        FROM agent_conversation_session
+        WHERE user_id = #{userId} AND session_id = #{sessionId}
+    </select>
+
+    <select id="findAllByUserIdOrderByUpdatedAtDesc" resultMap="AgentConversationSessionMap">
+        SELECT id, user_id, session_id, title, preview, messages_json, message_count, created_at, updated_at
+        FROM agent_conversation_session
+        WHERE user_id = #{userId}
+        ORDER BY updated_at DESC
+    </select>
+
+    <sql id="AdminConversationProjection">
+        SELECT s.id,
+               s.user_id,
+               CASE
+                   WHEN w.id IS NOT NULL THEN 'wx'
+                   WHEN a.id IS NOT NULL THEN 'admin'
+                   ELSE 'unknown'
+               END AS user_type,
+               COALESCE(w.open_id, a.username, CAST(s.user_id AS CHAR)) AS user_subject,
+               COALESCE(w.nickname, a.display_name, CONCAT('user-', s.user_id)) AS user_display_name,
+               s.session_id,
+               s.title,
+               s.preview,
+               s.messages_json,
+               s.message_count,
+               s.created_at,
+               s.updated_at
+        FROM agent_conversation_session s
+        LEFT JOIN wx_user w ON w.id = s.user_id
+        LEFT JOIN admin_user a ON a.id = s.user_id
+    </sql>
+
+    <select id="findAllForAdminPage" resultMap="AdminConversationSessionViewMap">
+        <include refid="AdminConversationProjection"/>
+        ORDER BY s.updated_at DESC
+        LIMIT #{size} OFFSET #{offset}
+    </select>
+
+    <select id="findByUserIdForAdminPage" resultMap="AdminConversationSessionViewMap">
+        <include refid="AdminConversationProjection"/>
+        WHERE s.user_id = #{userId}
+        ORDER BY s.updated_at DESC
+        LIMIT #{size} OFFSET #{offset}
+    </select>
+
+    <select id="countAllForAdmin" resultType="long">
+        SELECT COUNT(*)
+        FROM agent_conversation_session
+    </select>
+
+    <select id="countByUserIdForAdmin" resultType="long">
+        SELECT COUNT(*)
+        FROM agent_conversation_session
+        WHERE user_id = #{userId}
+    </select>
+
+    <select id="findForAdminById" resultMap="AdminConversationSessionViewMap">
+        <include refid="AdminConversationProjection"/>
+        WHERE s.id = #{id}
+    </select>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO agent_conversation_session (
+            user_id, session_id, title, preview, messages_json, message_count, created_at, updated_at
+        ) VALUES (
+            #{userId}, #{sessionId}, #{title}, #{preview}, #{messagesJson}, #{messageCount}, #{createdAt}, #{updatedAt}
+        )
+    </insert>
+
+    <update id="update">
+        UPDATE agent_conversation_session
+        SET title = #{title},
+            preview = #{preview},
+            messages_json = #{messagesJson},
+            message_count = #{messageCount},
+            created_at = #{createdAt},
+            updated_at = #{updatedAt}
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteByUserIdAndSessionId">
+        DELETE FROM agent_conversation_session
+        WHERE user_id = #{userId} AND session_id = #{sessionId}
+    </delete>
+</mapper>

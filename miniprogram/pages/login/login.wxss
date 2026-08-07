@@ -1,0 +1,59 @@
+.hero {
+  padding: 32rpx 28rpx;
+}
+
+.hero-desc {
+  margin-top: 18rpx;
+  font-size: 28rpx;
+  line-height: 1.6;
+}
+
+.quick-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16rpx;
+  margin-top: 20rpx;
+}
+
+.quick-card {
+  padding: 24rpx;
+}
+
+.quick-label {
+  color: #183526;
+  font-size: 30rpx;
+  font-weight: 700;
+}
+
+.quick-hint {
+  margin-top: 10rpx;
+  font-size: 24rpx;
+}
+
+.login-panel {
+  margin-top: 20rpx;
+  padding: 28rpx;
+}
+
+.panel-title {
+  margin-top: 18rpx;
+  color: #163625;
+  font-size: 36rpx;
+  font-weight: 700;
+}
+
+.login-copy {
+  margin-top: 18rpx;
+  font-size: 26rpx;
+  line-height: 1.6;
+}
+
+.field-gap {
+  margin-top: 18rpx;
+}
+
+.submit-button {
+  margin-top: 24rpx;
+  height: 88rpx;
+  line-height: 88rpx;
+}

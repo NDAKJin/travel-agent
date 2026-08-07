@@ -31,3 +31,29 @@ build/
 
 ### VS Code ###
 .vscode/
+/src/main/resources/application.yml
+/src/main/resources/schema.sql
+/src/test/resources/application.yml
+
+### Local configuration and secrets ###
+.env
+.env.*
+!.env.example
+/src/main/resources/application-local.yml
+/src/test/resources/application-local.yml
+
+### Frontend dependencies and build output ###
+fe/node_modules/
+fe/dist/
+fe/.vite/
+
+### WeChat Developer Tools local settings ###
+miniprogram/project.private.config.json
+
+### Local runtime output and temporary files ###
+*.log
+/tmp-metadata/
+tmp_*
+*.tmp
+.DS_Store
+Thumbs.db
