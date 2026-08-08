@@ -54,13 +54,11 @@ public class AgentProperties {
     public static class RagProperties {
 
         private boolean enabled = true;
-        private boolean initializeOnStartup = true;
         private int topK = 4;
         private double similarityThreshold = 0.55d;
         private int maxContextChars = 4000;
         private int embeddingDimensions = 1024;
         private String knowledgeDirectory = "rag/scenic";
-        private String knowledgeLocation = "file:./rag/scenic/*.md";
         private final ElasticsearchProperties elasticsearch = new ElasticsearchProperties();
 
     }

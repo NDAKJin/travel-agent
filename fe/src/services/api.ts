@@ -11,6 +11,14 @@ import type {
 } from "../types";
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
+const DEBUG_LOGGING = import.meta.env.DEV || import.meta.env.VITE_DEBUG_LOGGING === "true";
+
+const createRequestId = () => {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+};
 
 type RequestOptions = {
   method?: string;
@@ -44,13 +52,28 @@ export class ApiError extends Error {
 const resolveUrl = (path: string) => `${API_BASE_URL}${path}`;
 
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const response = await fetch(resolveUrl(path), {
-    method: options.method ?? "GET",
+  const method = options.method ?? "GET";
+  const requestId = createRequestId();
+  const startedAt = performance.now();
+  if (DEBUG_LOGGING) console.info("[api] request", { requestId, method, path });
+  let response: Response;
+  try {
+    response = await fetch(resolveUrl(path), {
+      method,
     headers: {
       "Content-Type": "application/json",
       ...(options.accessToken ? { Authorization: `Bearer ${options.accessToken}` } : {})
-    },
-    body: options.body == null ? undefined : JSON.stringify(options.body)
+      },
+      body: options.body == null ? undefined : JSON.stringify(options.body)
+    });
+  } catch (error) {
+    if (DEBUG_LOGGING) console.error("[api] network failure", { requestId, method, path, durationMs: Math.round(performance.now() - startedAt), error });
+    throw error;
+  }
+  if (DEBUG_LOGGING) console.info("[api] response", {
+    requestId, method, path, status: response.status,
+    durationMs: Math.round(performance.now() - startedAt),
+    serverRequestId: response.headers.get("X-Request-Id")
   });
 
   if (!response.ok) {
@@ -68,6 +91,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
         message = raw;
       }
     }
+    if (DEBUG_LOGGING) console.warn("[api] request failed", { requestId, status: response.status, code, message });
     throw new ApiError(message, response.status, code);
   }
 

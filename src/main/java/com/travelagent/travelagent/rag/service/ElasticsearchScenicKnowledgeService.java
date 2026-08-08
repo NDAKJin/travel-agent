@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
@@ -15,6 +16,7 @@ import org.springframework.util.StringUtils;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class ElasticsearchScenicKnowledgeService implements ScenicKnowledgeService {
 
     private final ObjectProvider<VectorStore> scenicVectorStoreProvider;
@@ -22,27 +24,45 @@ public class ElasticsearchScenicKnowledgeService implements ScenicKnowledgeServi
 
     @Override
     public String buildContext(String query) {
+        long startedAt = System.nanoTime();
         if (!agentProperties.getRag().isEnabled() || !StringUtils.hasText(query)) {
+            log.debug("RAG search skipped: enabled={}, queryPresent={}",
+                    agentProperties.getRag().isEnabled(), StringUtils.hasText(query));
             return "";
         }
         VectorStore scenicVectorStore = scenicVectorStoreProvider.getIfAvailable();
         if (scenicVectorStore == null) {
+            log.warn("RAG search skipped because scenic vector store is unavailable");
             return "";
         }
-        List<Document> documents = scenicVectorStore.similaritySearch(SearchRequest.builder()
-                .query(query)
-                .topK(agentProperties.getRag().getTopK())
-                .similarityThreshold(agentProperties.getRag().getSimilarityThreshold())
-                .build());
-        if (documents.isEmpty()) {
-            return "";
+        try {
+            List<Document> documents = scenicVectorStore.similaritySearch(SearchRequest.builder()
+                    .query(query)
+                    .topK(agentProperties.getRag().getTopK())
+                    .similarityThreshold(agentProperties.getRag().getSimilarityThreshold())
+                    .build());
+            if (documents.isEmpty()) {
+                log.info("RAG search completed: resultCount=0, durationMs={}", elapsedMillis(startedAt));
+                return "";
+            }
+            String context = documents.stream()
+                    .sorted(Comparator.comparing(Document::getScore, Comparator.nullsLast(Comparator.reverseOrder())))
+                    .map(this::formatDocument)
+                    .collect(Collectors.joining("\n\n"))
+                    .strip();
+            String limitedContext = context.substring(0, Math.min(context.length(), agentProperties.getRag().getMaxContextChars()));
+            log.info("RAG search completed: resultCount={}, contextLength={}, durationMs={}",
+                    documents.size(), limitedContext.length(), elapsedMillis(startedAt));
+            return limitedContext;
+        } catch (RuntimeException exception) {
+            log.error("RAG search failed: queryLength={}, durationMs={}",
+                    query.length(), elapsedMillis(startedAt), exception);
+            throw exception;
         }
-        String context = documents.stream()
-                .sorted(Comparator.comparing(Document::getScore, Comparator.nullsLast(Comparator.reverseOrder())))
-                .map(this::formatDocument)
-                .collect(Collectors.joining("\n\n"))
-                .strip();
-        return context.substring(0, Math.min(context.length(), agentProperties.getRag().getMaxContextChars()));
+    }
+
+    private long elapsedMillis(long startedAt) {
+        return (System.nanoTime() - startedAt) / 1_000_000;
     }
 
     private String formatDocument(Document document) {

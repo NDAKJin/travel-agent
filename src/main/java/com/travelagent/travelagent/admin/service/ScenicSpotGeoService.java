@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.hc.core5.http.ParseException;
 import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.springframework.beans.factory.ObjectProvider;
@@ -23,6 +24,7 @@ import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class ScenicSpotGeoService {
     private final ObjectProvider<Rest5Client> restClientProvider;
     private final ObjectMapper objectMapper;
@@ -30,15 +32,17 @@ public class ScenicSpotGeoService {
     private final ScenicKnowledgeIngestionService scenicKnowledgeIngestionService;
 
     public List<AdminScenicSpotResponse> list() {
-        ensureIndex();
+        long startedAt = System.nanoTime();
         JsonNode root = request("GET", "/" + indexName() + "/_search?size=1000", null);
         List<AdminScenicSpotResponse> result = new ArrayList<>();
         for (JsonNode hit : root.path("hits").path("hits")) result.add(toResponse(hit.path("_source")));
+        log.info("Scenic spot list completed: resultCount={}, durationMs={}", result.size(), elapsedMillis(startedAt));
         return result;
     }
 
     public AdminScenicSpotResponse save(String id, AdminScenicSpotRequest input) {
-        ensureIndex();
+        log.info("Saving scenic spot: idPresent={}, nameLength={}, descriptionLength={}",
+                id != null && !id.isBlank(), input.name().length(), input.description().length());
         String spotId = id == null || id.isBlank() ? UUID.randomUUID().toString() : id;
         Instant now = Instant.now();
         Map<String, Object> source = Map.of("id", spotId, "name", input.name().trim(),
@@ -62,7 +66,7 @@ public class ScenicSpotGeoService {
     }
 
     public void delete(String id) {
-        ensureIndex();
+        log.info("Deleting scenic spot: id={}", id);
         AdminScenicSpotResponse previous = findById(id);
         try {
             scenicKnowledgeIngestionService.deleteDocument(id);
@@ -76,7 +80,7 @@ public class ScenicSpotGeoService {
     }
 
     public List<AdminScenicSpotResponse> nearby(double longitude, double latitude, String distance) {
-        ensureIndex();
+        long startedAt = System.nanoTime();
         Map<String, Object> body = Map.of(
                 "size", 100,
                 "sort", List.of(Map.of("_geo_distance", Map.of(
@@ -88,14 +92,12 @@ public class ScenicSpotGeoService {
         JsonNode root = request("POST", "/" + indexName() + "/_search", body);
         List<AdminScenicSpotResponse> result = new ArrayList<>();
         for (JsonNode hit : root.path("hits").path("hits")) result.add(toResponse(hit.path("_source")));
+        log.info("Nearby scenic spot list completed: resultCount={}, distance={}, durationMs={}",
+                result.size(), distance, elapsedMillis(startedAt));
         return result;
     }
 
-    public void ensureReadyForSearch() {
-        ensureIndex();
-    }
-
-    private void ensureIndex() {
+    public void ensureIndexReady() {
         String index = indexName();
         JsonNode mapping = request("GET", "/" + index + "/_mapping", null);
         JsonNode locationMapping = mapping.path(index).path("mappings").path("properties").path("location");
@@ -138,15 +140,28 @@ public class ScenicSpotGeoService {
             throw new IllegalStateException("Elasticsearch client is not configured");
         }
         Request request = new Request(method, endpoint);
+        long startedAt = System.nanoTime();
         try {
             if (body != null) request.setJsonEntity(objectMapper.writeValueAsString(body));
             Response response = restClient.performRequest(request);
             String payload = response.getEntity() == null ? "{}" : EntityUtils.toString(response.getEntity());
+            log.debug("Scenic geo Elasticsearch request completed: method={}, endpoint={}, status={}, durationMs={}",
+                    method, endpoint, response.getStatusCode(), elapsedMillis(startedAt));
             if (response.getStatusCode() >= 400 && response.getStatusCode() != 404) {
+                log.error("Scenic geo Elasticsearch request returned an error: method={}, endpoint={}, status={}, durationMs={}",
+                        method, endpoint, response.getStatusCode(), elapsedMillis(startedAt));
                 throw new IllegalStateException("Elasticsearch request failed: " + payload);
             }
             return payload.isBlank() ? objectMapper.createObjectNode() : objectMapper.readTree(payload);
-        } catch (IOException | ParseException exception) { throw new IllegalStateException("Elasticsearch scenic geo request failed", exception); }
+        } catch (IOException | ParseException exception) {
+            log.error("Scenic geo Elasticsearch request failed: method={}, endpoint={}, durationMs={}",
+                    method, endpoint, elapsedMillis(startedAt), exception);
+            throw new IllegalStateException("Elasticsearch scenic geo request failed", exception);
+        }
+    }
+
+    private long elapsedMillis(long startedAt) {
+        return (System.nanoTime() - startedAt) / 1_000_000;
     }
 
     private AdminScenicSpotResponse toResponse(JsonNode source) {

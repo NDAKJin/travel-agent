@@ -6,19 +6,13 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
-import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.core.io.Resource;
-import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 import org.springframework.stereotype.Service;
-import org.springframework.util.StreamUtils;
 import org.springframework.util.StringUtils;
 
 @Service
@@ -29,21 +23,12 @@ public class ScenicKnowledgeIngestionService {
     private final ObjectProvider<VectorStore> scenicVectorStoreProvider;
     private final AgentProperties agentProperties;
 
-    public void ingestAll() {
-        VectorStore scenicVectorStore = vectorStore();
-        if (scenicVectorStore == null || !agentProperties.getRag().isEnabled()) {
-            return;
-        }
-        ensureKnowledgeDirectoryReady();
-        List<Document> documents = loadDocuments();
-        if (!documents.isEmpty()) {
-            scenicVectorStore.add(documents);
-        }
-    }
-
     public void ingestDocument(Path path) {
+        long startedAt = System.nanoTime();
         VectorStore scenicVectorStore = vectorStore();
         if (scenicVectorStore == null || !agentProperties.getRag().isEnabled()) {
+            log.warn("Scenic document ingestion skipped: path={}, enabled={}, vectorStoreAvailable={}",
+                    path, agentProperties.getRag().isEnabled(), scenicVectorStore != null);
             return;
         }
         if (path == null || !Files.exists(path)) {
@@ -55,6 +40,8 @@ public class ScenicKnowledgeIngestionService {
                 throw new IllegalArgumentException("Knowledge document content must not be empty");
             }
             scenicVectorStore.add(List.of(toDocument(path.getFileName().toString(), content)));
+            log.info("Scenic document ingested: file={}, contentLength={}, durationMs={}",
+                    path.getFileName(), content.length(), elapsedMillis(startedAt));
         }
         catch (IOException exception) {
             throw new IllegalStateException("Failed to read scenic knowledge document", exception);
@@ -68,12 +55,15 @@ public class ScenicKnowledgeIngestionService {
         String content = "# " + title.trim() + "\n\n" + description.trim();
         scenicVectorStore.add(List.of(new Document(id, content, java.util.Map.of(
                 "title", title.trim(), "source", id, "type", "scenic-guide"))));
+        log.info("Scenic spot indexed into RAG: id={}, titleLength={}, descriptionLength={}",
+                id, title == null ? 0 : title.length(), description == null ? 0 : description.length());
     }
 
     public void deleteDocument(String id) {
         VectorStore scenicVectorStore = vectorStore();
         if (scenicVectorStore != null && agentProperties.getRag().isEnabled()) {
             scenicVectorStore.delete(List.of(id));
+            log.info("Scenic document removed from RAG: id={}", id);
         }
     }
 
@@ -81,41 +71,12 @@ public class ScenicKnowledgeIngestionService {
         return scenicVectorStoreProvider.getIfAvailable();
     }
 
+    private long elapsedMillis(long startedAt) {
+        return (System.nanoTime() - startedAt) / 1_000_000;
+    }
+
     public Path knowledgeDirectory() {
         return Paths.get(agentProperties.getRag().getKnowledgeDirectory()).toAbsolutePath().normalize();
-    }
-
-    private List<Document> loadDocuments() {
-        try {
-            PathMatchingResourcePatternResolver resolver = new PathMatchingResourcePatternResolver();
-            Resource[] resources = resolver.getResources(agentProperties.getRag().getKnowledgeLocation());
-            List<Document> documents = new ArrayList<>();
-            for (Resource resource : resources) {
-                if (!resource.exists()) {
-                    continue;
-                }
-                String content = StreamUtils.copyToString(resource.getInputStream(), StandardCharsets.UTF_8);
-                if (!StringUtils.hasText(content)) {
-                    continue;
-                }
-                documents.add(toDocument(Objects.requireNonNullElse(resource.getFilename(), "scenic-document"), content));
-            }
-            documents.sort(Comparator.comparing(Document::getId));
-            return documents;
-        }
-        catch (IOException exception) {
-            throw new IllegalStateException("Failed to load scenic knowledge documents", exception);
-        }
-    }
-
-    private void ensureKnowledgeDirectoryReady() {
-        Path knowledgeDirectory = knowledgeDirectory();
-        try {
-            Files.createDirectories(knowledgeDirectory);
-        }
-        catch (IOException exception) {
-            throw new IllegalStateException("Failed to prepare scenic knowledge directory", exception);
-        }
     }
 
     private Document toDocument(String filename, String content) {

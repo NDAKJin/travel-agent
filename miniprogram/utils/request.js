@@ -29,6 +29,8 @@ function buildSilentSessionError() {
 
 function baseRequest(path, options = {}) {
   return new Promise((resolve, reject) => {
+    const requestId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    const startedAt = Date.now();
     const app = getApp();
     const session = app.globalData.session;
     const headers = Object.assign(
@@ -49,6 +51,7 @@ function baseRequest(path, options = {}) {
       header: headers,
       success(res) {
         const { statusCode, data } = res;
+        console.log("[mini-api] response", { requestId, path, statusCode });
         if (statusCode >= 200 && statusCode < 300) {
           resolve(data);
           return;
@@ -57,7 +60,21 @@ function baseRequest(path, options = {}) {
         reject(buildError(statusCode, data));
       },
       fail(error) {
+        console.error("[mini-api] network failure", {
+          requestId,
+          path,
+          durationMs: Date.now() - startedAt,
+          error: error.errMsg
+        });
         reject(new Error(error.errMsg || "网络请求失败"));
+      },
+      complete() {
+        console.log("[mini-api] request completed", {
+          requestId,
+          method: options.method || "GET",
+          path,
+          durationMs: Date.now() - startedAt
+        });
       }
     });
   });
