@@ -1,0 +1,81 @@
+# Copy this file to application.yml for local development.
+# Do not commit application.yml or put real credentials in this example file.
+
+spring:
+  application:
+    name: travel-agent
+  ai:
+    openai:
+      # OpenAI-compatible model service endpoint.
+      base-url: ${SPRING_AI_OPENAI_BASE_URL:https://api.openai.com/v1}
+      api-key: ${SPRING_AI_OPENAI_API_KEY:}
+      chat:
+        model: ${SPRING_AI_OPENAI_CHAT_MODEL:qwen-plus}
+      embedding:
+        model: ${SPRING_AI_OPENAI_EMBEDDING_MODEL:text-embedding-v3}
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/travelagent?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC}
+    driver-class-name: ${SPRING_DATASOURCE_DRIVER_CLASS_NAME:com.mysql.cj.jdbc.Driver}
+    username: ${SPRING_DATASOURCE_USERNAME:travelagent}
+    password: ${SPRING_DATASOURCE_PASSWORD:}
+    hikari:
+      maximum-pool-size: ${SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE:10}
+      minimum-idle: ${SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE:5}
+      connection-timeout: ${SPRING_DATASOURCE_HIKARI_CONNECTION_TIMEOUT:30000}
+  data:
+    redis:
+      host: ${SPRING_DATA_REDIS_HOST:localhost}
+      port: ${SPRING_DATA_REDIS_PORT:6379}
+
+mybatis:
+  configuration:
+    map-underscore-to-camel-case: true
+
+springdoc:
+  api-docs:
+    enabled: ${SPRINGDOC_API_DOCS_ENABLED:true}
+  swagger-ui:
+    enabled: ${SPRINGDOC_SWAGGER_UI_ENABLED:true}
+
+nextdoc4j:
+  enabled: ${NEXTDOC4J_ENABLED:true}
+
+travel-agent:
+  amap:
+    web-service-key: ${TRAVEL_AGENT_AMAP_WEB_SERVICE_KEY:}
+    city: ${AMAP_SEARCH_CITY:全国}
+    page-size: ${AMAP_SEARCH_PAGE_SIZE:10}
+  auth:
+    issuer: ${TRAVEL_AGENT_AUTH_ISSUER:travel-agent}
+    jwt-secret: ${TRAVEL_AGENT_AUTH_JWT_SECRET:}
+    access-token-ttl: ${TRAVEL_AGENT_AUTH_ACCESS_TOKEN_TTL:PT15M}
+    refresh-token-ttl: ${TRAVEL_AGENT_AUTH_REFRESH_TOKEN_TTL:P1D}
+    wx:
+      app-id: ${TRAVEL_AGENT_AUTH_WX_APP_ID:}
+      secret: ${TRAVEL_AGENT_AUTH_WX_SECRET:}
+      code2-session-url: ${TRAVEL_AGENT_AUTH_WX_CODE2_SESSION_URL:https://api.weixin.qq.com/sns/jscode2session}
+  agent:
+    profile:
+      name: ${TRAVEL_AGENT_AGENT_PROFILE_NAME:Travel Buddy}
+      default-locale: ${TRAVEL_AGENT_AGENT_PROFILE_DEFAULT_LOCALE:zh-CN}
+    tool:
+      enabled: ${TRAVEL_AGENT_AGENT_TOOL_ENABLED:true}
+    prompt:
+      override: ${TRAVEL_AGENT_AGENT_PROMPT_OVERRIDE:}
+    qwen:
+      base-url: ${TRAVEL_AGENT_AGENT_QWEN_BASE_URL:}
+      api-key: ${TRAVEL_AGENT_AGENT_QWEN_API_KEY:}
+      model: ${TRAVEL_AGENT_AGENT_QWEN_MODEL:qwen-plus}
+    rag:
+      enabled: ${TRAVEL_AGENT_AGENT_RAG_ENABLED:true}
+      top-k: ${TRAVEL_AGENT_AGENT_RAG_TOP_K:4}
+      similarity-threshold: ${TRAVEL_AGENT_AGENT_RAG_SIMILARITY_THRESHOLD:0.55}
+      max-context-chars: ${TRAVEL_AGENT_AGENT_RAG_MAX_CONTEXT_CHARS:4000}
+      embedding-dimensions: ${TRAVEL_AGENT_AGENT_RAG_EMBEDDING_DIMENSIONS:1024}
+      knowledge-directory: ${TRAVEL_AGENT_AGENT_RAG_KNOWLEDGE_DIRECTORY:rag/scenic}
+      elasticsearch:
+        host: ${TRAVEL_AGENT_AGENT_RAG_ELASTICSEARCH_HOST:localhost}
+        port: ${TRAVEL_AGENT_AGENT_RAG_ELASTICSEARCH_PORT:9200}
+        scheme: ${TRAVEL_AGENT_AGENT_RAG_ELASTICSEARCH_SCHEME:http}
+        index-name: ${TRAVEL_AGENT_AGENT_RAG_ELASTICSEARCH_INDEX_NAME:travel-agent-scenic}
+        geo-index-name: ${TRAVEL_AGENT_AGENT_RAG_ELASTICSEARCH_GEO_INDEX_NAME:travel-agent-geo}
