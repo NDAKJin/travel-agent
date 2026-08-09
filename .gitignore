@@ -3,10 +3,6 @@ target/
 .mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
 !**/src/test/**/target/
-fe/
-miniprogram/
-
-
 ### STS ###
 .apt_generated
 .classpath
@@ -62,5 +58,3 @@ tmp_*
 Thumbs.db
 /log/
 /TODO.md
-/miniprogram/
-/fe/

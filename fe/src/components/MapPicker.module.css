@@ -1,0 +1,119 @@
+.wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  position: relative;
+}
+
+.searchBar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px;
+  border: 1px solid rgba(31, 122, 74, 0.18);
+  border-radius: 15px;
+  background: #fff;
+  box-shadow: 0 8px 20px rgba(33, 89, 57, 0.08);
+}
+
+.searchBar input {
+  flex: 1;
+  min-width: 0;
+  height: 38px;
+  padding: 0 10px;
+  border: 0;
+  outline: none;
+  color: #274637;
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+}
+
+.searchBar input::placeholder {
+  color: #9aafa1;
+}
+
+.searchButton {
+  border: 0;
+  border-radius: 11px;
+  padding: 0 15px;
+  height: 38px;
+  color: #fff;
+  background: linear-gradient(135deg, #238a51, #176a3e);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease;
+}
+
+.searchButton:not(:disabled):hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 14px rgba(27, 123, 71, 0.25);
+}
+
+.searchButton:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.results {
+  display: flex;
+  flex-direction: column;
+  position: absolute;
+  top: 54px;
+  left: 0;
+  right: 0;
+  max-height: 230px;
+  overflow: auto;
+  border: 1px solid rgba(31, 122, 74, 0.16);
+  border-radius: 15px;
+  background: #fff;
+  box-shadow: 0 16px 32px rgba(33, 89, 57, 0.18);
+  z-index: 3;
+}
+
+.resultItem {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  border: 0;
+  border-bottom: 1px solid rgba(31, 122, 74, 0.08);
+  padding: 10px 13px;
+  color: #274637;
+  background: #fff;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+
+.resultItem:last-child {
+  border-bottom: 0;
+}
+
+.resultItem:hover {
+  background: #f1faf3;
+}
+
+.resultItem span,
+.hint,
+.error {
+  color: #6b8175;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.map {
+  width: 100%;
+  height: 300px;
+  overflow: hidden;
+  border: 1px solid rgba(31, 122, 74, 0.16);
+  border-radius: 18px;
+  box-shadow: inset 0 2px 8px rgba(29, 125, 77, 0.035);
+}
+
+.error {
+  color: #b45309;
+}
