@@ -32,6 +32,13 @@
         WHERE user_id = #{userId} AND session_id = #{sessionId}
     </select>
 
+    <select id="findByUserIdAndSessionIdForUpdate" resultMap="AgentConversationSessionMap">
+        SELECT id, user_id, session_id, title, preview, message_count, created_at, updated_at
+        FROM agent_conversation_session
+        WHERE user_id = #{userId} AND session_id = #{sessionId}
+        FOR UPDATE
+    </select>
+
     <select id="findAllByUserIdOrderByUpdatedAtDesc" resultMap="AgentConversationSessionMap">
         SELECT id, user_id, session_id, title, preview, message_count, created_at, updated_at
         FROM agent_conversation_session

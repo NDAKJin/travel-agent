@@ -53,6 +53,37 @@ public class MybatisAgentConversationStore implements AgentConversationStore {
         }
     }
 
+    @Transactional
+    @Override
+    public void append(long userId, AgentSessionContext sessionContext, List<AgentMessage> messages) {
+        if (messages.isEmpty()) {
+            return;
+        }
+        AgentConversationSession session = mapper.findByUserIdAndSessionIdForUpdate(
+                userId, sessionContext.sessionId());
+        if (session == null) {
+            session = new AgentConversationSession();
+            session.setUserId(userId);
+            session.setSessionId(sessionContext.sessionId());
+            session.setTitle(buildTitle(sessionContext.messages()));
+            session.setCreatedAt(sessionContext.createdAt());
+            session.setMessageCount(0);
+            session.setPreview("");
+            session.setUpdatedAt(sessionContext.updatedAt());
+            mapper.insert(session);
+        }
+
+        int firstSequenceNo = session.getMessageCount();
+        session.setTitle(session.getTitle() == null || session.getTitle().isBlank()
+                || "new-chat".equals(session.getTitle())
+                ? buildTitle(sessionContext.messages()) : session.getTitle());
+        session.setPreview(buildPreview(messages));
+        session.setMessageCount(firstSequenceNo + messages.size());
+        session.setUpdatedAt(sessionContext.updatedAt());
+        mapper.update(session);
+        mapper.insertMessages(toMessageEntities(session.getId(), firstSequenceNo, messages));
+    }
+
     @Override
     public List<AgentSessionSummary> list(long userId) {
         return mapper.findAllByUserIdOrderByUpdatedAtDesc(userId).stream()
@@ -83,12 +114,17 @@ public class MybatisAgentConversationStore implements AgentConversationStore {
     }
 
     private List<AgentConversationMessage> toMessageEntities(long sessionId, List<AgentMessage> messages) {
+        return toMessageEntities(sessionId, 0, messages);
+    }
+
+    private List<AgentConversationMessage> toMessageEntities(long sessionId, int firstSequenceNo,
+                                                              List<AgentMessage> messages) {
         Instant createdAt = Instant.now();
         return IntStream.range(0, messages.size()).mapToObj(index -> {
             AgentMessage source = messages.get(index);
             AgentConversationMessage target = new AgentConversationMessage();
             target.setSessionId(sessionId);
-            target.setSequenceNo(index);
+            target.setSequenceNo(firstSequenceNo + index);
             target.setRole(source.role());
             target.setContent(source.content());
             target.setCreatedAt(createdAt);

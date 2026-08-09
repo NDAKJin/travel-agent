@@ -2,6 +2,7 @@ import { FormEvent, Fragment, ReactNode, useEffect, useRef, useState } from "rea
 import styles from "./App.module.css";
 import MapPicker from "./components/MapPicker";
 import ScenicSpotsMap from "./components/ScenicSpotsMap";
+import ConversationDetailPage from "./components/ConversationDetailPage";
 import { api, ApiError } from "./services/api";
 import type {
   AdminConversationSummary,
@@ -627,6 +628,15 @@ export default function App() {
   const visibleScenicSpots = scenicSpots.slice((scenicPage - 1) * PAGE_SIZE, scenicPage * PAGE_SIZE);
 
   if (screen === "detail") {
+    return <ConversationDetailPage
+      detail={selectedConversationDetail}
+      loading={detailLoading}
+      onBack={backToDashboard}
+      renderMarkdown={renderMarkdown}
+    />;
+  }
+
+  if (selectedConversationDetail && false) {
     return (
       <main className={`${styles.page} ${styles.detailPage}`}>
         <section className={styles.scenicDetailShell}>
@@ -644,9 +654,9 @@ export default function App() {
             {detailLoading ? <div className={styles.helperText}>正在加载会话详情...</div> : null}
             {selectedConversationDetail ? (
               <div className={styles.detailMessages}>
-                {selectedConversationDetail.messages.map((message, index) => (
+                {selectedConversationDetail!.messages.map((message, index) => (
                   <article
-                    key={`${selectedConversationDetail.sessionId}-${index}`}
+                    key={`${selectedConversationDetail!.sessionId}-${index}`}
                     className={message.role === "assistant" ? styles.assistantBubble : styles.userBubble}
                   >
                     <div className={styles.messageRole}>{message.role === "assistant" ? "AI 助手" : "用户"}</div>

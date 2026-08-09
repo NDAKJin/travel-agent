@@ -71,7 +71,7 @@ public class AgentController {
 
     @PostMapping("/nearby/next")
     @Operation(summary = "Load the next page of nearby points of interest")
-    public NearbySearchResult nearbyNext(@RequestBody NearbyNextPageRequest request) {
+    public NearbySearchResult nearbyNext(@Valid @RequestBody NearbyNextPageRequest request) {
         return nearbyPoiSearchService.search(request.latitude(), request.longitude(), request.keyword(),
                 request.radiusMeters() == null ? 20_000 : request.radiusMeters(), request.searchAfter());
     }

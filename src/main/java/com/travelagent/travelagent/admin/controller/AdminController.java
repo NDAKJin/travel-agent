@@ -14,6 +14,9 @@ import com.travelagent.travelagent.admin.service.ScenicSpotGeoService;
 import com.travelagent.travelagent.common.dto.PageResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import org.springframework.validation.annotation.Validated;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -29,6 +32,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/admin")
 @RequiredArgsConstructor
+@Validated
 public class AdminController {
 
     private final AdminManagementService adminManagementService;
@@ -38,16 +42,16 @@ public class AdminController {
     @GetMapping("/wx-users")
     @Operation(summary = "Search wx users")
     public PageResponse<AdminWxUserResponse> searchWxUsers(@RequestParam(required = false) String keyword,
-                                                           @RequestParam(defaultValue = "1") int page,
-                                                           @RequestParam(defaultValue = "20") int size) {
+                                                           @RequestParam(defaultValue = "1") @Min(1) int page,
+                                                           @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
         return adminManagementService.searchWxUsers(keyword, page, size);
     }
 
     @GetMapping("/sessions")
     @Operation(summary = "List sessions")
     public PageResponse<AdminConversationSummaryResponse> listSessions(@RequestParam(required = false) Long wxUserId,
-                                                                       @RequestParam(defaultValue = "1") int page,
-                                                                       @RequestParam(defaultValue = "20") int size) {
+                                                                       @RequestParam(defaultValue = "1") @Min(1) int page,
+                                                                       @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
         return adminManagementService.listSessions(wxUserId, page, size);
     }
 

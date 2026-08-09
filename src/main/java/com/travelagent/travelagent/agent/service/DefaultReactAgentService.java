@@ -52,9 +52,8 @@ public class DefaultReactAgentService implements ReactAgentService {
                 request.sessionId(),
                 agentProperties.getTool().isEnabled());
         try {
-            List<AgentMessage> history = new ArrayList<>(conversationStore.load(user.userId(), sessionId)
-                    .map(AgentSessionContext::messages)
-                    .orElseGet(List::of));
+            AgentSessionContext existingSession = conversationStore.load(user.userId(), sessionId).orElse(null);
+            List<AgentMessage> history = new ArrayList<>(existingSession == null ? List.of() : existingSession.messages());
             log.debug("Loaded conversation history: sessionId={}, existingMessageCount={}", sessionId, history.size());
             history.add(new AgentMessage("user", request.message()));
 
@@ -64,10 +63,10 @@ public class DefaultReactAgentService implements ReactAgentService {
             if (!locationPermissionRequired) {
                 history.add(new AgentMessage("assistant", reply));
                 Instant now = Instant.now();
-                Instant createdAt = conversationStore.load(user.userId(), sessionId)
-                        .map(AgentSessionContext::createdAt)
-                        .orElse(now);
-                conversationStore.save(user.userId(), new AgentSessionContext(sessionId, List.copyOf(history), createdAt, now));
+                Instant createdAt = existingSession == null ? now : existingSession.createdAt();
+                conversationStore.append(user.userId(),
+                        new AgentSessionContext(sessionId, List.copyOf(history), createdAt, now),
+                        List.of(new AgentMessage("user", request.message()), new AgentMessage("assistant", reply)));
             }
             log.info("Completed react-agent chat: sessionId={}, totalMessageCount={}, replyLength={}",
                     sessionId,

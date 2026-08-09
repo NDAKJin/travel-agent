@@ -12,6 +12,9 @@ public interface AgentConversationSessionMapper {
 
     AgentConversationSession findByUserIdAndSessionId(long userId, String sessionId);
 
+    AgentConversationSession findByUserIdAndSessionIdForUpdate(@Param("userId") long userId,
+                                                               @Param("sessionId") String sessionId);
+
     List<AgentConversationSession> findAllByUserIdOrderByUpdatedAtDesc(long userId);
 
     List<AdminConversationSessionView> findAllForAdminPage(@Param("offset") int offset,

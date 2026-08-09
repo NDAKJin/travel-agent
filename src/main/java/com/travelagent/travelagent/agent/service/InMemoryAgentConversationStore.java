@@ -24,6 +24,20 @@ public class InMemoryAgentConversationStore implements AgentConversationStore {
     }
 
     @Override
+    public void append(long userId, AgentSessionContext sessionContext, List<AgentMessage> messages) {
+        sessions.compute(key(userId, sessionContext.sessionId()), (ignored, existing) -> {
+            List<AgentMessage> history = existing == null ? List.of() : existing.messages();
+            List<AgentMessage> combined = new java.util.ArrayList<>(history);
+            combined.addAll(messages);
+            return new AgentSessionContext(
+                    sessionContext.sessionId(),
+                    List.copyOf(combined),
+                    existing == null ? sessionContext.createdAt() : existing.createdAt(),
+                    sessionContext.updatedAt());
+        });
+    }
+
+    @Override
     public List<AgentSessionSummary> list(long userId) {
         String prefix = userId + ":";
         return sessions.entrySet().stream()
