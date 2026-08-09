@@ -1,5 +1,7 @@
 import { FormEvent, Fragment, ReactNode, useEffect, useRef, useState } from "react";
 import styles from "./App.module.css";
+import MapPicker from "./components/MapPicker";
+import ScenicSpotsMap from "./components/ScenicSpotsMap";
 import { api, ApiError } from "./services/api";
 import type {
   AdminConversationSummary,
@@ -16,7 +18,7 @@ const SESSION_EXPIRED = "__SESSION_EXPIRED__";
 const PAGE_SIZE = 6;
 
 type AdminView = "sessions" | "scenic" | "rag";
-type Screen = "dashboard" | "detail" | "scenicDetail";
+type Screen = "dashboard" | "detail" | "scenicDetail" | "scenicCreate";
 
 const readStoredSession = (): AuthSession | null => {
   const raw = window.localStorage.getItem(STORAGE_KEY);
@@ -209,12 +211,12 @@ export default function App() {
   const [docResult, setDocResult] = useState<AdminScenicDocumentResponse | null>(null);
   const [docError, setDocError] = useState("");
   const [scenicSpots, setScenicSpots] = useState<AdminScenicSpot[]>([]);
+  const scenicLoadSequenceRef = useRef(0);
   const [scenicPage, setScenicPage] = useState(1);
   const [scenicName, setScenicName] = useState("");
   const [scenicDescription, setScenicDescription] = useState("");
   const [scenicLongitude, setScenicLongitude] = useState("");
   const [scenicLatitude, setScenicLatitude] = useState("");
-  const [scenicLoading, setScenicLoading] = useState(false);
   const [scenicSaving, setScenicSaving] = useState(false);
   const [scenicError, setScenicError] = useState("");
   const [selectedScenicSpot, setSelectedScenicSpot] = useState<AdminScenicSpot | null>(null);
@@ -355,17 +357,16 @@ export default function App() {
   }, [session, screen, selectedUser?.id, sessionPage]);
 
   const loadScenicSpots = async () => {
-    setScenicLoading(true);
+    const requestSequence = ++scenicLoadSequenceRef.current;
     setScenicError("");
     try {
       const result = await withAuthorizedRequest(accessToken => api.listScenicSpots(accessToken));
+      if (requestSequence !== scenicLoadSequenceRef.current) return;
       setScenicSpots(result);
       setScenicPage(1);
     } catch (error) {
       const message = readErrorMessage(error, "加载景区列表失败");
       if (message !== SESSION_EXPIRED) setScenicError(message);
-    } finally {
-      setScenicLoading(false);
     }
   };
 
@@ -439,6 +440,20 @@ export default function App() {
 
   const backToDashboard = () => setScreen("dashboard");
 
+  const openScenicCreate = () => {
+    setScenicName("");
+    setScenicDescription("");
+    setScenicLongitude("");
+    setScenicLatitude("");
+    setScenicError("");
+    setScreen("scenicCreate");
+  };
+
+  const backToScenicManagement = () => {
+    setAdminView("scenic");
+    setScreen("dashboard");
+  };
+
   const saveDocument = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!docTitle.trim() || !docContent.trim() || docSaving) return;
@@ -476,11 +491,16 @@ export default function App() {
     setScenicSaving(true);
     setScenicError("");
     try {
-      await withAuthorizedRequest(accessToken => api.createScenicSpot(accessToken, {
+      const createdSpot = await withAuthorizedRequest(accessToken => api.createScenicSpot(accessToken, {
         name: scenicName.trim(), description: scenicDescription.trim(), longitude, latitude
       }));
+      scenicLoadSequenceRef.current += 1;
+      setScenicSpots(current => [createdSpot, ...current.filter(spot => spot.id !== createdSpot.id)]);
+      setScenicPage(1);
       setScenicName(""); setScenicDescription(""); setScenicLongitude(""); setScenicLatitude("");
-      await loadScenicSpots();
+      setScreen("dashboard");
+      setAdminView("scenic");
+      showToast("景区已创建");
     } catch (error) {
       const message = readErrorMessage(error, "保存景区失败");
       if (message !== SESSION_EXPIRED) setScenicError(message);
@@ -498,13 +518,19 @@ export default function App() {
     }
   };
 
-  const openScenicSpot = (spot: AdminScenicSpot) => {
-    setSelectedScenicSpot(spot);
-    setScenicEditName(spot.name);
-    setScenicEditDescription(spot.description);
-    setScenicEditLongitude(String(spot.longitude));
-    setScenicEditLatitude(String(spot.latitude));
-    setScreen("scenicDetail");
+  const openScenicSpot = async (spot: AdminScenicSpot) => {
+    try {
+      const detail = await withAuthorizedRequest(accessToken => api.getScenicSpot(accessToken, spot.id));
+      setSelectedScenicSpot(detail);
+      setScenicEditName(detail.name);
+      setScenicEditDescription(detail.description);
+      setScenicEditLongitude(String(detail.longitude));
+      setScenicEditLatitude(String(detail.latitude));
+      setScreen("scenicDetail");
+    } catch (error) {
+      const message = readErrorMessage(error, "加载景区详情失败");
+      if (message !== SESSION_EXPIRED) showToast(message);
+    }
   };
 
   const saveScenicEdit = async (event: FormEvent<HTMLFormElement>) => {
@@ -637,6 +663,54 @@ export default function App() {
     );
   }
 
+  if (screen === "scenicCreate") {
+    return (
+      <main className={`${styles.page} ${styles.detailPage}`}>
+        {toastMessage ? <div className={styles.toast} role="alert"><span className={styles.toastIcon}>!</span><span>{toastMessage}</span></div> : null}
+        <section className={styles.scenicDetailShell}>
+          <div className={styles.scenicDetailTopBar}>
+            <button type="button" className={styles.backButton} onClick={backToScenicManagement}>返回</button>
+            <div>
+              <div className={styles.eyebrow}>景区管理</div>
+              <h2 className={styles.sectionTitle}>新建景区</h2>
+              <p className={styles.scenicDetailLead}>填写景区信息并在地图上选择位置，保存后会同步更新搜索、问答和地理索引。</p>
+            </div>
+          </div>
+          <form className={styles.scenicDetailCard} onSubmit={saveScenicSpot}>
+            <div className={styles.scenicEditorFields}>
+            <div className={styles.cardHeader}>景区基础信息</div>
+            <label className={styles.field}><span>景区名</span><input value={scenicName} onChange={event => setScenicName(event.target.value)} placeholder="例如：西湖景区" /></label>
+            <label className={styles.field}><span>景区介绍</span><textarea className={styles.scenicDescriptionTextarea} value={scenicDescription} onChange={event => setScenicDescription(event.target.value)} rows={8} placeholder="景区简介、亮点和游玩建议" /></label>
+            </div>
+              <div className={styles.editorMapPanel}>
+                <div className={styles.cardHeader}>地图选点</div>
+                <MapPicker
+              accessToken={session?.token.accessToken ?? ""}
+              longitude={scenicLongitude}
+              latitude={scenicLatitude}
+                onChange={(nextLongitude, nextLatitude) => {
+                  setScenicLongitude(nextLongitude);
+                  setScenicLatitude(nextLatitude);
+                }}
+                />
+                <div className={styles.formRow}>
+                  <label className={styles.field}><span>经度</span><input type="number" step="any" value={scenicLongitude} onChange={event => setScenicLongitude(event.target.value)} placeholder="120.1551" /></label>
+                  <label className={styles.field}><span>纬度</span><input type="number" step="any" value={scenicLatitude} onChange={event => setScenicLatitude(event.target.value)} placeholder="30.2741" /></label>
+                </div>
+              </div>
+            <div className={styles.editorFooter}>
+              <div className={styles.helperText}>点击地图即可自动填入经纬度，也可以在下方手动微调。</div>
+              <div className={styles.formActions}>
+                <button type="button" className={styles.secondaryButton} onClick={backToScenicManagement}>取消</button>
+                <button className={styles.primaryButton} type="submit" disabled={scenicSaving || !scenicName.trim() || !scenicDescription.trim() || !scenicLongitude || !scenicLatitude}>{scenicSaving ? "保存中..." : "保存景区"}</button>
+              </div>
+            </div>
+          </form>
+        </section>
+      </main>
+    );
+  }
+
   if (screen === "scenicDetail" && selectedScenicSpot) {
     return (
       <main className={`${styles.page} ${styles.detailPage}`}>
@@ -645,18 +719,33 @@ export default function App() {
           <div className={styles.detailTopBar}>
             <button type="button" className={styles.backButton} onClick={() => setScreen("dashboard")}>返回</button>
             <div>
+              <div className={styles.eyebrow}>景区管理</div>
               <h2 className={styles.sectionTitle}>{selectedScenicSpot.name}</h2>
               <p className={styles.scenicDetailLead}>维护景区基础信息，保存后会同步更新搜索与问答内容。</p>
             </div>
           </div>
           <form className={styles.scenicDetailCard} onSubmit={saveScenicEdit}>
+            <div className={styles.scenicEditorFields}>
             <div className={styles.cardHeader}>编辑景区信息</div>
             <label className={styles.field}><span>景区名</span><input value={scenicEditName} onChange={event => setScenicEditName(event.target.value)} /></label>
-                <label className={styles.field}><span>景区介绍</span><textarea className={styles.scenicDescriptionTextarea} rows={14} value={scenicEditDescription} onChange={event => setScenicEditDescription(event.target.value)} placeholder="填写景区亮点、游览建议和注意事项..." /></label>
-            <div className={styles.formRow}>
-              <label className={styles.field}><span>经度</span><input type="number" step="any" value={scenicEditLongitude} onChange={event => setScenicEditLongitude(event.target.value)} /></label>
-              <label className={styles.field}><span>纬度</span><input type="number" step="any" value={scenicEditLatitude} onChange={event => setScenicEditLatitude(event.target.value)} /></label>
+            <label className={styles.field}><span>景区介绍</span><textarea className={styles.scenicDescriptionTextarea} rows={14} value={scenicEditDescription} onChange={event => setScenicEditDescription(event.target.value)} placeholder="填写景区亮点、游览建议和注意事项..." /></label>
             </div>
+              <div className={styles.editorMapPanel}>
+                <div className={styles.cardHeader}>地图选点</div>
+                <MapPicker
+              accessToken={session?.token.accessToken ?? ""}
+              longitude={scenicEditLongitude}
+              latitude={scenicEditLatitude}
+                onChange={(nextLongitude, nextLatitude) => {
+                  setScenicEditLongitude(nextLongitude);
+                  setScenicEditLatitude(nextLatitude);
+                }}
+                />
+                <div className={styles.formRow}>
+                  <label className={styles.field}><span>经度</span><input type="number" step="any" value={scenicEditLongitude} onChange={event => setScenicEditLongitude(event.target.value)} /></label>
+                  <label className={styles.field}><span>纬度</span><input type="number" step="any" value={scenicEditLatitude} onChange={event => setScenicEditLatitude(event.target.value)} /></label>
+                </div>
+              </div>
             <div className={styles.editorFooter}>
               <div className={styles.helperText}>保存后会同步更新 RAG 索引和 geo 地理索引。</div>
               <button className={styles.primaryButton} type="submit" disabled={scenicEditSaving || !scenicEditName.trim() || !scenicEditDescription.trim()}>{scenicEditSaving ? "保存中..." : "保存修改"}</button>
@@ -708,7 +797,7 @@ export default function App() {
         </aside>
 
         <section className={styles.contentPanel}>
-          <div className={`${styles.panelHeader} ${adminView === "scenic" ? styles.scenicPanelHeader : ""}`}>
+          <div className={styles.panelHeader}>
             <div>
               <div className={styles.eyebrow}>{adminView === "sessions" ? "会话管理" : adminView === "scenic" ? "景区管理" : "知识管理"}</div>
               <h2 className={styles.sectionTitle}>
@@ -716,6 +805,7 @@ export default function App() {
               </h2>
             </div>
             {adminView === "sessions" && selectedUser ? <div className={styles.panelMeta}>{selectedUser.openId}</div> : null}
+            {adminView === "scenic" ? <button type="button" className={styles.primaryButton} onClick={openScenicCreate}>新建景区</button> : null}
           </div>
 
           {adminView === "sessions" ? (
@@ -811,21 +901,10 @@ export default function App() {
             </div>
           ) : adminView === "scenic" ? (
             <div className={styles.dualPanel}>
-              <form className={styles.editorCard} onSubmit={saveScenicSpot}>
-                <div className={styles.cardHeader}>新建景区</div>
-                <label className={styles.field}><span>景区名</span><input value={scenicName} onChange={event => setScenicName(event.target.value)} placeholder="例如：西湖景区" /></label>
-                <label className={styles.field}><span>景区介绍</span><textarea className={styles.scenicDescriptionTextarea} value={scenicDescription} onChange={event => setScenicDescription(event.target.value)} rows={8} placeholder="景区简介、亮点和游玩建议" /></label>
-                <div className={styles.formRow}>
-                  <label className={styles.field}><span>经度</span><input type="number" step="any" value={scenicLongitude} onChange={event => setScenicLongitude(event.target.value)} placeholder="120.1551" /></label>
-                  <label className={styles.field}><span>纬度</span><input type="number" step="any" value={scenicLatitude} onChange={event => setScenicLatitude(event.target.value)} placeholder="30.2741" /></label>
-                </div>
-                <div className={styles.editorFooter}><div className={styles.helperText}>保存后同时写入 RAG 索引和 geo_point 地理索引。</div><button className={styles.primaryButton} type="submit" disabled={scenicSaving || !scenicName.trim() || !scenicDescription.trim() || !scenicLongitude || !scenicLatitude}>{scenicSaving ? "保存中..." : "新建景区"}</button></div>
-              </form>
               <div className={styles.cardPanel}>
-                <div className={styles.listHeaderRow}><div className={styles.cardHeader}>已有景区</div><button type="button" className={styles.secondaryButton} onClick={() => void loadScenicSpots()}>刷新</button></div>
-                {scenicLoading ? <div className={styles.helperText}>正在加载...</div> : null}
+                <div className={styles.listHeaderRow}><div className={styles.cardHeader}>已有景区</div></div>
                 <div className={styles.listBlock}>{visibleScenicSpots.map(spot => <div key={spot.id} className={styles.scenicCompactItem} role="button" tabIndex={0} onClick={() => openScenicSpot(spot)}>
-                  <div className={styles.listTitle}>{spot.name}</div><div className={styles.scenicCompactPreview}>{spot.description}</div><div className={styles.listMeta}>经度 {spot.longitude} / 纬度 {spot.latitude}</div>
+                  <div className={styles.listTitle}>{spot.name}</div><div className={styles.listMeta}>经度 {spot.longitude} / 纬度 {spot.latitude}</div>
                   <button type="button" className={styles.secondaryButton} onClick={event => { event.stopPropagation(); void deleteScenicSpot(spot); }}>删除</button>
                 </div>)}</div>
                 <div className={styles.paginationBar}>
@@ -835,6 +914,10 @@ export default function App() {
                     <button type="button" className={styles.secondaryButton} disabled={scenicPage >= scenicTotalPages} onClick={() => setScenicPage(page => Math.min(scenicTotalPages, page + 1))}>下一页</button>
                   </div>
                 </div>
+              </div>
+              <div className={styles.cardPanel}>
+                <div className={styles.listHeaderRow}><div className={styles.cardHeader}>景区分布</div></div>
+                <ScenicSpotsMap spots={scenicSpots} onSpotClick={spot => void openScenicSpot(spot)} />
               </div>
             </div>
           ) : (

@@ -37,6 +37,14 @@ type WxLoginPayload = {
   avatarUrl?: string;
 };
 
+export type AdminMapPlace = {
+  id: string;
+  name: string;
+  address: string;
+  longitude: number;
+  latitude: number;
+};
+
 export class ApiError extends Error {
   status: number;
   code?: string;
@@ -179,6 +187,13 @@ export const api = {
   },
   listScenicSpots(accessToken: string) {
     return request<AdminScenicSpot[]>("/api/admin/scenic-spots", { accessToken });
+  },
+  getScenicSpot(accessToken: string, id: string) {
+    return request<AdminScenicSpot>(`/api/admin/scenic-spots/${id}`, { accessToken });
+  },
+  searchMapPlaces(accessToken: string, keyword: string) {
+    const query = new URLSearchParams({ keyword });
+    return request<AdminMapPlace[]>(`/api/admin/map/places?${query.toString()}`, { accessToken });
   },
   createScenicSpot(accessToken: string, payload: { name: string; description: string; longitude: number; latitude: number }) {
     return request<AdminScenicSpot>("/api/admin/scenic-spots", {

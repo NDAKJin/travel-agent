@@ -26,6 +26,8 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 @Slf4j
 public class ScenicSpotGeoService {
+    private static final String SCENIC_CATEGORY = "景区";
+
     private final ObjectProvider<Rest5Client> restClientProvider;
     private final ObjectMapper objectMapper;
     private final AgentProperties agentProperties;
@@ -35,7 +37,7 @@ public class ScenicSpotGeoService {
         long startedAt = System.nanoTime();
         JsonNode root = request("GET", "/" + indexName() + "/_search?size=1000", null);
         List<AdminScenicSpotResponse> result = new ArrayList<>();
-        for (JsonNode hit : root.path("hits").path("hits")) result.add(toResponse(hit.path("_source")));
+        for (JsonNode hit : root.path("hits").path("hits")) result.add(toResponse(hit.path("_source"), false));
         log.info("Scenic spot list completed: resultCount={}, durationMs={}", result.size(), elapsedMillis(startedAt));
         return result;
     }
@@ -46,23 +48,26 @@ public class ScenicSpotGeoService {
         String spotId = id == null || id.isBlank() ? UUID.randomUUID().toString() : id;
         Instant now = Instant.now();
         Map<String, Object> source = Map.of("id", spotId, "name", input.name().trim(),
-                "description", input.description().trim(), "longitude", input.longitude(),
-                "latitude", input.latitude(), "location", Map.of("lat", input.latitude(), "lon", input.longitude()),
+                "category", SCENIC_CATEGORY,
+                "location", Map.of("lat", input.latitude(), "lon", input.longitude()),
                 "updatedAt", now.toString());
         AdminScenicSpotResponse previous = findById(spotId);
         try {
             scenicKnowledgeIngestionService.ingestScenicSpot(spotId, input.name(), input.description());
             request("PUT", "/" + indexName() + "/_doc/" + spotId, source);
         } catch (RuntimeException exception) {
-            if (previous == null) {
-                scenicKnowledgeIngestionService.deleteDocument(spotId);
-            } else {
-                scenicKnowledgeIngestionService.ingestScenicSpot(spotId, previous.name(), previous.description());
-            }
+            if (previous == null) scenicKnowledgeIngestionService.deleteDocument(spotId);
+            else scenicKnowledgeIngestionService.ingestScenicSpot(spotId, previous.name(), previous.description());
             throw exception;
         }
-        return new AdminScenicSpotResponse(spotId, input.name().trim(), input.description().trim(),
+        return new AdminScenicSpotResponse(spotId, input.name().trim(), SCENIC_CATEGORY, input.description().trim(),
                 input.longitude(), input.latitude(), now);
+    }
+
+    public AdminScenicSpotResponse get(String id) {
+        AdminScenicSpotResponse spot = findById(id);
+        if (spot == null) throw new IllegalArgumentException("Scenic spot not found");
+        return spot;
     }
 
     public void delete(String id) {
@@ -100,38 +105,16 @@ public class ScenicSpotGeoService {
     public void ensureIndexReady() {
         String index = indexName();
         JsonNode mapping = request("GET", "/" + index + "/_mapping", null);
-        JsonNode locationMapping = mapping.path(index).path("mappings").path("properties").path("location");
-        String locationType = locationMapping.path("type").asText("");
-        if (!locationMapping.isMissingNode() && !"geo_point".equals(locationType)) {
-            List<JsonNode> documents = loadDocuments();
-            request("DELETE", "/" + index, null);
-            createIndex(index);
-            for (JsonNode document : documents) {
-                request("PUT", "/" + index + "/_doc/" + document.path("_id").asText(), document.path("_source"));
-            }
-            return;
-        }
-        if (locationMapping.isMissingNode()) {
-            createIndex(index);
-        }
+        if (mapping.path(index).isMissingNode()) createIndex(index);
     }
 
     private void createIndex(String index) {
         request("PUT", "/" + index, Map.of("mappings", Map.of("properties", Map.of(
                 "id", Map.of("type", "keyword"),
                 "name", Map.of("type", "text"),
-                "description", Map.of("type", "text"),
-                "longitude", Map.of("type", "double"),
-                "latitude", Map.of("type", "double"),
+                "category", Map.of("type", "keyword"),
                 "location", Map.of("type", "geo_point"),
                 "updatedAt", Map.of("type", "date")))));
-    }
-
-    private List<JsonNode> loadDocuments() {
-        JsonNode root = request("GET", "/" + indexName() + "/_search?size=1000", null);
-        List<JsonNode> documents = new ArrayList<>();
-        root.path("hits").path("hits").forEach(documents::add);
-        return documents;
     }
 
     private JsonNode request(String method, String endpoint, Object body) {
@@ -165,9 +148,41 @@ public class ScenicSpotGeoService {
     }
 
     private AdminScenicSpotResponse toResponse(JsonNode source) {
-        return new AdminScenicSpotResponse(source.path("id").asText(), source.path("name").asText(),
-                source.path("description").asText(), source.path("longitude").asDouble(),
-                source.path("latitude").asDouble(), Instant.parse(source.path("updatedAt").asText()));
+        return toResponse(source, true);
+    }
+
+    private AdminScenicSpotResponse toResponse(JsonNode source, boolean includeDescription) {
+        String id = source.path("id").asText();
+        String name = source.path("name").asText();
+        String category = source.path("category").asText(SCENIC_CATEGORY);
+        String description = includeDescription ? loadKnowledgeDescription(id, name) : "";
+        JsonNode location = source.path("location");
+        return new AdminScenicSpotResponse(id, name, category, description,
+                location.path("lon").asDouble(), location.path("lat").asDouble(),
+                Instant.parse(source.path("updatedAt").asText()));
+    }
+
+    private String loadKnowledgeDescription(String id, String name) {
+        JsonNode byId = request("GET", "/" + knowledgeIndexName() + "/_doc/" + id, null).path("_source");
+        String content = byId.path("content").asText("");
+        if (!content.isBlank()) return removeTitleLine(content);
+
+        JsonNode byTitle = request("POST", "/" + knowledgeIndexName() + "/_search", Map.of(
+                "size", 1,
+                "query", Map.of("match_phrase", Map.of("content", "# " + name)))).path("hits").path("hits");
+        if (byTitle.isArray() && !byTitle.isEmpty()) {
+            return removeTitleLine(byTitle.get(0).path("_source").path("content").asText(""));
+        }
+        return "";
+    }
+
+    private String removeTitleLine(String content) {
+        String normalized = content.strip();
+        if (normalized.startsWith("# ")) {
+            int lineBreak = normalized.indexOf('\n');
+            return lineBreak < 0 ? "" : normalized.substring(lineBreak + 1).strip();
+        }
+        return normalized;
     }
 
     private AdminScenicSpotResponse findById(String id) {
@@ -176,5 +191,7 @@ public class ScenicSpotGeoService {
         return source.isMissingNode() || source.isEmpty() ? null : toResponse(source);
     }
 
-    private String indexName() { return agentProperties.getRag().getElasticsearch().getIndexName() + "-geo"; }
+    private String indexName() { return agentProperties.getRag().getElasticsearch().getGeoIndexName(); }
+
+    private String knowledgeIndexName() { return agentProperties.getRag().getElasticsearch().getIndexName(); }
 }

@@ -90,6 +90,7 @@ export type AdminScenicDocumentResponse = {
 export type AdminScenicSpot = {
   id: string;
   name: string;
+  category: string;
   description: string;
   longitude: number;
   latitude: number;

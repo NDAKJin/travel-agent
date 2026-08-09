@@ -7,7 +7,8 @@
 
 .detailPage {
   height: 100vh;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .authShell,
@@ -70,7 +71,7 @@
 
 .heroCard {
   position: relative;
-  overflow: hidden;
+  overflow: visible;
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
@@ -293,8 +294,9 @@
 }
 
 .scenicDetailCard {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 0.92fr);
+  align-items: start;
   gap: 18px;
   width: min(1260px, 100%);
   margin: 0 auto;
@@ -314,8 +316,73 @@
   min-width: 0;
 }
 
+.scenicDetailCard > .cardHeader,
+.scenicDetailCard > .field,
+.scenicDetailCard > .editorFooter {
+  grid-column: 1;
+}
+
+.scenicDetailCard > .formRow {
+  grid-column: 2;
+  grid-row: 4;
+}
+
+.scenicDetailCard > .editorFooter {
+  grid-column: 1 / -1;
+  grid-row: auto;
+  position: relative;
+  z-index: 2;
+  padding-top: 18px;
+}
+
+.scenicEditorFields {
+  display: flex;
+  grid-column: 1;
+  grid-row: 1;
+  align-self: stretch;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.scenicEditorFields > .field:last-child {
+  display: flex;
+  flex: 1;
+  min-height: 300px;
+  flex-direction: column;
+}
+
+.scenicEditorFields > .field:last-child .scenicDescriptionTextarea {
+  flex: 1;
+  height: auto;
+  min-height: 0;
+}
+
+.editorMapPanel {
+  grid-column: 2;
+  grid-row: 1;
+  align-self: start;
+  position: sticky;
+  top: 18px;
+  min-width: 0;
+  padding: 18px;
+  border: 1px solid rgba(31, 122, 74, 0.1);
+  border-radius: 22px;
+  background: rgba(247, 252, 248, 0.82);
+}
+
+.editorMapPanel .cardHeader {
+  margin-bottom: 12px;
+}
+
+.editorMapPanel .formRow {
+  flex: 0 0 auto;
+  margin-top: 14px;
+}
+
 .scenicDetailShell {
-  width: min(1160px, 100%);
+  width: min(1260px, 100%);
   min-height: 100%;
   margin: 0 auto;
   padding: 28px 34px 42px;
@@ -323,12 +390,39 @@
 }
 
 .scenicDetailTopBar {
-  width: min(920px, 100%);
-  margin: 0 auto 24px;
-  display: grid;
-  grid-template-columns: auto 1fr;
-  align-items: start;
+  width: 100%;
+  margin: 0 auto 18px;
+  display: flex;
+  align-items: center;
   gap: 18px;
+}
+
+.scenicDetailTopBar > div:last-child {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  min-width: 0;
+}
+
+.scenicDetailTopBar .eyebrow {
+  flex: 0 0 auto;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #6b8175;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.scenicDetailTopBar .sectionTitle {
+  margin: 0;
+  font-size: clamp(24px, 3vw, 32px);
+}
+
+.formActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .scenicDetailLead {
@@ -343,7 +437,7 @@
   min-height: 260px;
   padding: 16px 18px;
   box-sizing: border-box;
-  resize: vertical;
+  resize: none;
   color: #274637;
   font: inherit;
   font-size: 15px;
@@ -607,7 +701,8 @@
 .detailShell {
   position: relative;
   width: min(1360px, 100%);
-  height: 100%;
+  min-height: 100%;
+  height: auto;
   min-height: 0;
   margin: 0 auto;
   padding: 0 24px 24px;
@@ -620,21 +715,26 @@
 .detailTopBar {
   display: flex;
   align-items: center;
-  gap: 14px;
-  position: absolute;
-  top: -16px;
-  left: -28px;
-  z-index: 2;
-  width: auto;
-  margin: 0;
+  gap: 18px;
+  width: 100%;
+  margin: 0 auto 18px;
 }
 
 .detailShell .eyebrow {
-  display: none;
+  display: block;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #6b8175;
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .detailShell .detailTopBar > div {
-  display: none;
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  min-width: 0;
 }
 
 .detailShell .scenicDetailLead {
@@ -642,7 +742,9 @@
 }
 
 .detailShell .sectionTitle {
-  display: none;
+  display: block;
+  margin: 0;
+  font-size: clamp(24px, 3vw, 32px);
 }
 
 .detailShell .editorFooter .helperText {
@@ -651,6 +753,18 @@
 
 .detailShell .editorFooter {
   justify-content: flex-end;
+}
+
+.scenicDetailShell .editorFooter .helperText {
+  display: none;
+}
+
+.scenicDetailShell .editorFooter {
+  justify-content: flex-end;
+}
+
+.scenicDetailShell .scenicDetailLead {
+  display: none;
 }
 
 .dualPanel > .editorCard .editorFooter .helperText {
@@ -662,15 +776,34 @@
 }
 
 .detailShell .scenicDetailCard {
-  flex: 1;
+  flex: 0 0 auto;
   min-height: 0;
   margin: 44px auto 0;
 }
 
 .detailShell .scenicDescriptionTextarea {
-  height: clamp(180px, 30vh, 280px);
+  height: clamp(300px, 48vh, 620px);
   min-height: 0;
   flex: 0 0 auto;
+}
+
+.detailShell .editorMapPanel {
+  display: flex;
+  flex-direction: column;
+  align-self: stretch;
+}
+
+.detailShell .editorMapPanel > div:last-child {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.detailShell .editorMapPanel .map {
+  flex: 1;
+  height: auto;
+  min-height: 440px;
 }
 
 .detailPageCard {
@@ -983,19 +1116,67 @@
   }
 
   .scenicDetailTopBar {
+    display: grid;
     grid-template-columns: 1fr;
     gap: 12px;
     margin-bottom: 16px;
   }
 
+  .scenicDetailTopBar > div:last-child {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
+  }
+
   .scenicDetailCard {
+    grid-template-columns: 1fr;
     padding: 22px 18px;
     border-radius: 22px;
   }
 
+  .scenicDetailCard > .cardHeader,
+  .scenicDetailCard > .field,
+  .scenicDetailCard > .formRow,
+  .scenicDetailCard > .editorFooter,
+  .scenicEditorFields,
+  .editorMapPanel {
+    grid-column: 1;
+  }
+
+  .scenicEditorFields {
+    grid-row: auto;
+  }
+
+  .scenicDetailCard > .formRow,
+  .scenicDetailCard > .editorFooter {
+    grid-row: auto;
+  }
+
+  .editorMapPanel {
+    grid-row: auto;
+    position: static;
+  }
+
+  .detailShell .editorMapPanel .map {
+    flex: 0 0 300px;
+    height: 300px;
+    min-height: 300px;
+  }
+
+  .detailShell .scenicDescriptionTextarea {
+    height: 280px;
+  }
+
   .detailShell .detailTopBar {
-    top: -6px;
-    left: -14px;
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .detailShell .detailTopBar > div {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
   }
 
   .scenicDetailCard .formRow {

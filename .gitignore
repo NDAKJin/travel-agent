@@ -3,6 +3,9 @@ target/
 .mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
 !**/src/test/**/target/
+fe/
+miniprogram/
+
 
 ### STS ###
 .apt_generated
@@ -57,3 +60,7 @@ tmp_*
 *.tmp
 .DS_Store
 Thumbs.db
+/log/
+/TODO.md
+/miniprogram/
+/fe/

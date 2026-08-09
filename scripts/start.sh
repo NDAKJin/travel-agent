@@ -4,7 +4,7 @@ set -euo pipefail
 APP_HOME="${APP_HOME:-/opt/travel-agent}"
 JAR_PATH="${JAR_PATH:-$APP_HOME/app.jar}"
 ENV_FILE="${ENV_FILE:-$APP_HOME/.env}"
-LOG_FILE="${LOG_FILE:-$APP_HOME/app.log}"
+LOG_FILE="${LOG_FILE:-$APP_HOME/log/app.log}"
 PID_FILE="${PID_FILE:-$APP_HOME/app.pid}"
 JAVA_CMD="${JAVA_CMD:-java}"
 
@@ -27,7 +27,7 @@ fi
 : "${SPRING_PROFILES_ACTIVE:=prod}"
 export SPRING_PROFILES_ACTIVE
 
-mkdir -p "$APP_HOME"
+mkdir -p "$(dirname "$LOG_FILE")"
 touch "$LOG_FILE"
 
 nohup "$JAVA_CMD" -jar "$JAR_PATH" >> "$LOG_FILE" 2>&1 &

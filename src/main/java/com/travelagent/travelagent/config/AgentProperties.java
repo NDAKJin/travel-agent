@@ -71,6 +71,7 @@ public class AgentProperties {
         private int port = 9200;
         private String scheme = "http";
         private String indexName = "travel-agent-scenic";
+        private String geoIndexName = "travel-agent-geo";
 
     }
 }

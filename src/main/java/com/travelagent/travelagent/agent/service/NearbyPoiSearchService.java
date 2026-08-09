@@ -121,5 +121,5 @@ public class NearbyPoiSearchService {
         return (System.nanoTime() - startedAt) / 1_000_000;
     }
 
-    private String indexName() { return agentProperties.getRag().getElasticsearch().getIndexName() + "-geo"; }
+    private String indexName() { return agentProperties.getRag().getElasticsearch().getGeoIndexName(); }
 }

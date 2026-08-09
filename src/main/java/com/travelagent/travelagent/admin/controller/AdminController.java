@@ -2,12 +2,14 @@ package com.travelagent.travelagent.admin.controller;
 
 import com.travelagent.travelagent.agent.dto.AgentSessionDetailResponse;
 import com.travelagent.travelagent.admin.dto.AdminConversationSummaryResponse;
+import com.travelagent.travelagent.admin.dto.AdminMapPlaceResponse;
 import com.travelagent.travelagent.admin.dto.AdminScenicDocumentCreateRequest;
 import com.travelagent.travelagent.admin.dto.AdminScenicDocumentResponse;
 import com.travelagent.travelagent.admin.dto.AdminScenicSpotRequest;
 import com.travelagent.travelagent.admin.dto.AdminScenicSpotResponse;
 import com.travelagent.travelagent.admin.dto.AdminWxUserResponse;
 import com.travelagent.travelagent.admin.service.AdminManagementService;
+import com.travelagent.travelagent.admin.service.AmapPlaceSearchService;
 import com.travelagent.travelagent.admin.service.ScenicSpotGeoService;
 import com.travelagent.travelagent.common.dto.PageResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -31,6 +33,7 @@ public class AdminController {
 
     private final AdminManagementService adminManagementService;
     private final ScenicSpotGeoService scenicSpotGeoService;
+    private final AmapPlaceSearchService amapPlaceSearchService;
 
     @GetMapping("/wx-users")
     @Operation(summary = "Search wx users")
@@ -66,12 +69,24 @@ public class AdminController {
         return scenicSpotGeoService.list();
     }
 
+    @GetMapping("/scenic-spots/{id}")
+    @Operation(summary = "Get scenic spot detail")
+    public AdminScenicSpotResponse getScenicSpot(@PathVariable String id) {
+        return scenicSpotGeoService.get(id);
+    }
+
     @GetMapping("/scenic-spots/nearby")
     @Operation(summary = "Find nearby scenic spots")
     public List<AdminScenicSpotResponse> nearbyScenicSpots(@RequestParam double longitude,
                                                            @RequestParam double latitude,
                                                            @RequestParam(defaultValue = "20km") String distance) {
         return scenicSpotGeoService.nearby(longitude, latitude, distance);
+    }
+
+    @GetMapping("/map/places")
+    @Operation(summary = "Search Amap places")
+    public List<AdminMapPlaceResponse> searchMapPlaces(@RequestParam String keyword) {
+        return amapPlaceSearchService.search(keyword);
     }
 
     @PostMapping("/scenic-spots")
