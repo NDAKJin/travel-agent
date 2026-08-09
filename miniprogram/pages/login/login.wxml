@@ -1,30 +1,62 @@
-<view class="page-shell">
-  <view class="hero card">
-    <view class="eyebrow">原生微信小程序</view>
-    <view class="section-title">你的随身旅行规划助手</view>
-    <view class="hero-desc muted">进入小程序先完成微信登录，随后才能生成行程、继续历史会话并保存旅行方案。</view>
-  </view>
+<view class="login-page">
+  <view class="ambient ambient-one"></view>
+  <view class="ambient ambient-two"></view>
 
-  <view class="quick-grid">
-    <block wx:for="{{quickEntries}}" wx:key="label">
-      <view class="quick-card card">
-        <view class="quick-label">{{item.label}}</view>
-        <view class="quick-hint muted">{{item.hint}}</view>
+  <view class="page-shell">
+    <view class="brand-row">
+      <view class="brand-mark">
+        <view class="brand-mark-dot"></view>
+        <view class="brand-mark-line"></view>
       </view>
-    </block>
-  </view>
-
-  <view class="login-panel card">
-    <view class="eyebrow">立即进入</view>
-    <view class="panel-title">仅支持微信登录</view>
-    <view class="login-copy muted">
-      点击下方按钮后会调用微信授权信息，并使用当前后端的微信登录接口创建会话。
+      <view class="brand-name">途见</view>
+      <view class="brand-tag">TRAVEL AI</view>
     </view>
 
-    <view wx:if="{{errorMessage}}" class="error-box field-gap">{{errorMessage}}</view>
+    <view class="hero">
+      <view class="hero-kicker"><view class="kicker-dot"></view>你的随身旅行规划助手</view>
+      <view class="section-title">把下一站，交给<br /><text class="title-highlight">懂你的 AI</text></view>
+      <view class="hero-desc">从灵感到行程，从预算到攻略，<br />为你轻松安排每一次出发。</view>
+      <view class="hero-route">
+        <view class="route-point active"></view>
+        <view class="route-line"></view>
+        <view class="route-point"></view>
+        <view class="route-line short"></view>
+        <view class="route-point"></view>
+        <text class="route-label">灵感 · 规划 · 出发</text>
+      </view>
+    </view>
 
-    <button class="primary-button submit-button" loading="{{loading}}" bindtap="submitLogin">
-      {{loading ? '登录中...' : '微信授权登录'}}
-    </button>
+    <view class="quick-grid">
+      <block wx:for="{{quickEntries}}" wx:key="label">
+        <view class="quick-card">
+          <view class="quick-icon icon-{{index}}">{{item.icon}}</view>
+          <view class="quick-content">
+            <view class="quick-label">{{item.label}}</view>
+            <view class="quick-hint">{{item.hint}}</view>
+          </view>
+        </view>
+      </block>
+    </view>
+
+    <view class="login-panel">
+      <view class="panel-heading">
+        <view>
+          <view class="panel-eyebrow">READY TO GO</view>
+          <view class="panel-title">登录，开启旅程</view>
+        </view>
+        <view class="panel-spark">✦</view>
+      </view>
+      <view class="login-copy">使用微信授权登录，即可保存你的旅行灵感与专属行程。</view>
+
+      <view wx:if="{{errorMessage}}" class="error-box field-gap">{{errorMessage}}</view>
+
+      <button class="primary-button submit-button" loading="{{loading}}" bindtap="submitLogin">
+        <text>{{loading ? '登录中...' : '微信授权登录'}}</text>
+        <text wx:if="{{!loading}}" class="button-arrow">→</text>
+      </button>
+      <view class="privacy-note"><view class="lock-icon">⌁</view> 微信安全授权 · 不保存敏感信息</view>
+    </view>
+
+    <view class="footer-note">让每一次出发，都恰到好处</view>
   </view>
 </view>

@@ -36,10 +36,10 @@ Page({
     loading: false,
     errorMessage: "",
     quickEntries: [
-      { label: "智能问答", hint: "直接生成行程" },
-      { label: "热门目的地", hint: "查看出行灵感" },
-      { label: "预算助手", hint: "快速拆分花费" },
-      { label: "历史方案", hint: "回看已保存会话" }
+      { label: "智能问答", hint: "直接生成行程", icon: "✦" },
+      { label: "热门目的地", hint: "查看出行灵感", icon: "⌖" },
+      { label: "附近探索", hint: "发现身边好去处", icon: "⌖" },
+      { label: "我的行程", hint: "查看已保存计划", icon: "↺" }
     ]
   },
 

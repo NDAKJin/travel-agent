@@ -2,13 +2,11 @@
   <view class="workspace card">
     <view class="sidebar {{sidebarCollapsed ? 'sidebar-collapsed' : ''}}">
       <view class="sidebar-top">
-        <view class="sidebar-brand-wrap">
+        <view class="sidebar-header">
           <button class="ghost-button sidebar-toggle" bindtap="toggleSidebar">
             <view class="sidebar-toggle-icon {{sidebarCollapsed ? 'sidebar-toggle-icon-collapsed' : ''}}">
-              <view class="drawer-line"></view>
-              <view class="drawer-line drawer-line-short"></view>
-              <view class="drawer-line"></view>
-              <view class="drawer-chevron"></view>
+              <view class="toggle-panel"></view>
+              <view class="toggle-arrow"></view>
             </view>
           </button>
         </view>
@@ -58,6 +56,10 @@
 
     <view class="chat-shell {{sidebarCollapsed ? 'chat-shell-expanded' : ''}}">
       <view class="chat-header">
+        <view class="chat-heading">
+          <view class="chat-heading-title">途见 <text>· AI 旅行助手</text></view>
+          <view class="chat-heading-subtitle">让每一次出发，都恰到好处</view>
+        </view>
         <button class="new-session-button" bindtap="startNewConversation">
           <view class="new-session-icon">
             <view class="new-session-bubble"></view>
@@ -79,7 +81,7 @@
               <block wx:for="{{messages}}" wx:key="id">
                 <view id="{{item.id}}" class="message-row {{item.role === 'user' ? 'message-row-user' : ''}}">
                   <view class="message-bubble {{item.role === 'user' ? 'user-bubble' : 'assistant-bubble'}}">
-                    <view class="message-role">{{item.role === 'user' ? '我' : 'AI 助手'}}</view>
+                    <view wx:if="{{item.role !== 'user'}}" class="message-role">AI 助手</view>
                     <view wx:if="{{item.role === 'user'}}" class="message-text">{{item.text}}</view>
                     <rich-text wx:else class="message-rich-text" nodes="{{item.html}}"></rich-text>
                     <view wx:if="{{item.nearbySearch}}" class="nearby-results">
