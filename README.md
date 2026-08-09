@@ -76,6 +76,7 @@ travel-agent/
 
 项目不会在仓库中提交本地配置和密钥。请将 [`application.example.yml`](src/main/resources/application.example.yml) 复制为 `src/main/resources/application.yml`，再填写数据库、Redis、模型服务、微信和高德地图配置。`application.yml` 已被 `.gitignore` 忽略，不应提交到 Git。也可以通过环境变量覆盖示例文件中的配置。
 
+
 后端常用配置可使用 Spring Boot 的环境变量命名方式：
 
 | 配置项 | 环境变量示例 | 用途 |

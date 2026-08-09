@@ -16,7 +16,6 @@ public class AdminConversationSessionView {
     private String sessionId;
     private String title;
     private String preview;
-    private String messagesJson;
     private int messageCount;
     private Instant createdAt;
     private Instant updatedAt;

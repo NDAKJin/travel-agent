@@ -1,12 +1,9 @@
 package com.travelagent.travelagent.admin.service;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.travelagent.travelagent.agent.dto.AgentConversationMessageResponse;
 import com.travelagent.travelagent.agent.dto.AgentSessionDetailResponse;
 import com.travelagent.travelagent.agent.mapper.AgentConversationSessionMapper;
-import com.travelagent.travelagent.agent.model.AgentMessage;
+import com.travelagent.travelagent.agent.model.AgentConversationMessage;
 import com.travelagent.travelagent.admin.model.AdminConversationSessionView;
 import com.travelagent.travelagent.admin.dto.AdminConversationSummaryResponse;
 import com.travelagent.travelagent.admin.dto.AdminConversationUserResponse;
@@ -34,14 +31,11 @@ import org.springframework.util.StringUtils;
 @RequiredArgsConstructor
 public class AdminManagementService {
 
-    private static final TypeReference<List<AgentMessage>> MESSAGE_LIST_TYPE = new TypeReference<>() {
-    };
     private static final Pattern SAFE_FILE_NAME = Pattern.compile("[^a-z0-9._-]+");
 
     private final WxUserMapper wxUserMapper;
     private final AgentConversationSessionMapper conversationSessionMapper;
     private final ScenicKnowledgeIngestionService scenicKnowledgeIngestionService;
-    private final ObjectMapper objectMapper;
 
     public PageResponse<AdminWxUserResponse> searchWxUsers(String keyword, int page, int size) {
         String normalized = normalizeKeyword(keyword);
@@ -81,7 +75,8 @@ public class AdminManagementService {
         if (session == null) {
             throw new IllegalArgumentException("Conversation session not found");
         }
-        return toDetail(session.getSessionId(), session.getMessagesJson(), session.getCreatedAt(), session.getUpdatedAt());
+        return toDetail(session.getSessionId(), conversationSessionMapper.findMessagesBySessionId(session.getId()),
+                session.getCreatedAt(), session.getUpdatedAt());
     }
 
     public AdminScenicDocumentResponse addScenicDocument(AdminScenicDocumentCreateRequest request) {
@@ -157,31 +152,22 @@ public class AdminManagementService {
         return "# " + title.trim() + "\n\n" + content.trim() + "\n";
     }
 
-    private AgentSessionDetailResponse toDetail(String sessionId, String messagesJson, Instant createdAt, Instant updatedAt) {
-        List<AgentMessage> messages = deserialize(messagesJson);
+    private AgentSessionDetailResponse toDetail(String sessionId, List<AgentConversationMessage> messages,
+                                                Instant createdAt, Instant updatedAt) {
         return new AgentSessionDetailResponse(
                 sessionId,
                 buildTitle(messages),
                 messages.stream()
-                        .map(message -> new AgentConversationMessageResponse(message.role(), message.content()))
+                        .map(message -> new AgentConversationMessageResponse(message.getRole(), message.getContent()))
                         .toList(),
                 createdAt,
                 updatedAt);
     }
 
-    private List<AgentMessage> deserialize(String messagesJson) {
-        try {
-            return objectMapper.readValue(messagesJson, MESSAGE_LIST_TYPE);
-        }
-        catch (JsonProcessingException exception) {
-            throw new IllegalStateException("Failed to deserialize conversation messages", exception);
-        }
-    }
-
-    private String buildTitle(List<AgentMessage> messages) {
+    private String buildTitle(List<AgentConversationMessage> messages) {
         return messages.stream()
-                .filter(message -> "user".equalsIgnoreCase(message.role()))
-                .map(AgentMessage::content)
+                .filter(message -> "user".equalsIgnoreCase(message.getRole()))
+                .map(AgentConversationMessage::getContent)
                 .filter(StringUtils::hasText)
                 .findFirst()
                 .map(text -> text.length() <= 60 ? text : text.substring(0, 57) + "...")

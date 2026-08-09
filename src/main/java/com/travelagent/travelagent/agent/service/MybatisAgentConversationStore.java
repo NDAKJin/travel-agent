@@ -1,53 +1,55 @@
 package com.travelagent.travelagent.agent.service;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.travelagent.travelagent.agent.mapper.AgentConversationSessionMapper;
+import com.travelagent.travelagent.agent.model.AgentConversationMessage;
 import com.travelagent.travelagent.agent.model.AgentConversationSession;
 import com.travelagent.travelagent.agent.model.AgentMessage;
 import com.travelagent.travelagent.agent.model.AgentSessionContext;
 import com.travelagent.travelagent.agent.model.AgentSessionSummary;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.IntStream;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 @Component
 public class MybatisAgentConversationStore implements AgentConversationStore {
 
-    private static final TypeReference<List<AgentMessage>> MESSAGE_LIST_TYPE = new TypeReference<>() {
-    };
-
     private final AgentConversationSessionMapper mapper;
-    private final ObjectMapper objectMapper;
 
-    public MybatisAgentConversationStore(AgentConversationSessionMapper mapper, ObjectMapper objectMapper) {
+    public MybatisAgentConversationStore(AgentConversationSessionMapper mapper) {
         this.mapper = mapper;
-        this.objectMapper = objectMapper;
     }
 
     @Override
     public Optional<AgentSessionContext> load(long userId, String sessionId) {
-        return Optional.ofNullable(mapper.findByUserIdAndSessionId(userId, sessionId)).map(this::toContext);
+        return Optional.ofNullable(mapper.findByUserIdAndSessionId(userId, sessionId))
+                .map(session -> toContext(session, mapper.findMessagesBySessionId(session.getId())));
     }
 
+    @Transactional
     @Override
     public void save(long userId, AgentSessionContext sessionContext) {
         AgentConversationSession session = Optional.ofNullable(
-                mapper.findByUserIdAndSessionId(userId, sessionContext.sessionId()))
+                        mapper.findByUserIdAndSessionId(userId, sessionContext.sessionId()))
                 .orElseGet(AgentConversationSession::new);
         session.setUserId(userId);
         session.setSessionId(sessionContext.sessionId());
         session.setTitle(buildTitle(sessionContext.messages()));
         session.setPreview(buildPreview(sessionContext.messages()));
         session.setMessageCount(sessionContext.messages().size());
-        session.setMessagesJson(serialize(sessionContext.messages()));
         session.setCreatedAt(sessionContext.createdAt());
         session.setUpdatedAt(sessionContext.updatedAt());
         if (session.getId() == null) {
             mapper.insert(session);
         } else {
             mapper.update(session);
+        }
+
+        mapper.deleteMessagesBySessionId(session.getId());
+        if (!sessionContext.messages().isEmpty()) {
+            mapper.insertMessages(toMessageEntities(session.getId(), sessionContext.messages()));
         }
     }
 
@@ -63,17 +65,35 @@ public class MybatisAgentConversationStore implements AgentConversationStore {
                 .toList();
     }
 
+    @Transactional
     @Override
     public void delete(long userId, String sessionId) {
         mapper.deleteByUserIdAndSessionId(userId, sessionId);
     }
 
-    private AgentSessionContext toContext(AgentConversationSession session) {
+    private AgentSessionContext toContext(AgentConversationSession session,
+                                          List<AgentConversationMessage> messages) {
         return new AgentSessionContext(
                 session.getSessionId(),
-                deserialize(session.getMessagesJson()),
+                messages.stream()
+                        .map(message -> new AgentMessage(message.getRole(), message.getContent()))
+                        .toList(),
                 session.getCreatedAt(),
                 session.getUpdatedAt());
+    }
+
+    private List<AgentConversationMessage> toMessageEntities(long sessionId, List<AgentMessage> messages) {
+        Instant createdAt = Instant.now();
+        return IntStream.range(0, messages.size()).mapToObj(index -> {
+            AgentMessage source = messages.get(index);
+            AgentConversationMessage target = new AgentConversationMessage();
+            target.setSessionId(sessionId);
+            target.setSequenceNo(index);
+            target.setRole(source.role());
+            target.setContent(source.content());
+            target.setCreatedAt(createdAt);
+            return target;
+        }).toList();
     }
 
     private String buildTitle(List<AgentMessage> messages) {
@@ -84,7 +104,7 @@ public class MybatisAgentConversationStore implements AgentConversationStore {
                 .filter(text -> !text.isBlank())
                 .findFirst()
                 .map(text -> truncate(text, 60))
-                .orElse("新对话");
+                .orElse("new-chat");
     }
 
     private String buildPreview(List<AgentMessage> messages) {
@@ -103,21 +123,5 @@ public class MybatisAgentConversationStore implements AgentConversationStore {
             return value;
         }
         return value.substring(0, maxLength - 3) + "...";
-    }
-
-    private String serialize(List<AgentMessage> messages) {
-        try {
-            return objectMapper.writeValueAsString(messages);
-        } catch (JsonProcessingException ex) {
-            throw new IllegalStateException("Failed to serialize conversation messages", ex);
-        }
-    }
-
-    private List<AgentMessage> deserialize(String messagesJson) {
-        try {
-            return objectMapper.readValue(messagesJson, MESSAGE_LIST_TYPE);
-        } catch (JsonProcessingException ex) {
-            throw new IllegalStateException("Failed to deserialize conversation messages", ex);
-        }
     }
 }

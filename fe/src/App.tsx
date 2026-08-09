@@ -628,7 +628,7 @@ export default function App() {
 
   if (screen === "detail") {
     return (
-      <main className={styles.page}>
+      <main className={`${styles.page} ${styles.detailPage}`}>
         <section className={styles.scenicDetailShell}>
           <div className={styles.scenicDetailTopBar}>
             <button type="button" className={styles.backButton} onClick={backToDashboard}>

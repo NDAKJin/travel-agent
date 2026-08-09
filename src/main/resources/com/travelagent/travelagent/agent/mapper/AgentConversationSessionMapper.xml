@@ -7,7 +7,6 @@
         <result column="session_id" property="sessionId"/>
         <result column="title" property="title"/>
         <result column="preview" property="preview"/>
-        <result column="messages_json" property="messagesJson"/>
         <result column="message_count" property="messageCount"/>
         <result column="created_at" property="createdAt"/>
         <result column="updated_at" property="updatedAt"/>
@@ -22,20 +21,19 @@
         <result column="session_id" property="sessionId"/>
         <result column="title" property="title"/>
         <result column="preview" property="preview"/>
-        <result column="messages_json" property="messagesJson"/>
         <result column="message_count" property="messageCount"/>
         <result column="created_at" property="createdAt"/>
         <result column="updated_at" property="updatedAt"/>
     </resultMap>
 
     <select id="findByUserIdAndSessionId" resultMap="AgentConversationSessionMap">
-        SELECT id, user_id, session_id, title, preview, messages_json, message_count, created_at, updated_at
+        SELECT id, user_id, session_id, title, preview, message_count, created_at, updated_at
         FROM agent_conversation_session
         WHERE user_id = #{userId} AND session_id = #{sessionId}
     </select>
 
     <select id="findAllByUserIdOrderByUpdatedAtDesc" resultMap="AgentConversationSessionMap">
-        SELECT id, user_id, session_id, title, preview, messages_json, message_count, created_at, updated_at
+        SELECT id, user_id, session_id, title, preview, message_count, created_at, updated_at
         FROM agent_conversation_session
         WHERE user_id = #{userId}
         ORDER BY updated_at DESC
@@ -54,7 +52,6 @@
                s.session_id,
                s.title,
                s.preview,
-               s.messages_json,
                s.message_count,
                s.created_at,
                s.updated_at
@@ -92,11 +89,32 @@
         WHERE s.id = #{id}
     </select>
 
+    <select id="findMessagesBySessionId" resultType="com.travelagent.travelagent.agent.model.AgentConversationMessage">
+        SELECT id, session_id, sequence_no, role, content, created_at
+        FROM agent_conversation_message
+        WHERE session_id = #{sessionId}
+        ORDER BY sequence_no ASC
+    </select>
+
+    <delete id="deleteMessagesBySessionId">
+        DELETE FROM agent_conversation_message
+        WHERE session_id = #{sessionId}
+    </delete>
+
+    <insert id="insertMessages">
+        INSERT INTO agent_conversation_message (
+            session_id, sequence_no, role, content, created_at
+        ) VALUES
+        <foreach collection="messages" item="message" separator=",">
+            (#{message.sessionId}, #{message.sequenceNo}, #{message.role}, #{message.content}, #{message.createdAt})
+        </foreach>
+    </insert>
+
     <insert id="insert" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO agent_conversation_session (
-            user_id, session_id, title, preview, messages_json, message_count, created_at, updated_at
+            user_id, session_id, title, preview, message_count, created_at, updated_at
         ) VALUES (
-            #{userId}, #{sessionId}, #{title}, #{preview}, #{messagesJson}, #{messageCount}, #{createdAt}, #{updatedAt}
+            #{userId}, #{sessionId}, #{title}, #{preview}, #{messageCount}, #{createdAt}, #{updatedAt}
         )
     </insert>
 
@@ -104,9 +122,7 @@
         UPDATE agent_conversation_session
         SET title = #{title},
             preview = #{preview},
-            messages_json = #{messagesJson},
             message_count = #{messageCount},
-            created_at = #{createdAt},
             updated_at = #{updatedAt}
         WHERE id = #{id}
     </update>

@@ -1,6 +1,7 @@
 package com.travelagent.travelagent.agent.mapper;
 
 import com.travelagent.travelagent.agent.model.AgentConversationSession;
+import com.travelagent.travelagent.agent.model.AgentConversationMessage;
 import com.travelagent.travelagent.admin.model.AdminConversationSessionView;
 import java.util.List;
 import org.apache.ibatis.annotations.Mapper;
@@ -25,6 +26,12 @@ public interface AgentConversationSessionMapper {
     long countByUserIdForAdmin(long userId);
 
     AdminConversationSessionView findForAdminById(long id);
+
+    List<AgentConversationMessage> findMessagesBySessionId(long sessionId);
+
+    int deleteMessagesBySessionId(long sessionId);
+
+    int insertMessages(@Param("messages") List<AgentConversationMessage> messages);
 
     int insert(AgentConversationSession session);
 
