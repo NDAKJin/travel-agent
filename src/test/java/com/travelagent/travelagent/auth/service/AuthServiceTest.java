@@ -118,14 +118,13 @@ class AuthServiceTest {
         when(wxUserMapper.findById(10L)).thenReturn(user);
 
         TokenPair firstTokenPair = jwtTokenService.issueTokenPair(10L, "wx", "wx-open-id-demo", "wx-user");
-        when(refreshTokenStore.isTokenValid(10L, firstTokenPair.refreshTokenId())).thenReturn(true);
+        when(refreshTokenStore.consumeToken(10L, firstTokenPair.refreshTokenId())).thenReturn(true);
 
         AuthResponse refreshed = authService.refresh(new RefreshTokenRequest(firstTokenPair.refreshToken()));
 
         assertThat(refreshed.token().refreshToken()).isNotEqualTo(firstTokenPair.refreshToken());
         ArgumentCaptor<String> tokenIdCaptor = ArgumentCaptor.forClass(String.class);
         ArgumentCaptor<Duration> ttlCaptor = ArgumentCaptor.forClass(Duration.class);
-        verify(refreshTokenStore).revokeToken(10L, firstTokenPair.refreshTokenId());
         verify(refreshTokenStore).storeToken(eq(10L), tokenIdCaptor.capture(), ttlCaptor.capture());
         assertThat(tokenIdCaptor.getValue()).isNotBlank();
         assertThat(ttlCaptor.getValue()).isPositive();
@@ -134,7 +133,7 @@ class AuthServiceTest {
     @Test
     void refreshRejectsInactiveTokenWhenWhitelistValidationFails() {
         TokenPair firstTokenPair = jwtTokenService.issueTokenPair(10L, "wx", "wx-open-id-demo", "wx-user");
-        when(refreshTokenStore.isTokenValid(10L, firstTokenPair.refreshTokenId())).thenReturn(false);
+        when(refreshTokenStore.consumeToken(10L, firstTokenPair.refreshTokenId())).thenReturn(false);
 
         assertThatThrownBy(() -> authService.refresh(new RefreshTokenRequest(firstTokenPair.refreshToken())))
                 .isInstanceOf(AuthException.class)

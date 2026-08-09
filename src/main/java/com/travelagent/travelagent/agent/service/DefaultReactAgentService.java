@@ -44,6 +44,12 @@ public class DefaultReactAgentService implements ReactAgentService {
 
     @Override
     public AgentChatResponse chat(AuthenticatedUser user, AgentChatRequest request) {
+        if (request.message().length() > agentProperties.getMaxMessageChars()) {
+            throw new IllegalArgumentException("message exceeds the configured maximum length");
+        }
+        if (request.sessionId() != null && request.sessionId().length() > agentProperties.getMaxSessionIdChars()) {
+            throw new IllegalArgumentException("sessionId exceeds the configured maximum length");
+        }
         String sessionId = normalizeSessionId(request.sessionId());
         CurrentUserLocationContext.set(request.location());
         LocationPermissionContext.clear();
@@ -53,7 +59,8 @@ public class DefaultReactAgentService implements ReactAgentService {
                 agentProperties.getTool().isEnabled());
         try {
             AgentSessionContext existingSession = conversationStore.load(user.userId(), sessionId).orElse(null);
-            List<AgentMessage> history = new ArrayList<>(existingSession == null ? List.of() : existingSession.messages());
+            List<AgentMessage> history = new ArrayList<>(boundedHistory(
+                    existingSession == null ? List.of() : existingSession.messages()));
             log.debug("Loaded conversation history: sessionId={}, existingMessageCount={}", sessionId, history.size());
             history.add(new AgentMessage("user", request.message()));
 
@@ -64,8 +71,9 @@ public class DefaultReactAgentService implements ReactAgentService {
                 history.add(new AgentMessage("assistant", reply));
                 Instant now = Instant.now();
                 Instant createdAt = existingSession == null ? now : existingSession.createdAt();
+                List<AgentMessage> storedHistory = boundedHistory(history);
                 conversationStore.append(user.userId(),
-                        new AgentSessionContext(sessionId, List.copyOf(history), createdAt, now),
+                        new AgentSessionContext(sessionId, storedHistory, createdAt, now),
                         List.of(new AgentMessage("user", request.message()), new AgentMessage("assistant", reply)));
             }
             log.info("Completed react-agent chat: sessionId={}, totalMessageCount={}, replyLength={}",
@@ -163,6 +171,14 @@ public class DefaultReactAgentService implements ReactAgentService {
             return UUID.randomUUID().toString();
         }
         return sessionId;
+    }
+
+    private List<AgentMessage> boundedHistory(List<AgentMessage> messages) {
+        int max = Math.max(2, agentProperties.getMaxHistoryMessages());
+        if (messages.size() <= max) {
+            return List.copyOf(messages);
+        }
+        return List.copyOf(messages.subList(messages.size() - max, messages.size()));
     }
 
     private List<Message> toChatMessages(String systemPrompt, List<AgentMessage> conversation) {

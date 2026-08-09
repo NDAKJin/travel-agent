@@ -14,10 +14,6 @@ import com.travelagent.travelagent.common.dto.PageResponse;
 import com.travelagent.travelagent.auth.mapper.WxUserMapper;
 import com.travelagent.travelagent.auth.model.WxUser;
 import com.travelagent.travelagent.rag.service.ScenicKnowledgeIngestionService;
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.text.Normalizer;
 import java.time.Instant;
 import java.util.List;
@@ -81,20 +77,8 @@ public class AdminManagementService {
 
     public AdminScenicDocumentResponse addScenicDocument(AdminScenicDocumentCreateRequest request) {
         String fileName = buildFileName(request.title());
-        Path directory = scenicKnowledgeIngestionService.knowledgeDirectory();
-        Path target = directory.resolve(fileName).normalize();
-        if (!target.startsWith(directory)) {
-            throw new IllegalArgumentException("Invalid scenic document file name");
-        }
-        try {
-            Files.createDirectories(directory);
-            Files.writeString(target, buildMarkdown(request.title(), request.content()), StandardCharsets.UTF_8);
-            scenicKnowledgeIngestionService.ingestDocument(target);
-            return new AdminScenicDocumentResponse(fileName, target.toString(), Instant.now());
-        }
-        catch (IOException exception) {
-            throw new IllegalStateException("Failed to save scenic document", exception);
-        }
+        scenicKnowledgeIngestionService.publishDocument(fileName, buildMarkdown(request.title(), request.content()));
+        return new AdminScenicDocumentResponse(fileName, "elasticsearch:" + fileName, Instant.now());
     }
 
     private AdminWxUserResponse toWxUserResponse(WxUser user) {

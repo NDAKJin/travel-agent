@@ -87,14 +87,13 @@ public class AuthService {
         long userId = decodedToken.longClaim("uid");
         String userType = decodedToken.stringClaim("userType");
         String currentTokenId = decodedToken.stringClaim("jti");
-        if (!refreshTokenStore.isTokenValid(userId, currentTokenId)) {
+        if (!refreshTokenStore.consumeToken(userId, currentTokenId)) {
             log.warn("Refresh token validation failed: userId={}, userType={}, tokenId={}", userId, userType, currentTokenId);
             throw new AuthException("Refresh token is not active");
         }
-        AuthenticatedAccount account = loadAccount(userType, userId);
+        AuthenticatedAccount account = loadEnabledAccount(userType, userId);
         TokenPair nextTokenPair = jwtTokenService.issueTokenPair(account.id(), account.userType(), account.subject(), account.displayName());
         Duration ttl = Duration.between(clock.instant(), nextTokenPair.refreshTokenExpiresAt());
-        refreshTokenStore.revokeToken(userId, currentTokenId);
         refreshTokenStore.storeToken(userId, nextTokenPair.refreshTokenId(), ttl);
         log.info("Refresh token rotation succeeded: userId={}, userType={}", userId, userType);
         return toAuthResponse(account, nextTokenPair);
@@ -131,6 +130,19 @@ public class AuthService {
                     .orElseThrow(() -> new AuthException("Admin user not found"));
             default -> throw new AuthException("Unsupported account type");
         };
+    }
+
+    private AuthenticatedAccount loadEnabledAccount(String userType, long userId) {
+        AuthenticatedAccount account = loadAccount(userType, userId);
+        boolean enabled = switch (userType) {
+            case "wx" -> wxUserMapper.findById(userId).isEnabled();
+            case "admin" -> adminUserMapper.findById(userId).isEnabled();
+            default -> false;
+        };
+        if (!enabled) {
+            throw new AuthException("Account is disabled");
+        }
+        return account;
     }
 
     private WxUser createWxUser(String openId, WxLoginRequest request) {

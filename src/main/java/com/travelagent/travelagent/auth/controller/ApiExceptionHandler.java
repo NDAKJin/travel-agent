@@ -10,6 +10,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.slf4j.MDC;
 
 @RestControllerAdvice
 @Slf4j
@@ -37,10 +38,21 @@ public class ApiExceptionHandler {
         return ResponseEntity.badRequest().body(error("BAD_REQUEST", ex.getMessage()));
     }
 
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<Map<String, Object>> handleUnexpectedException(Exception ex) {
+        log.error("Unhandled API exception", ex);
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(error("INTERNAL_ERROR", "服务暂时不可用，请稍后重试"));
+    }
+
     private Map<String, Object> error(String code, String message) {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("code", code);
         body.put("message", message);
+        String requestId = MDC.get("requestId");
+        if (requestId != null && !requestId.isBlank()) {
+            body.put("requestId", requestId);
+        }
         return body;
     }
 }

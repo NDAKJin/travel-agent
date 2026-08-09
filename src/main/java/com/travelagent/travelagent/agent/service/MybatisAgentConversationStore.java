@@ -73,15 +73,18 @@ public class MybatisAgentConversationStore implements AgentConversationStore {
             mapper.insert(session);
         }
 
-        int firstSequenceNo = session.getMessageCount();
+        List<AgentMessage> boundedMessages = sessionContext.messages();
         session.setTitle(session.getTitle() == null || session.getTitle().isBlank()
                 || "new-chat".equals(session.getTitle())
                 ? buildTitle(sessionContext.messages()) : session.getTitle());
         session.setPreview(buildPreview(messages));
-        session.setMessageCount(firstSequenceNo + messages.size());
+        session.setMessageCount(boundedMessages.size());
         session.setUpdatedAt(sessionContext.updatedAt());
         mapper.update(session);
-        mapper.insertMessages(toMessageEntities(session.getId(), firstSequenceNo, messages));
+        mapper.deleteMessagesBySessionId(session.getId());
+        if (!boundedMessages.isEmpty()) {
+            mapper.insertMessages(toMessageEntities(session.getId(), 0, boundedMessages));
+        }
     }
 
     @Override

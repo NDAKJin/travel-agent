@@ -55,6 +55,9 @@ travel-agent:
       secret: ${TRAVEL_AGENT_AUTH_WX_SECRET:}
       code2-session-url: ${TRAVEL_AGENT_AUTH_WX_CODE2_SESSION_URL:https://api.weixin.qq.com/sns/jscode2session}
   agent:
+    max-message-chars: ${TRAVEL_AGENT_AGENT_MAX_MESSAGE_CHARS:4000}
+    max-session-id-chars: ${TRAVEL_AGENT_AGENT_MAX_SESSION_ID_CHARS:64}
+    max-history-messages: ${TRAVEL_AGENT_AGENT_MAX_HISTORY_MESSAGES:40}
     profile:
       name: ${TRAVEL_AGENT_AGENT_PROFILE_NAME:Travel Buddy}
       default-locale: ${TRAVEL_AGENT_AGENT_PROFILE_DEFAULT_LOCALE:zh-CN}

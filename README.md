@@ -76,7 +76,7 @@ travel-agent/
 
 ## 配置
 
-项目不会在仓库中提交本地配置和密钥。请将 [`application.example.yml`](src/main/resources/application.example.yml) 复制为 `src/main/resources/application.yml`，再填写数据库、Redis、模型服务、微信和高德地图配置。`application.yml` 已被 `.gitignore` 忽略，不应提交到 Git。也可以通过环境变量覆盖示例文件中的配置。
+项目不会在仓库中提交本地配置和密钥。请将 [`application.example.yml`](src/main/resources/application.example.yml) 复制为 `src/main/resources/application.yml`，再填写数据库、Redis、模型服务、微信和高德地图配置。
 
 
 后端常用配置可使用 Spring Boot 的环境变量命名方式：
@@ -108,7 +108,7 @@ VITE_AMAP_KEY=your_amap_web_js_key
 VITE_AMAP_SECURITY_JS_CODE=your_amap_security_js_code
 ```
 
-微信小程序后端地址配置在 [`miniprogram/utils/config.js`](miniprogram/utils/config.js)。真机调试时需要使用可访问的 HTTPS 地址，并在微信公众平台配置合法域名。
+微信小程序后端地址配置在 [`miniprogram/utils/config.js`](miniprogram/utils/config.js)。
 
 ## 启动后端
 
@@ -133,7 +133,7 @@ Linux / macOS：
 java -jar target/travel-agent-0.0.1-SNAPSHOT.jar
 ```
 
-生产环境可使用 [`scripts/start.sh`](scripts/start.sh)。脚本默认从 `/opt/travel-agent/app.jar` 启动，并读取同目录下的 `.env` 文件。
+
 
 ## 启动管理前端
 

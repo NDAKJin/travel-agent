@@ -6,6 +6,7 @@ import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -13,6 +14,10 @@ import org.springframework.stereotype.Component;
 public class RedisRefreshTokenStore implements RefreshTokenStore {
     private static final String KEY_PREFIX = "auth:rt:";
     private static final String KEY_VALUE = "1";
+    private static final DefaultRedisScript<Long> CONSUME_SCRIPT = new DefaultRedisScript<>(
+            "if redis.call('get', KEYS[1]) == ARGV[1] then "
+                    + "redis.call('del', KEYS[1]); return 1; "
+                    + "else return 0; end", Long.class);
 
     @Autowired
     private StringRedisTemplate redisTemplate;
@@ -28,6 +33,15 @@ public class RedisRefreshTokenStore implements RefreshTokenStore {
         boolean valid = Objects.equals(KEY_VALUE, redisTemplate.opsForValue().get(key(userId, tokenId)));
         log.debug("Validated refresh token: userId={}, tokenId={}, valid={}", userId, tokenId, valid);
         return valid;
+    }
+
+    @Override
+    public boolean consumeToken(long userId, String tokenId) {
+        Long result = redisTemplate.execute(CONSUME_SCRIPT,
+                java.util.List.of(key(userId, tokenId)), KEY_VALUE);
+        boolean consumed = Long.valueOf(1L).equals(result);
+        log.debug("Consumed refresh token: userId={}, tokenId={}, consumed={}", userId, tokenId, consumed);
+        return consumed;
     }
 
     @Override

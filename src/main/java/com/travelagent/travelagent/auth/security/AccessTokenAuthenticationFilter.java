@@ -1,5 +1,6 @@
 package com.travelagent.travelagent.auth.security;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.travelagent.travelagent.auth.exception.AuthException;
 import com.travelagent.travelagent.auth.model.DecodedToken;
 import com.travelagent.travelagent.auth.service.JwtTokenService;
@@ -25,6 +26,9 @@ public class AccessTokenAuthenticationFilter extends OncePerRequestFilter {
 
     @Autowired
     private JwtTokenService jwtTokenService;
+
+    @Autowired
+    private ObjectMapper objectMapper = new ObjectMapper();
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
@@ -77,6 +81,6 @@ public class AccessTokenAuthenticationFilter extends OncePerRequestFilter {
         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         response.setCharacterEncoding("UTF-8");
-        response.getWriter().write("{\"code\":\"AUTH_ERROR\",\"message\":\"" + message + "\"}");
+        objectMapper.writeValue(response.getWriter(), java.util.Map.of("code", "AUTH_ERROR", "message", message));
     }
 }

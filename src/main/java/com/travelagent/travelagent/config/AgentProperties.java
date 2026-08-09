@@ -14,6 +14,10 @@ public class AgentProperties {
     private final QwenProperties qwen = new QwenProperties();
     private final RagProperties rag = new RagProperties();
 
+    private int maxMessageChars = 4000;
+    private int maxSessionIdChars = 64;
+    private int maxHistoryMessages = 40;
+
     @Getter
     @Setter
     public static class ProfileProperties {

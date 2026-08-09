@@ -8,6 +8,9 @@ public interface RefreshTokenStore {
 
     boolean isTokenValid(long userId, String tokenId);
 
+    /** Atomically validates and consumes a refresh token. */
+    boolean consumeToken(long userId, String tokenId);
+
     void revokeToken(long userId, String tokenId);
 
     void revokeAll(long userId);

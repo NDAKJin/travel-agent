@@ -1,11 +1,7 @@
 package com.travelagent.travelagent.rag.service;
 
 import com.travelagent.travelagent.config.AgentProperties;
-import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,28 +19,26 @@ public class ScenicKnowledgeIngestionService {
     private final ObjectProvider<VectorStore> scenicVectorStoreProvider;
     private final AgentProperties agentProperties;
 
-    public void ingestDocument(Path path) {
-        long startedAt = System.nanoTime();
+    /** Publishes a document directly to the vector store; no local file is created. */
+    public void publishDocument(String documentId, String content) {
+        if (!StringUtils.hasText(documentId) || !StringUtils.hasText(content)) {
+            throw new IllegalArgumentException("Knowledge document must not be empty");
+        }
         VectorStore scenicVectorStore = vectorStore();
-        if (scenicVectorStore == null || !agentProperties.getRag().isEnabled()) {
-            log.warn("Scenic document ingestion skipped: path={}, enabled={}, vectorStoreAvailable={}",
-                    path, agentProperties.getRag().isEnabled(), scenicVectorStore != null);
-            return;
+        if (!agentProperties.getRag().isEnabled() || scenicVectorStore == null) {
+            throw new IllegalStateException("RAG indexing is not available");
         }
-        if (path == null || !Files.exists(path)) {
-            throw new IllegalArgumentException("Knowledge document does not exist");
-        }
+
         try {
-            String content = Files.readString(path, StandardCharsets.UTF_8);
-            if (!StringUtils.hasText(content)) {
-                throw new IllegalArgumentException("Knowledge document content must not be empty");
+            scenicVectorStore.add(List.of(toDocument(documentId, content)));
+            log.info("Scenic document published: file={}, contentLength={}", documentId, content.length());
+        } catch (RuntimeException exception) {
+            try {
+                scenicVectorStore.delete(List.of(documentId));
+            } catch (RuntimeException cleanup) {
+                log.error("Failed to compensate scenic vector document: {}", documentId, cleanup);
             }
-            scenicVectorStore.add(List.of(toDocument(path.getFileName().toString(), content)));
-            log.info("Scenic document ingested: file={}, contentLength={}, durationMs={}",
-                    path.getFileName(), content.length(), elapsedMillis(startedAt));
-        }
-        catch (IOException exception) {
-            throw new IllegalStateException("Failed to read scenic knowledge document", exception);
+            throw new IllegalStateException("Failed to publish scenic knowledge document", exception);
         }
     }
 
@@ -73,10 +67,6 @@ public class ScenicKnowledgeIngestionService {
 
     private long elapsedMillis(long startedAt) {
         return (System.nanoTime() - startedAt) / 1_000_000;
-    }
-
-    public Path knowledgeDirectory() {
-        return Paths.get(agentProperties.getRag().getKnowledgeDirectory()).toAbsolutePath().normalize();
     }
 
     private Document toDocument(String filename, String content) {
