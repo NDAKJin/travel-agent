@@ -9,11 +9,13 @@
 
 ## 后端接口
 
-默认请求地址在 `utils/config.js`：
+默认请求地址配置在 `utils/config.js`：
 
 ```js
 const BASE_URL = "https://api.ndakjin.asia";
 ```
+
+首次导入项目时，请先复制 `utils/config.example.js` 为 `utils/config.js`，再填写真实后端地址。
 
 当前对接接口：
 
@@ -28,7 +30,7 @@ const BASE_URL = "https://api.ndakjin.asia";
 1. 打开微信开发者工具。
 2. 选择“导入项目”。
 3. 项目目录选择 `D:\travel-agent\miniprogram`。
-4. 如需真实调试，替换 `project.config.json` 里的 `appid`。
+4. 复制 `project.config.example.json` 为 `project.config.json`，再填写真实小程序 AppID。
 
 ## 注意
 

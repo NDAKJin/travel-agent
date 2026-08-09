@@ -954,7 +954,7 @@ export default function App() {
                 </div>
               ) : null}
               <div className={styles.editorFooter}>
-                <div className={styles.helperText}>保存后会写入 RAG 的 md 目录，并同步到 Elasticsearch。</div>
+                <div className={styles.helperText}>保存后只写入 Elasticsearch RAG 索引，不会在本地保存 Markdown 文件。</div>
                 <button className={styles.primaryButton} type="submit" disabled={docSaving || !docTitle.trim() || !docContent.trim()}>
                   {docSaving ? "保存中..." : "添加"}
                 </button>

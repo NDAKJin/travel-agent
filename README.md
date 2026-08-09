@@ -108,7 +108,7 @@ VITE_AMAP_KEY=your_amap_web_js_key
 VITE_AMAP_SECURITY_JS_CODE=your_amap_security_js_code
 ```
 
-微信小程序后端地址配置在 [`miniprogram/utils/config.js`](miniprogram/utils/config.js)。
+微信小程序后端地址配置在本地的 `miniprogram/utils/config.js`，示例文件为 [`miniprogram/utils/config.example.js`](miniprogram/utils/config.example.js)。
 
 ## 启动后端
 
@@ -157,8 +157,8 @@ npm run preview # 预览生产构建
 
 1. 安装并打开微信开发者工具。
 2. 导入项目目录 `miniprogram/`。
-3. 将 `miniprogram/utils/config.js` 中的后端地址改为实际可访问地址。
-4. 使用与 `miniprogram/project.config.json` 一致的 AppID，或替换为自己的 AppID。
+3. 将 `miniprogram/utils/config.example.js` 复制为本地 `config.js`，再填写实际可访问的 HTTPS 后端地址。
+4. 将 `miniprogram/project.config.example.json` 复制为本地 `project.config.json`，再填写自己的 AppID。
 5. 在后端配置微信 AppID 和 AppSecret。
 
 小程序当前仅保留微信授权登录入口，登录成功后进入 AI 助手聊天页面。

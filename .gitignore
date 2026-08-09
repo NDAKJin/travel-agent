@@ -47,6 +47,8 @@ fe/.vite/
 
 ### WeChat Developer Tools local settings ###
 miniprogram/project.private.config.json
+miniprogram/project.config.json
+miniprogram/utils/config.js
 
 ### Local runtime output and temporary files ###
 *.log

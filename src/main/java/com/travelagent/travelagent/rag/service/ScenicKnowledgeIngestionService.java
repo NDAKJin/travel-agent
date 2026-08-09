@@ -1,7 +1,6 @@
 package com.travelagent.travelagent.rag.service;
 
 import com.travelagent.travelagent.config.AgentProperties;
-import java.nio.charset.StandardCharsets;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

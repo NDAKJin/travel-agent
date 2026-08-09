@@ -62,7 +62,6 @@ public class AgentProperties {
         private double similarityThreshold = 0.55d;
         private int maxContextChars = 4000;
         private int embeddingDimensions = 1024;
-        private String knowledgeDirectory = "rag/scenic";
         private final ElasticsearchProperties elasticsearch = new ElasticsearchProperties();
 
     }

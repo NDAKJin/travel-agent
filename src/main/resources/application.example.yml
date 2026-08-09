@@ -75,7 +75,6 @@ travel-agent:
       similarity-threshold: ${TRAVEL_AGENT_AGENT_RAG_SIMILARITY_THRESHOLD:0.55}
       max-context-chars: ${TRAVEL_AGENT_AGENT_RAG_MAX_CONTEXT_CHARS:4000}
       embedding-dimensions: ${TRAVEL_AGENT_AGENT_RAG_EMBEDDING_DIMENSIONS:1024}
-      knowledge-directory: ${TRAVEL_AGENT_AGENT_RAG_KNOWLEDGE_DIRECTORY:rag/scenic}
       elasticsearch:
         host: ${TRAVEL_AGENT_AGENT_RAG_ELASTICSEARCH_HOST:localhost}
         port: ${TRAVEL_AGENT_AGENT_RAG_ELASTICSEARCH_PORT:9200}
