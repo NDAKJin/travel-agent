@@ -3,14 +3,15 @@ package com.travelagent.travelagent.auth.service;
 import java.time.Duration;
 import java.util.Objects;
 import java.util.Set;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Component;
 
 @Component
 @Slf4j
+@RequiredArgsConstructor
 public class RedisRefreshTokenStore implements RefreshTokenStore {
     private static final String KEY_PREFIX = "auth:rt:";
     private static final String KEY_VALUE = "1";
@@ -19,8 +20,7 @@ public class RedisRefreshTokenStore implements RefreshTokenStore {
                     + "redis.call('del', KEYS[1]); return 1; "
                     + "else return 0; end", Long.class);
 
-    @Autowired
-    private StringRedisTemplate redisTemplate;
+    private final StringRedisTemplate redisTemplate;
 
     @Override
     public void storeToken(long userId, String tokenId, Duration ttl) {

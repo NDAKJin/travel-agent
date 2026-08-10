@@ -24,7 +24,6 @@ import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
-import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 class DefaultReactAgentServiceTest {
@@ -52,11 +51,8 @@ class DefaultReactAgentServiceTest {
         properties.getProfile().setName("Travel Buddy");
         properties.getTool().setEnabled(true);
         properties.getQwen().setModel("qwen-plus");
-        reactAgentService = new DefaultReactAgentService();
-        ReflectionTestUtils.setField(reactAgentService, "agentProperties", properties);
-        ReflectionTestUtils.setField(reactAgentService, "promptProvider", promptProvider);
-        ReflectionTestUtils.setField(reactAgentService, "chatClient", chatClient);
-        ReflectionTestUtils.setField(reactAgentService, "conversationStore", new InMemoryAgentConversationStore());
+        reactAgentService = new DefaultReactAgentService(
+                properties, promptProvider, chatClient, new InMemoryAgentConversationStore());
     }
 
     @Test

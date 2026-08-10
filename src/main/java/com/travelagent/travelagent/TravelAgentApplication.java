@@ -10,7 +10,8 @@ import org.mybatis.spring.annotation.MapperScan;
 @ConfigurationPropertiesScan
 @MapperScan({
         "com.travelagent.travelagent.auth.mapper",
-        "com.travelagent.travelagent.agent.mapper"
+        "com.travelagent.travelagent.agent.mapper",
+        "com.travelagent.travelagent.admin.mapper"
 })
 public class TravelAgentApplication {
 

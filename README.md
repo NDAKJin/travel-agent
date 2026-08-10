@@ -76,7 +76,7 @@ travel-agent/
 
 ## 配置
 
-项目不会在仓库中提交本地配置和密钥。请将 [`application.example.yml`](src/main/resources/application.example.yml) 复制为 `src/main/resources/application.yml`，再填写数据库、Redis、模型服务、微信和高德地图配置。
+请将 [`application.example.yml`](src/main/resources/application.example.yml) 复制为 `src/main/resources/application.yml`，再填写数据库、Redis、模型服务、微信和高德地图配置。
 
 
 后端常用配置可使用 Spring Boot 的环境变量命名方式：
@@ -145,13 +145,6 @@ npm run dev
 
 默认开发地址为 `http://localhost:5173`。
 
-常用命令：
-
-```bash
-npm run check   # TypeScript 类型检查
-npm run build   # 构建生产文件
-npm run preview # 预览生产构建
-```
 
 ## 启动微信小程序
 
@@ -160,24 +153,6 @@ npm run preview # 预览生产构建
 3. 将 `miniprogram/utils/config.example.js` 复制为本地 `config.js`，再填写实际可访问的 HTTPS 后端地址。
 4. 将 `miniprogram/project.config.example.json` 复制为本地 `project.config.json`，再填写自己的 AppID。
 5. 在后端配置微信 AppID 和 AppSecret。
-
-小程序当前仅保留微信授权登录入口，登录成功后进入 AI 助手聊天页面。
-
-## 测试
-
-运行后端测试：
-
-```bash
-./mvnw test
-```
-
-运行前端类型检查和构建：
-
-```bash
-cd fe
-npm run check
-npm run build
-```
 
 ## License
 

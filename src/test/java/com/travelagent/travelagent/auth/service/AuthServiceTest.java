@@ -36,7 +36,6 @@ import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
-import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 class AuthServiceTest {
@@ -66,26 +65,22 @@ class AuthServiceTest {
         properties.setJwtSecret("test-secret-key-for-hs256-signing-123456");
         properties.setAccessTokenTtl(Duration.ofMinutes(15));
         properties.setRefreshTokenTtl(Duration.ofDays(1));
-        jwtTokenService = new JwtTokenService();
         SecretKeySpec secretKey = new SecretKeySpec(properties.getJwtSecret().getBytes(), "HmacSHA256");
         JwtEncoder jwtEncoder = new NimbusJwtEncoder(new ImmutableSecret<>(secretKey));
         NimbusJwtDecoder jwtDecoder = NimbusJwtDecoder.withSecretKey(secretKey)
                 .macAlgorithm(MacAlgorithm.HS256)
                 .build();
         jwtDecoder.setJwtValidator(token -> OAuth2TokenValidatorResult.success());
-        ReflectionTestUtils.setField(jwtTokenService, "properties", properties);
-        ReflectionTestUtils.setField(jwtTokenService, "clock", clock);
-        ReflectionTestUtils.setField(jwtTokenService, "jwtEncoder", jwtEncoder);
-        ReflectionTestUtils.setField(jwtTokenService, "jwtDecoder", jwtDecoder);
+        jwtTokenService = new JwtTokenService(properties, clock, jwtEncoder, jwtDecoder);
         passwordHasher = new BCryptPasswordHasher();
-        authService = new AuthService();
-        ReflectionTestUtils.setField(authService, "wxUserMapper", wxUserMapper);
-        ReflectionTestUtils.setField(authService, "adminUserMapper", adminUserMapper);
-        ReflectionTestUtils.setField(authService, "jwtTokenService", jwtTokenService);
-        ReflectionTestUtils.setField(authService, "refreshTokenStore", refreshTokenStore);
-        ReflectionTestUtils.setField(authService, "passwordHasher", passwordHasher);
-        ReflectionTestUtils.setField(authService, "wxMiniProgramIdentityResolver", wxMiniProgramIdentityResolver);
-        ReflectionTestUtils.setField(authService, "clock", clock);
+        authService = new AuthService(
+                wxUserMapper,
+                adminUserMapper,
+                jwtTokenService,
+                refreshTokenStore,
+                passwordHasher,
+                wxMiniProgramIdentityResolver,
+                clock);
     }
 
     @Test

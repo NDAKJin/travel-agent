@@ -49,7 +49,7 @@ public class MybatisAgentConversationStore implements AgentConversationStore {
 
         mapper.deleteMessagesBySessionId(session.getId());
         if (!sessionContext.messages().isEmpty()) {
-            mapper.insertMessages(toMessageEntities(session.getId(), sessionContext.messages()));
+            mapper.insertMessages(toMessageEntities(session.getId(), 0, sessionContext.messages()));
         }
     }
 
@@ -114,10 +114,6 @@ public class MybatisAgentConversationStore implements AgentConversationStore {
                         .toList(),
                 session.getCreatedAt(),
                 session.getUpdatedAt());
-    }
-
-    private List<AgentConversationMessage> toMessageEntities(long sessionId, List<AgentMessage> messages) {
-        return toMessageEntities(sessionId, 0, messages);
     }
 
     private List<AgentConversationMessage> toMessageEntities(long sessionId, int firstSequenceNo,

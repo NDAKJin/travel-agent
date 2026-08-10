@@ -6,6 +6,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.travelagent.travelagent.config.AuthProperties;
 import com.travelagent.travelagent.auth.service.JwtTokenService;
 import jakarta.servlet.FilterChain;
@@ -24,7 +25,6 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
-import org.springframework.test.util.ReflectionTestUtils;
 
 class AccessTokenAuthenticationFilterTest {
 
@@ -48,14 +48,8 @@ class AccessTokenAuthenticationFilterTest {
                 .build();
         jwtDecoder.setJwtValidator(token -> OAuth2TokenValidatorResult.success());
 
-        jwtTokenService = new JwtTokenService();
-        ReflectionTestUtils.setField(jwtTokenService, "properties", properties);
-        ReflectionTestUtils.setField(jwtTokenService, "clock", FIXED_CLOCK);
-        ReflectionTestUtils.setField(jwtTokenService, "jwtEncoder", jwtEncoder);
-        ReflectionTestUtils.setField(jwtTokenService, "jwtDecoder", jwtDecoder);
-
-        filter = new AccessTokenAuthenticationFilter();
-        ReflectionTestUtils.setField(filter, "jwtTokenService", jwtTokenService);
+        jwtTokenService = new JwtTokenService(properties, FIXED_CLOCK, jwtEncoder, jwtDecoder);
+        filter = new AccessTokenAuthenticationFilter(jwtTokenService, new ObjectMapper());
     }
 
     @Test

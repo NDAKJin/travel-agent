@@ -35,7 +35,9 @@ public class ScenicSpotGeoService {
 
     public List<AdminScenicSpotResponse> list() {
         long startedAt = System.nanoTime();
-        JsonNode root = request("GET", "/" + indexName() + "/_search?size=1000", null);
+        JsonNode root = request("POST", "/" + indexName() + "/_search", Map.of(
+                "size", 1000, "query", Map.of("bool", Map.of("must_not", List.of(
+                        Map.of("match", Map.of("categoryGroup", "便民服务")))))));
         List<AdminScenicSpotResponse> result = new ArrayList<>();
         for (JsonNode hit : root.path("hits").path("hits")) result.add(toResponse(hit.path("_source"), false));
         log.info("Scenic spot list completed: resultCount={}, durationMs={}", result.size(), elapsedMillis(startedAt));
@@ -48,7 +50,7 @@ public class ScenicSpotGeoService {
         String spotId = id == null || id.isBlank() ? UUID.randomUUID().toString() : id;
         Instant now = Instant.now();
         Map<String, Object> source = Map.of("id", spotId, "name", input.name().trim(),
-                "category", SCENIC_CATEGORY,
+                "category", SCENIC_CATEGORY, "categoryGroup", SCENIC_CATEGORY,
                 "location", Map.of("lat", input.latitude(), "lon", input.longitude()),
                 "updatedAt", now.toString());
         AdminScenicSpotResponse previous = findById(spotId);
@@ -113,6 +115,11 @@ public class ScenicSpotGeoService {
                 "id", Map.of("type", "keyword"),
                 "name", Map.of("type", "text"),
                 "category", Map.of("type", "keyword"),
+                "categoryGroup", Map.of("type", "keyword"),
+                "description", Map.of("type", "text"),
+                "address", Map.of("type", "text"),
+                "longitude", Map.of("type", "double"),
+                "latitude", Map.of("type", "double"),
                 "location", Map.of("type", "geo_point"),
                 "updatedAt", Map.of("type", "date")))));
     }

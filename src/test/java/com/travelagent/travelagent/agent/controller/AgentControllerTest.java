@@ -12,6 +12,7 @@ import com.travelagent.travelagent.agent.dto.AgentChatResponse;
 import com.travelagent.travelagent.agent.dto.AgentConversationMessageResponse;
 import com.travelagent.travelagent.agent.dto.AgentSessionDetailResponse;
 import com.travelagent.travelagent.agent.dto.AgentSessionSummaryResponse;
+import com.travelagent.travelagent.agent.service.NearbyPoiSearchService;
 import com.travelagent.travelagent.agent.service.ReactAgentService;
 import com.travelagent.travelagent.auth.security.AuthenticatedUser;
 import java.util.List;
@@ -20,7 +21,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 class AgentControllerTest {
@@ -34,8 +34,7 @@ class AgentControllerTest {
     @BeforeEach
     void setUp() {
         reactAgentService = mock(ReactAgentService.class);
-        AgentController agentController = new AgentController();
-        ReflectionTestUtils.setField(agentController, "reactAgentService", reactAgentService);
+        AgentController agentController = new AgentController(reactAgentService, mock(NearbyPoiSearchService.class));
         mockMvc = MockMvcBuilders.standaloneSetup(agentController).build();
     }
 

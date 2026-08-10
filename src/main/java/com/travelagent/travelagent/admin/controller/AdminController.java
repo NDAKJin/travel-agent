@@ -8,9 +8,13 @@ import com.travelagent.travelagent.admin.dto.AdminScenicDocumentResponse;
 import com.travelagent.travelagent.admin.dto.AdminScenicSpotRequest;
 import com.travelagent.travelagent.admin.dto.AdminScenicSpotResponse;
 import com.travelagent.travelagent.admin.dto.AdminWxUserResponse;
+import com.travelagent.travelagent.admin.dto.AdminServicePointRequest;
+import com.travelagent.travelagent.admin.dto.AdminServicePointResponse;
 import com.travelagent.travelagent.admin.service.AdminManagementService;
 import com.travelagent.travelagent.admin.service.AmapPlaceSearchService;
 import com.travelagent.travelagent.admin.service.ScenicSpotGeoService;
+import com.travelagent.travelagent.admin.service.ServicePointGeoService;
+import com.travelagent.travelagent.admin.service.ServicePointCategoryService;
 import com.travelagent.travelagent.common.dto.PageResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
@@ -38,6 +42,39 @@ public class AdminController {
     private final AdminManagementService adminManagementService;
     private final ScenicSpotGeoService scenicSpotGeoService;
     private final AmapPlaceSearchService amapPlaceSearchService;
+    private final ServicePointGeoService servicePointGeoService;
+    private final ServicePointCategoryService servicePointCategoryService;
+
+    @GetMapping("/service-point-categories")
+    public List<String> listServicePointCategories() { return servicePointCategoryService.list(); }
+
+    @PostMapping("/service-point-categories")
+    public String createServicePointCategory(@RequestBody String name) { return servicePointCategoryService.create(name.replaceAll("^\"|\"$", "")); }
+
+    @GetMapping("/service-points")
+    @Operation(summary = "List convenience service points")
+    public PageResponse<AdminServicePointResponse> listServicePoints(
+            @RequestParam(required = false) String category,
+            @RequestParam(defaultValue = "1") @Min(1) int page,
+            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
+        return servicePointGeoService.list(category, page, size);
+    }
+
+    @GetMapping("/service-points/{id}")
+    public AdminServicePointResponse getServicePoint(@PathVariable String id) { return servicePointGeoService.get(id); }
+
+    @PostMapping("/service-points")
+    public AdminServicePointResponse createServicePoint(@Valid @RequestBody AdminServicePointRequest request) {
+        return servicePointGeoService.save(null, request);
+    }
+
+    @PutMapping("/service-points/{id}")
+    public AdminServicePointResponse updateServicePoint(@PathVariable String id, @Valid @RequestBody AdminServicePointRequest request) {
+        return servicePointGeoService.save(id, request);
+    }
+
+    @DeleteMapping("/service-points/{id}")
+    public void deleteServicePoint(@PathVariable String id) { servicePointGeoService.delete(id); }
 
     @GetMapping("/wx-users")
     @Operation(summary = "Search wx users")

@@ -18,7 +18,6 @@ import org.springframework.security.oauth2.core.OAuth2TokenValidatorResult;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
-import org.springframework.test.util.ReflectionTestUtils;
 
 class JwtTokenServiceTest {
 
@@ -30,17 +29,17 @@ class JwtTokenServiceTest {
         properties.setJwtSecret("test-secret-key-for-hs256-signing-123456");
         properties.setAccessTokenTtl(Duration.ofMinutes(15));
         properties.setRefreshTokenTtl(Duration.ofDays(1));
-        jwtTokenService = new JwtTokenService();
         SecretKeySpec secretKey = new SecretKeySpec(properties.getJwtSecret().getBytes(), "HmacSHA256");
         JwtEncoder jwtEncoder = new NimbusJwtEncoder(new ImmutableSecret<>(secretKey));
         NimbusJwtDecoder jwtDecoder = NimbusJwtDecoder.withSecretKey(secretKey)
                 .macAlgorithm(MacAlgorithm.HS256)
                 .build();
         jwtDecoder.setJwtValidator(token -> OAuth2TokenValidatorResult.success());
-        ReflectionTestUtils.setField(jwtTokenService, "properties", properties);
-        ReflectionTestUtils.setField(jwtTokenService, "clock", Clock.fixed(Instant.parse("2026-08-02T00:00:00Z"), ZoneOffset.UTC));
-        ReflectionTestUtils.setField(jwtTokenService, "jwtEncoder", jwtEncoder);
-        ReflectionTestUtils.setField(jwtTokenService, "jwtDecoder", jwtDecoder);
+        jwtTokenService = new JwtTokenService(
+                properties,
+                Clock.fixed(Instant.parse("2026-08-02T00:00:00Z"), ZoneOffset.UTC),
+                jwtEncoder,
+                jwtDecoder);
     }
 
     @Test

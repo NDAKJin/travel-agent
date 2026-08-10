@@ -45,7 +45,7 @@ public class NearbyPoiSearchService {
         bool.put("filter", List.of(Map.of("geo_distance", geoDistance)));
         if (StringUtils.hasText(keyword)) {
             bool.put("must", List.of(Map.of("multi_match", Map.of(
-                    "query", keyword.trim(), "fields", List.of("name", "description")))));
+                    "query", keyword.trim(), "fields", List.of("name", "description", "category", "categoryGroup")))));
         } else {
             bool.put("must", List.of(Map.of("match_all", Map.of())));
         }
@@ -71,12 +71,15 @@ public class NearbyPoiSearchService {
             JsonNode sort = hit.path("sort");
             double distance = sort.path(0).asDouble();
             String address = source.path("address").asText("");
+            JsonNode sourceLocation = source.path("location");
+            double resultLongitude = source.has("longitude") ? source.path("longitude").asDouble() : sourceLocation.path("lon").asDouble();
+            double resultLatitude = source.has("latitude") ? source.path("latitude").asDouble() : sourceLocation.path("lat").asDouble();
             if (address.isBlank()) {
-                address = "坐标 " + source.path("latitude").asDouble() + ", " + source.path("longitude").asDouble();
+                address = "坐标 " + resultLatitude + ", " + resultLongitude;
             }
             pois.add(new NearbyPoi(source.path("id").asText(), source.path("name").asText(),
                     address, source.path("description").asText(""),
-                    source.path("latitude").asDouble(), source.path("longitude").asDouble(), distance));
+                    resultLatitude, resultLongitude, distance));
             if (!sort.isEmpty()) {
                 List<Object> cursor = new ArrayList<>();
                 sort.forEach(value -> cursor.add(value.isNumber() ? value.numberValue() : value.asText()));

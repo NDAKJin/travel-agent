@@ -9,8 +9,8 @@ import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtClaimsSet;
@@ -24,23 +24,17 @@ import org.springframework.util.Assert;
 
 @Service
 @Slf4j
+@RequiredArgsConstructor
 public class JwtTokenService {
     private static final String CLAIM_USER_ID = "uid";
     private static final String CLAIM_USER_TYPE = "userType";
     private static final String CLAIM_DISPLAY_NAME = "displayName";
     private static final String CLAIM_TOKEN_TYPE = "token_type";
 
-    @Autowired
-    private AuthProperties properties;
-
-    @Autowired
-    private Clock clock;
-
-    @Autowired
-    private JwtEncoder jwtEncoder;
-
-    @Autowired
-    private JwtDecoder jwtDecoder;
+    private final AuthProperties properties;
+    private final Clock clock;
+    private final JwtEncoder jwtEncoder;
+    private final JwtDecoder jwtDecoder;
 
     public TokenPair issueTokenPair(long userId, String userType, String subject, String displayName) {
         Instant issuedAt = clock.instant();

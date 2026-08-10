@@ -566,6 +566,7 @@
 
 .field input,
 .field textarea,
+.field select,
 .searchBar input,
 .editorCard textarea,
 .editorCard input {
@@ -580,6 +581,8 @@
   color: #1d3426;
   outline: none;
 }
+
+.field select { appearance: none; cursor: pointer; }
 
 .sidebar {
   display: flex;
@@ -704,6 +707,8 @@
   height: 100%;
   min-height: 0;
 }
+
+.panelHeaderHidden { display: none; }
 
 .detailShell {
   position: relative;
@@ -1022,6 +1027,71 @@
   align-items: stretch;
 }
 
+.servicePointsLayout {
+  overflow: auto;
+  align-items: start;
+}
+
+.serviceOverview,
+.serviceEditorShell {
+  min-height: 0;
+  overflow: auto;
+  padding: 4px 2px 24px;
+}
+
+.serviceOverviewHeader,
+.serviceEditorTopBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 18px;
+}
+
+.serviceOverviewLead { margin: 8px 0 0; color: #5c7367; font-size: 13px; }
+.serviceListToolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.serviceListToolbar select { min-width: 130px; border: 0; border-radius: 12px; padding: 9px 12px; color: #305241; background: #f5fbf5; box-shadow: inset 0 0 0 1px rgba(49,122,76,.12); }
+.serviceOverviewGrid { display: grid; grid-template-columns: minmax(280px, .9fr) minmax(0, 1.4fr); gap: 18px; min-height: 430px; }
+.serviceOverviewGrid > .cardPanel { min-height: 430px; }
+.serviceEditorCard { display: grid; grid-template-columns: minmax(0, 1fr) minmax(360px, .95fr); gap: 18px; padding: 28px; border-radius: 26px; background: rgba(255,255,255,.92); box-shadow: 0 22px 56px rgba(33,89,57,.1); }
+.serviceEditorCard .scenicEditorFields { grid-column: 1; }
+.serviceEditorCard .editorMapPanel { grid-column: 2; grid-row: 1; }
+.serviceEditorCard .errorText,
+.serviceEditorCard .editorFooter { grid-column: 1 / -1; }
+.serviceEditorCard textarea { min-height: 150px; resize: vertical; }
+
+.servicePointsLayout > .cardPanel,
+.servicePointsLayout > .editorCard {
+  height: auto;
+  min-height: 0;
+  overflow: visible;
+}
+
+.servicePointsLayout > .editorCard .field:last-of-type {
+  flex: 0 0 auto;
+}
+
+.servicePointsLayout > .editorCard textarea {
+  min-height: 120px;
+  flex: 0 0 auto;
+}
+
+.servicePointItem {
+  padding-right: 16px;
+  cursor: default;
+}
+
+.servicePointActions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.servicePointItem .secondaryButton {
+  position: static;
+  padding: 7px 12px;
+}
+
 .cardPanel {
   display: flex;
   flex-direction: column;
@@ -1091,6 +1161,10 @@
   .contentPanel {
     min-height: auto;
   }
+
+  .serviceOverviewGrid,
+  .serviceEditorCard { grid-template-columns: 1fr; }
+  .serviceEditorCard .editorMapPanel { grid-column: 1; grid-row: auto; position: static; }
 }
 
 @media (max-width: 720px) {

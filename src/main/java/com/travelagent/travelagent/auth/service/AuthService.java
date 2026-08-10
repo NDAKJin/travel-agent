@@ -20,36 +20,24 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Objects;
 import java.util.Optional;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @Transactional
 @Slf4j
+@RequiredArgsConstructor
 public class AuthService {
 
-    @Autowired
-    private WxUserMapper wxUserMapper;
-
-    @Autowired
-    private AdminUserMapper adminUserMapper;
-
-    @Autowired
-    private JwtTokenService jwtTokenService;
-
-    @Autowired
-    private RefreshTokenStore refreshTokenStore;
-
-    @Autowired
-    private PasswordHasher passwordHasher;
-
-    @Autowired
-    private WxMiniProgramIdentityResolver wxMiniProgramIdentityResolver;
-
-    @Autowired
-    private Clock clock;
+    private final WxUserMapper wxUserMapper;
+    private final AdminUserMapper adminUserMapper;
+    private final JwtTokenService jwtTokenService;
+    private final RefreshTokenStore refreshTokenStore;
+    private final PasswordHasher passwordHasher;
+    private final WxMiniProgramIdentityResolver wxMiniProgramIdentityResolver;
+    private final Clock clock;
 
     public AuthResponse loginWx(WxLoginRequest request) {
         WxSessionIdentity identity = wxMiniProgramIdentityResolver.resolve(request.code());

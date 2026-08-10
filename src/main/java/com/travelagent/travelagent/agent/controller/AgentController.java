@@ -15,8 +15,8 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.List;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -30,13 +30,11 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/agent")
 @Tag(name = "Travel Agent", description = "Travel assistant chat API")
 @Slf4j
+@RequiredArgsConstructor
 public class AgentController {
 
-    @Autowired
-    private ReactAgentService reactAgentService;
-
-    @Autowired
-    private NearbyPoiSearchService nearbyPoiSearchService;
+    private final ReactAgentService reactAgentService;
+    private final NearbyPoiSearchService nearbyPoiSearchService;
 
     @PostMapping("/chat")
     @Operation(summary = "Chat with the agent", description = "Keeps multi-turn conversation by sessionId")

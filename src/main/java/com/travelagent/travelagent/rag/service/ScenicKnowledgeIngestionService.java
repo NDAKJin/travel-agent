@@ -64,10 +64,6 @@ public class ScenicKnowledgeIngestionService {
         return scenicVectorStoreProvider.getIfAvailable();
     }
 
-    private long elapsedMillis(long startedAt) {
-        return (System.nanoTime() - startedAt) / 1_000_000;
-    }
-
     private Document toDocument(String filename, String content) {
         String title = extractTitle(content, filename);
         return new Document(

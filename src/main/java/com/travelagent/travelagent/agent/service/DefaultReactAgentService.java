@@ -15,6 +15,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.AssistantMessage;
@@ -22,25 +23,18 @@ import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.model.ChatResponse;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 @Service
 @Slf4j
+@RequiredArgsConstructor
 public class DefaultReactAgentService implements ReactAgentService {
 
-    @Autowired
-    private AgentProperties agentProperties;
-
-    @Autowired
-    private PromptProvider promptProvider;
-
-    @Autowired
-    private ChatClient chatClient;
-
-    @Autowired
-    private AgentConversationStore conversationStore;
+    private final AgentProperties agentProperties;
+    private final PromptProvider promptProvider;
+    private final ChatClient chatClient;
+    private final AgentConversationStore conversationStore;
 
     @Override
     public AgentChatResponse chat(AuthenticatedUser user, AgentChatRequest request) {
@@ -140,7 +134,7 @@ public class DefaultReactAgentService implements ReactAgentService {
     }
 
     private String callModel(List<AgentMessage> history) {
-        List<Message> messages = toChatMessages(buildSystemPrompt(), history);
+        List<Message> messages = toChatMessages(promptProvider.systemPrompt(), history);
         try {
             log.debug("Calling chat model: model={}, sessionMessageCount={}, toolEnabled={}",
                     agentProperties.getQwen().getModel(),
@@ -160,10 +154,6 @@ public class DefaultReactAgentService implements ReactAgentService {
             log.error("Chat model call failed: model={}", agentProperties.getQwen().getModel(), exception);
             throw exception;
         }
-    }
-
-    private String buildSystemPrompt() {
-        return promptProvider.systemPrompt();
     }
 
     private String normalizeSessionId(String sessionId) {

@@ -3,6 +3,7 @@ import styles from "./App.module.css";
 import MapPicker from "./components/MapPicker";
 import ScenicSpotsMap from "./components/ScenicSpotsMap";
 import ConversationDetailPage from "./components/ConversationDetailPage";
+import ServicePointsPage from "./components/ServicePointsPage";
 import { api, ApiError } from "./services/api";
 import type {
   AdminConversationSummary,
@@ -18,8 +19,8 @@ const STORAGE_KEY = "travel-agent-session";
 const SESSION_EXPIRED = "__SESSION_EXPIRED__";
 const PAGE_SIZE = 6;
 
-type AdminView = "sessions" | "scenic" | "rag";
-type Screen = "dashboard" | "detail" | "scenicDetail" | "scenicCreate";
+type AdminView = "sessions" | "scenic" | "services" | "rag";
+type Screen = "dashboard" | "detail" | "scenicDetail" | "scenicCreate" | "serviceCreate";
 
 const readStoredSession = (): AuthSession | null => {
   const raw = window.localStorage.getItem(STORAGE_KEY);
@@ -673,6 +674,15 @@ export default function App() {
     );
   }
 
+  if (screen === "serviceCreate") {
+    return (
+      <main className={`${styles.page} ${styles.detailPage}`}>
+        {toastMessage ? <div className={styles.toast} role="alert"><span className={styles.toastIcon}>!</span><span>{toastMessage}</span></div> : null}
+        {session ? <ServicePointsPage accessToken={session.token.accessToken} authorized={withAuthorizedRequest} onToast={showToast} forceEditor onBack={() => { setAdminView("services"); setScreen("dashboard"); }} /> : null}
+      </main>
+    );
+  }
+
   if (screen === "scenicCreate") {
     return (
       <main className={`${styles.page} ${styles.detailPage}`}>
@@ -790,6 +800,9 @@ export default function App() {
             >
               <span>景区管理</span>
             </button>
+            <button type="button" className={adminView === "services" ? styles.navButtonActive : styles.navButton} onClick={() => setAdminView("services")}>
+              <span>便民服务</span>
+            </button>
             <button
               type="button"
               className={adminView === "rag" ? styles.navButtonActive : styles.navButton}
@@ -807,11 +820,11 @@ export default function App() {
         </aside>
 
         <section className={styles.contentPanel}>
-          <div className={styles.panelHeader}>
+          <div className={adminView === "services" ? styles.panelHeaderHidden : styles.panelHeader}>
             <div>
-              <div className={styles.eyebrow}>{adminView === "sessions" ? "会话管理" : adminView === "scenic" ? "景区管理" : "知识管理"}</div>
+              <div className={styles.eyebrow}>{adminView === "sessions" ? "会话管理" : adminView === "scenic" ? "景区管理" : adminView === "services" ? "便民服务" : "知识管理"}</div>
               <h2 className={styles.sectionTitle}>
-                {adminView === "sessions" ? (selectedUser ? `${selectedUser.nickname} 的会话` : "全部会话") : adminView === "scenic" ? "景区地理数据与知识" : "新增景区 Markdown"}
+                {adminView === "sessions" ? (selectedUser ? `${selectedUser.nickname} 的会话` : "全部会话") : adminView === "scenic" ? "景区地理数据与知识" : adminView === "services" ? "服务点地图与列表" : "新增景区 Markdown"}
               </h2>
             </div>
             {adminView === "sessions" && selectedUser ? <div className={styles.panelMeta}>{selectedUser.openId}</div> : null}
@@ -909,6 +922,8 @@ export default function App() {
                 </div>
               </div>
             </div>
+          ) : adminView === "services" ? (
+            session ? <ServicePointsPage accessToken={session.token.accessToken} authorized={withAuthorizedRequest} onToast={showToast} onCreatePage={() => setScreen("serviceCreate")} /> : null
           ) : adminView === "scenic" ? (
             <div className={styles.dualPanel}>
               <div className={styles.cardPanel}>

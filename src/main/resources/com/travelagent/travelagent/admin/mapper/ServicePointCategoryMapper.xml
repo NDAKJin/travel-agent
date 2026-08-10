@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.travelagent.travelagent.admin.mapper.ServicePointCategoryMapper">
+  <resultMap id="CategoryMap" type="com.travelagent.travelagent.admin.model.ServicePointCategory"><id column="id" property="id"/><result column="name" property="name"/><result column="created_at" property="createdAt"/></resultMap>
+  <select id="findAll" resultMap="CategoryMap">SELECT id, name, created_at FROM service_point_category ORDER BY id</select>
+  <insert id="insert" useGeneratedKeys="true" keyProperty="id">INSERT INTO service_point_category (name, created_at) VALUES (#{name}, #{createdAt})</insert>
+</mapper>

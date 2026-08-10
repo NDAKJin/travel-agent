@@ -97,6 +97,17 @@ export type AdminScenicSpot = {
   updatedAt: string;
 };
 
+export type AdminServicePoint = {
+  id: string;
+  name: string;
+  category: string;
+  description: string;
+  address: string;
+  longitude: number;
+  latitude: number;
+  updatedAt: string;
+};
+
 export type PageResponse<T> = {
   content: T[];
   total: number;
