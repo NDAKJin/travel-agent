@@ -1,120 +1,106 @@
+<div align="center">
+
 # Travel Agent
 
-> 本项目是一个正在开发中的学习项目，欢迎通过邮件 `ndakjin@qq.com` 进行交流。
+### 让每一次出发，都有一位懂目的地的 AI 向导
 
-一个面向旅行场景的 AI 助手项目，包含 Spring Boot 后端、React 管理前端和原生微信小程序。项目支持微信登录、AI 对话、会话历史、附近地点搜索、景区知识库检索以及景区和用户管理。
+面向旅行场景的智能助手与运营管理平台：在微信小程序中对话、规划行程、发现附近地点；在管理台维护景区、服务点与 RAG 知识库。
 
-## 功能概览
+[![Java](https://img.shields.io/badge/Java-21-ED8B00?logo=openjdk&logoColor=white)](https://openjdk.org/)
+[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.1-6DB33F?logo=springboot&logoColor=white)](https://spring.io/projects/spring-boot)
+[![Spring AI](https://img.shields.io/badge/Spring%20AI-2.0-6DB33F?logo=spring&logoColor=white)](https://spring.io/projects/spring-ai)
+[![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=20232A)](https://react.dev/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![MySQL](https://img.shields.io/badge/MySQL-4479A1?logo=mysql&logoColor=white)](https://www.mysql.com/)
+[![Redis](https://img.shields.io/badge/Redis-DC382D?logo=redis&logoColor=white)](https://redis.io/)
+[![Elasticsearch](https://img.shields.io/badge/Elasticsearch-005571?logo=elasticsearch&logoColor=white)](https://www.elastic.co/elasticsearch)
+[![Vite](https://img.shields.io/badge/Vite-7-646CFF?logo=vite&logoColor=white)](https://vite.dev/)
+[![WeChat](https://img.shields.io/badge/WeChat%20Mini%20Program-07C160?logo=wechat&logoColor=white)](https://developers.weixin.qq.com/miniprogram/dev/framework/)
+[![License](https://img.shields.io/badge/license-MIT-2ea44f)](LICENSE)
 
-- 微信小程序登录与用户会话管理
-- 基于 Spring AI 的旅行问答与行程建议
-- 会话创建、历史记录和上下文保存
-- 基于用户当前位置的附近景点及文旅服务搜索
-- 景区知识库 RAG 检索
-- Elasticsearch 景区地理索引与知识向量索引
-- React 管理后台
-  - 微信用户查询
-  - 对话记录查看
-  - 景区信息维护
-  - 景区知识文档录入
-  - 高德地图地点搜索与选点
+<a href="https://openjdk.org/"><img src="https://skillicons.dev/icons?i=java,spring,react,ts,mysql,redis,elasticsearch" alt="Travel Agent 技术栈" /></a>
 
-## 项目结构
+**Java 21** · **Spring Boot 4** · **Spring AI** · **React 18** · **微信小程序** · **Elasticsearch**
 
-```text
-travel-agent/
-├── src/                         # Spring Boot 后端
-│   ├── main/java/.../auth/      # 登录、JWT、权限认证
-│   ├── main/java/.../agent/     # AI 对话、工具调用、会话管理
-│   ├── main/java/.../admin/     # 管理后台接口
-│   ├── main/java/.../rag/       # 景区知识库与 RAG
-│   └── main/resources/          # 配置和 MyBatis 映射文件
-├── fe/                          # React + TypeScript 管理前端
-├── miniprogram/                 # 原生微信小程序
-├── scripts/start.sh             # Linux 生产环境启动脚本
-├── pom.xml
-└── mvnw / mvnw.cmd
+[快速开始](#快速开始) · [系统架构](#系统架构) · [API 文档](#api-文档) · [项目结构](#项目结构)
+
+</div>
+
+## 项目简介
+
+Travel Agent 将旅行问答、目的地知识和运营管理放进同一套系统：
+
+| 使用者 | 能做什么 |
+| --- | --- |
+| 旅行者 | 微信授权登录、AI 旅行问答、会话历史、附近景点与服务推荐 |
+| 运营人员 | 管理微信用户、会话、景区、服务点、地图地点与 Markdown 知识库 |
+
+## 核心能力
+
+- **上下文旅行对话**：基于 OpenAI 兼容模型生成旅行建议，支持多轮会话。
+- **RAG 目的地知识**：景区文档写入 Elasticsearch 向量索引，为回答提供可检索的本地知识。
+- **附近地点推荐**：结合用户位置与高德地图服务搜索周边景点和文旅服务。
+- **运营管理台**：React + TypeScript 管理会话、景区、服务点和知识内容。
+- **微信小程序入口**：原生 WXML / WXSS / JavaScript，完成登录、聊天和历史会话。
+- **安全认证**：微信登录与管理端登录统一使用 JWT，刷新令牌存储在 Redis。
+
+## 系统架构
+
+```mermaid
+flowchart LR
+    mini[微信小程序]
+    admin[React 管理台]
+    api[Travel Agent API<br/>Spring Boot]
+    mysql[(MySQL)]
+    redis[(Redis)]
+    es[(Elasticsearch<br/>RAG + 地理索引)]
+    amap[高德地图 API]
+    model[OpenAI 兼容模型]
+
+    mini --> api
+    admin --> api
+    api --> mysql
+    api --> redis
+    api --> es
+    api --> amap
+    api --> model
 ```
 
 ## 技术栈
 
-### 后端
+| 层次 | 技术 |
+| --- | --- |
+| Backend | Java 21、Spring Boot 4、Spring AI、Spring Security、MyBatis |
+| Data | MySQL、Redis、Elasticsearch |
+| Admin console | React 18、TypeScript、Vite、高德地图 JS API |
+| Mini program | 原生 JavaScript、WXML、WXSS |
+| API docs | Springdoc OpenAPI、NextDoc4j |
 
-- Java 21
-- Spring Boot 4.1
-- Spring AI 2.0
-- Spring Security + JWT
-- MyBatis
-- MySQL / H2
-- Redis（刷新令牌存储）
-- Elasticsearch（景区地理检索与向量知识库）
-- Maven Wrapper
+## 快速开始
 
-### 前端
-
-- React 18
-- TypeScript
-- Vite
-- 高德地图 JS API
-
-### 小程序
-
-- 原生微信小程序 JavaScript / WXML / WXSS
-- 微信 `wx.login()` 登录流程
-
-## 环境要求
+### 环境要求
 
 - JDK 21+
-- Maven 3.9+（也可以使用项目自带的 Maven Wrapper）
 - Node.js 18+
-- MySQL
-- Redis
-- Elasticsearch
-- 可用的 OpenAI 兼容模型服务
-- 微信小程序 AppID 和 AppSecret
-- 高德地图 Web 服务 Key；管理前端地图还需要 JS API Key
+- MySQL、Redis、Elasticsearch
+- OpenAI 兼容模型服务 API Key
+- 使用微信登录时，需要小程序 AppID / AppSecret；使用地图功能时，需要高德 Web 服务 Key
 
-## 配置
+### 1. 配置并启动后端
 
-请将 [`application.example.yml`](src/main/resources/application.example.yml) 复制为 `src/main/resources/application.yml`，再填写数据库、Redis、模型服务、微信和高德地图配置。
+复制示例配置：
 
-
-后端常用配置可使用 Spring Boot 的环境变量命名方式：
-
-| 配置项 | 环境变量示例 | 用途 |
-| --- | --- | --- |
-| 数据库 | `SPRING_DATASOURCE_URL` | MySQL JDBC 连接地址 |
-| 数据库用户名 | `SPRING_DATASOURCE_USERNAME` | MySQL 用户名 |
-| 数据库密码 | `SPRING_DATASOURCE_PASSWORD` | MySQL 密码 |
-| Redis | `SPRING_DATA_REDIS_HOST` / `SPRING_DATA_REDIS_PORT` | 刷新令牌存储 |
-| JWT 密钥 | `TRAVEL_AGENT_AUTH_JWT_SECRET` | JWT 签名密钥 |
-| 微信 AppID | `TRAVEL_AGENT_AUTH_WX_APP_ID` | 微信登录 |
-| 微信 Secret | `TRAVEL_AGENT_AUTH_WX_SECRET` | 微信登录 |
-| 大模型 API Key | `TRAVEL_AGENT_AGENT_QWEN_API_KEY` 或 Spring AI 对应配置 | AI 对话与向量嵌入 |
-| 高德 Web 服务 Key | `TRAVEL_AGENT_AMAP_WEB_SERVICE_KEY` | 后端附近地点搜索 |
-| Elasticsearch | `TRAVEL_AGENT_AGENT_RAG_ELASTICSEARCH_HOST` / `..._PORT` | RAG 和地理索引 |
-
-RAG 默认开启。如果本地暂时没有 Elasticsearch，可设置：
-
-```bash
-TRAVEL_AGENT_AGENT_RAG_ENABLED=false
+```powershell
+Copy-Item src/main/resources/application.example.yml src/main/resources/application.yml
 ```
 
-管理前端配置位于 `fe/.env`，可参考 [`fe/.env.example`](fe/.env.example)：
+在 `application.yml` 中填写数据库、Redis、模型服务、微信、高德地图和 Elasticsearch 配置。暂时不使用 RAG 时可关闭：
 
-```dotenv
-VITE_API_BASE_URL=http://localhost:8080
-VITE_AMAP_KEY=your_amap_web_js_key
-VITE_AMAP_SECURITY_JS_CODE=your_amap_security_js_code
+```powershell
+$env:TRAVEL_AGENT_AGENT_RAG_ENABLED = "false"
 ```
 
-微信小程序后端地址配置在本地的 `miniprogram/utils/config.js`，示例文件为 [`miniprogram/utils/config.example.js`](miniprogram/utils/config.example.js)。
-
-## 启动后端
-
-先准备 MySQL、Redis、Elasticsearch 以及模型服务，并完成环境变量配置。
-
-Windows：
+启动 API：
 
 ```powershell
 .\mvnw.cmd spring-boot:run
@@ -126,34 +112,71 @@ Linux / macOS：
 ./mvnw spring-boot:run
 ```
 
-也可以先构建 JAR：
+默认地址：`http://localhost:8080`
 
-```bash
-./mvnw clean package
-java -jar target/travel-agent-0.0.1-SNAPSHOT.jar
-```
+### 2. 启动管理台
 
-
-
-## 启动管理前端
-
-```bash
+```powershell
 cd fe
+Copy-Item .env.example .env
 npm install
 npm run dev
 ```
 
-默认开发地址为 `http://localhost:5173`。
+在 `fe/.env` 中设置 `VITE_API_BASE_URL=http://localhost:8080`。管理台默认地址：`http://localhost:5173`。
 
+### 3. 导入微信小程序
 
-## 启动微信小程序
+1. 复制 `miniprogram/utils/config.example.js` 为 `config.js` 并填写后端地址。
+2. 复制 `miniprogram/project.config.example.json` 为 `project.config.json` 并填写 AppID。
+3. 使用微信开发者工具导入 `miniprogram/` 目录。
 
-1. 安装并打开微信开发者工具。
-2. 导入项目目录 `miniprogram/`。
-3. 将 `miniprogram/utils/config.example.js` 复制为本地 `config.js`，再填写实际可访问的 HTTPS 后端地址。
-4. 将 `miniprogram/project.config.example.json` 复制为本地 `project.config.json`，再填写自己的 AppID。
-5. 在后端配置微信 AppID 和 AppSecret。
+真机调试需要 HTTPS 地址，并在微信公众平台配置合法域名。
 
-## License
+## API 文档
 
-本项目采用 [MIT License](LICENSE) 开源。
+后端启动后访问：
+
+- OpenAPI UI：`http://localhost:8080/doc.html`
+- OpenAPI JSON：`http://localhost:8080/v3/api-docs`
+
+主要接口分组：
+
+| 分组 | 示例 |
+| --- | --- |
+| 认证 | `POST /api/auth/wx/login`、`POST /api/auth/admin/login`、`POST /api/auth/refresh` |
+| AI 助手 | `POST /api/agent/chat`、`GET /api/agent/sessions`、`POST /api/agent/nearby/next` |
+| 运营管理 | `/api/admin/scenic-spots`、`/api/admin/service-points`、`/api/admin/sessions` |
+| 知识库 | `POST /api/admin/rag/scenic-documents` |
+
+## 项目结构
+
+```text
+travel-agent/
+├── src/                 Spring Boot API：认证、Agent、RAG、管理端
+├── fe/                  React + TypeScript 管理台
+├── miniprogram/         原生微信小程序
+├── scripts/             部署与辅助脚本
+├── pom.xml              Maven 构建配置
+└── LICENSE              MIT License
+```
+
+## 开发与测试
+
+运行后端测试：
+
+```powershell
+.\mvnw.cmd test
+```
+
+检查并构建管理台：
+
+```powershell
+cd fe
+npm run check
+npm run build
+```
+
+## 开源协议
+
+[MIT](LICENSE) · 联系方式：`ndakjin@qq.com`
