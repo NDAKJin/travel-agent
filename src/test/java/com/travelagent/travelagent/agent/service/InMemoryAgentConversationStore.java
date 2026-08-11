@@ -9,7 +9,7 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
-public class InMemoryAgentConversationStore implements AgentConversationStore {
+class InMemoryAgentConversationStore implements AgentConversationStore {
 
     private final ConcurrentMap<String, AgentSessionContext> sessions = new ConcurrentHashMap<>();
 
@@ -25,13 +25,9 @@ public class InMemoryAgentConversationStore implements AgentConversationStore {
 
     @Override
     public void append(long userId, AgentSessionContext sessionContext, List<AgentMessage> messages) {
-        sessions.compute(key(userId, sessionContext.sessionId()), (ignored, existing) -> {
-            return new AgentSessionContext(
-                    sessionContext.sessionId(),
-                    sessionContext.messages(),
-                    existing == null ? sessionContext.createdAt() : existing.createdAt(),
-                    sessionContext.updatedAt());
-        });
+        sessions.compute(key(userId, sessionContext.sessionId()), (ignored, existing) -> new AgentSessionContext(
+                sessionContext.sessionId(), sessionContext.messages(),
+                existing == null ? sessionContext.createdAt() : existing.createdAt(), sessionContext.updatedAt()));
     }
 
     @Override
@@ -54,14 +50,9 @@ public class InMemoryAgentConversationStore implements AgentConversationStore {
                 .filter(message -> "user".equalsIgnoreCase(message.role()))
                 .map(AgentMessage::content)
                 .findFirst()
-                .orElse("新对话");
+                .orElse("new-chat");
         String preview = sessionContext.messages().isEmpty() ? "" : sessionContext.messages().getLast().content();
-        return new AgentSessionSummary(
-                sessionContext.sessionId(),
-                title,
-                preview,
-                sessionContext.messages().size(),
-                sessionContext.updatedAt());
+        return new AgentSessionSummary(sessionContext.sessionId(), title, preview, sessionContext.messages().size(), sessionContext.updatedAt());
     }
 
     private String key(long userId, String sessionId) {

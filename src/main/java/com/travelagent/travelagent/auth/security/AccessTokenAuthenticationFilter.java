@@ -1,6 +1,6 @@
 package com.travelagent.travelagent.auth.security;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.alibaba.fastjson2.JSON;
 import com.travelagent.travelagent.auth.exception.AuthException;
 import com.travelagent.travelagent.auth.model.DecodedToken;
 import com.travelagent.travelagent.auth.service.JwtTokenService;
@@ -26,7 +26,6 @@ import org.springframework.web.filter.OncePerRequestFilter;
 public class AccessTokenAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtTokenService jwtTokenService;
-    private final ObjectMapper objectMapper;
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
@@ -80,6 +79,6 @@ public class AccessTokenAuthenticationFilter extends OncePerRequestFilter {
         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         response.setCharacterEncoding("UTF-8");
-        objectMapper.writeValue(response.getWriter(), java.util.Map.of("code", "AUTH_ERROR", "message", message));
+        response.getWriter().write(JSON.toJSONString(java.util.Map.of("code", "AUTH_ERROR", "message", message)));
     }
 }

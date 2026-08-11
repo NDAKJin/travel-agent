@@ -6,8 +6,8 @@ import com.travelagent.travelagent.agent.dto.AgentSessionDetailResponse;
 import com.travelagent.travelagent.agent.dto.AgentSessionSummaryResponse;
 import com.travelagent.travelagent.agent.dto.NearbyNextPageRequest;
 import com.travelagent.travelagent.agent.dto.NearbySearchResult;
+import com.travelagent.travelagent.agent.service.DefaultReactAgentService;
 import com.travelagent.travelagent.agent.service.NearbyPoiSearchService;
-import com.travelagent.travelagent.agent.service.ReactAgentService;
 import com.travelagent.travelagent.auth.security.AuthenticatedUser;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -33,7 +33,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class AgentController {
 
-    private final ReactAgentService reactAgentService;
+    private final DefaultReactAgentService reactAgentService;
     private final NearbyPoiSearchService nearbyPoiSearchService;
 
     @PostMapping("/chat")

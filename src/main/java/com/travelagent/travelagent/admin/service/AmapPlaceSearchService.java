@@ -1,7 +1,7 @@
 package com.travelagent.travelagent.admin.service;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONObject;
 import com.travelagent.travelagent.admin.dto.AdminMapPlaceResponse;
 import com.travelagent.travelagent.config.AmapProperties;
 import java.util.ArrayList;
@@ -18,7 +18,6 @@ import org.springframework.web.client.RestClient;
 public class AmapPlaceSearchService {
 
     private final AmapProperties amapProperties;
-    private final ObjectMapper objectMapper;
     private final RestClient restClient = RestClient.create("https://restapi.amap.com");
 
     public List<AdminMapPlaceResponse> search(String keyword) {
@@ -42,28 +41,29 @@ public class AmapPlaceSearchService {
                 .body(String.class);
 
         try {
-            JsonNode root = objectMapper.readTree(body);
-            if (!"1".equals(root.path("status").asText())) {
+            JSONObject root = JSON.parseObject(body);
+            if (!"1".equals(root.getString("status"))) {
                 log.warn("Amap place search failed: info={}, infocode={}",
-                        root.path("info").asText(), root.path("infocode").asText());
+                        root.getString("info"), root.getString("infocode"));
                 return List.of();
             }
 
             List<AdminMapPlaceResponse> places = new ArrayList<>();
-            for (JsonNode poi : root.path("pois")) {
-                String[] location = poi.path("location").asText("").split(",");
+            for (Object value : root.getList("pois", JSONObject.class)) {
+                JSONObject poi = (JSONObject) value;
+                String[] location = poi.getString("location", "").split(",");
                 if (location.length != 2) {
                     continue;
                 }
                 try {
                     places.add(new AdminMapPlaceResponse(
-                            poi.path("id").asText(),
-                            poi.path("name").asText(),
-                            poi.path("address").asText(),
+                            poi.getString("id"),
+                            poi.getString("name"),
+                            poi.getString("address"),
                             Double.parseDouble(location[0]),
                             Double.parseDouble(location[1])));
                 } catch (NumberFormatException ignored) {
-                    log.debug("Skipping Amap POI with invalid location: {}", poi.path("location").asText());
+                    log.debug("Skipping Amap POI with invalid location: {}", poi.getString("location"));
                 }
             }
             return places;

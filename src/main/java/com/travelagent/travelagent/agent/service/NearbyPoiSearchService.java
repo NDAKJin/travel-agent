@@ -1,7 +1,8 @@
 package com.travelagent.travelagent.agent.service;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONArray;
+import com.alibaba.fastjson2.JSONObject;
 import com.travelagent.travelagent.agent.dto.NearbyPoi;
 import com.travelagent.travelagent.agent.dto.NearbySearchResult;
 import com.travelagent.travelagent.config.AgentProperties;
@@ -29,7 +30,6 @@ public class NearbyPoiSearchService {
     private static final int QUERY_SIZE = PAGE_SIZE + 1;
 
     private final ObjectProvider<Rest5Client> restClientProvider;
-    private final ObjectMapper objectMapper;
     private final AgentProperties agentProperties;
 
     public NearbySearchResult search(double latitude, double longitude, String keyword,
@@ -58,31 +58,32 @@ public class NearbyPoiSearchService {
         body.put("sort", List.of(geoSort, Map.of("id", "asc")));
         if (searchAfter != null && !searchAfter.isEmpty()) body.put("search_after", searchAfter);
 
-        JsonNode root = request("POST", "/" + indexName() + "/_search", body);
+        JSONObject root = request("POST", "/" + indexName() + "/_search", body);
         List<NearbyPoi> pois = new ArrayList<>();
         List<Object> nextCursor = List.of();
         boolean hasMore = false;
-        for (JsonNode hit : root.path("hits").path("hits")) {
+        for (Object value : root.getJSONObject("hits").getJSONArray("hits")) {
+            JSONObject hit = (JSONObject) value;
             if (pois.size() >= PAGE_SIZE) {
                 hasMore = true;
                 break;
             }
-            JsonNode source = hit.path("_source");
-            JsonNode sort = hit.path("sort");
-            double distance = sort.path(0).asDouble();
-            String address = source.path("address").asText("");
-            JsonNode sourceLocation = source.path("location");
-            double resultLongitude = source.has("longitude") ? source.path("longitude").asDouble() : sourceLocation.path("lon").asDouble();
-            double resultLatitude = source.has("latitude") ? source.path("latitude").asDouble() : sourceLocation.path("lat").asDouble();
+            JSONObject source = hit.getJSONObject("_source");
+            JSONArray sort = hit.getJSONArray("sort");
+            double distance = sort.getDoubleValue(0);
+            String address = source.getString("address", "");
+            JSONObject sourceLocation = source.getJSONObject("location");
+            double resultLongitude = source.containsKey("longitude") ? source.getDoubleValue("longitude") : sourceLocation.getDoubleValue("lon");
+            double resultLatitude = source.containsKey("latitude") ? source.getDoubleValue("latitude") : sourceLocation.getDoubleValue("lat");
             if (address.isBlank()) {
                 address = "坐标 " + resultLatitude + ", " + resultLongitude;
             }
-            pois.add(new NearbyPoi(source.path("id").asText(), source.path("name").asText(),
-                    address, source.path("description").asText(""),
+            pois.add(new NearbyPoi(source.getString("id"), source.getString("name"),
+                    address, source.getString("description", ""),
                     resultLatitude, resultLongitude, distance));
             if (!sort.isEmpty()) {
                 List<Object> cursor = new ArrayList<>();
-                sort.forEach(value -> cursor.add(value.isNumber() ? value.numberValue() : value.asText()));
+                cursor.addAll(sort);
                 nextCursor = cursor;
             }
         }
@@ -93,7 +94,7 @@ public class NearbyPoiSearchService {
         return result;
     }
 
-    private JsonNode request(String method, String endpoint, Object body) {
+    private JSONObject request(String method, String endpoint, Object body) {
         Rest5Client restClient = restClientProvider.getIfAvailable();
         if (restClient == null) {
             throw new IllegalStateException("Elasticsearch client is not configured");
@@ -101,18 +102,18 @@ public class NearbyPoiSearchService {
         Request request = new Request(method, endpoint);
         long startedAt = System.nanoTime();
         try {
-            request.setJsonEntity(objectMapper.writeValueAsString(body));
+            request.setJsonEntity(JSON.toJSONString(body));
             Response response = restClient.performRequest(request);
             String payload = response.getEntity() == null ? "{}" : EntityUtils.toString(response.getEntity());
             log.debug("Elasticsearch request completed: method={}, endpoint={}, status={}, durationMs={}",
                     method, endpoint, response.getStatusCode(), elapsedMillis(startedAt));
-            if (response.getStatusCode() == 404) return objectMapper.createObjectNode();
+            if (response.getStatusCode() == 404) return new JSONObject();
             if (response.getStatusCode() >= 400) {
                 log.error("Elasticsearch request returned an error: method={}, endpoint={}, status={}, durationMs={}",
                         method, endpoint, response.getStatusCode(), elapsedMillis(startedAt));
                 throw new IllegalStateException("Nearby POI search failed: " + payload);
             }
-            return payload.isBlank() ? objectMapper.createObjectNode() : objectMapper.readTree(payload);
+            return payload.isBlank() ? new JSONObject() : JSON.parseObject(payload);
         } catch (IOException | ParseException exception) {
             log.error("Elasticsearch request failed: method={}, endpoint={}, durationMs={}",
                     method, endpoint, elapsedMillis(startedAt), exception);

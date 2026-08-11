@@ -19,9 +19,10 @@ class AgentPropertiesBindingTest {
                     "travel-agent.agent.profile.default-locale=zh-CN",
                     "travel-agent.agent.tool.enabled=false",
                     "travel-agent.agent.prompt.override=custom prompt",
-                    "travel-agent.agent.qwen.base-url=https://dashscope.aliyuncs.com/compatible-mode/v1",
-                    "travel-agent.agent.qwen.api-key=test-key",
-                    "travel-agent.agent.qwen.model=qwen-plus");
+                    "travel-agent.agent.qwen.model=qwen-plus",
+                    "travel-agent.agent.max-message-chars=123",
+                    "travel-agent.agent.max-session-id-chars=45",
+                    "travel-agent.agent.max-history-messages=6");
 
     @Test
     void bindsNestedAgentProperties() {
@@ -31,9 +32,10 @@ class AgentPropertiesBindingTest {
             assertThat(properties.getProfile().getDefaultLocale()).isEqualTo("zh-CN");
             assertThat(properties.getTool().isEnabled()).isFalse();
             assertThat(properties.getPrompt().getOverride()).isEqualTo("custom prompt");
-            assertThat(properties.getQwen().getBaseUrl()).isEqualTo("https://dashscope.aliyuncs.com/compatible-mode/v1");
-            assertThat(properties.getQwen().getApiKey()).isEqualTo("test-key");
             assertThat(properties.getQwen().getModel()).isEqualTo("qwen-plus");
+            assertThat(properties.getMaxMessageChars()).isEqualTo(123);
+            assertThat(properties.getMaxSessionIdChars()).isEqualTo(45);
+            assertThat(properties.getMaxHistoryMessages()).isEqualTo(6);
         });
     }
 
