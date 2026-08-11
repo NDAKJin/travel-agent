@@ -33,7 +33,8 @@ public class AccessTokenAuthenticationFilter extends OncePerRequestFilter {
         String path = request.getRequestURI();
         return path.startsWith("/api/auth/")
                 || path.startsWith("/doc.html")
-                || path.startsWith("/swagger-ui/")
+                || path.startsWith("/nextdoc/")
+                || path.equals("/favicon.ico")
                 || path.startsWith("/v3/api-docs")
                 || path.equals("/error");
     }

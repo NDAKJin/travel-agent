@@ -93,4 +93,12 @@ class AccessTokenAuthenticationFilterTest {
         assertThat(response.getStatus()).isEqualTo(200);
         verify(filterChain, times(1)).doFilter(request, response);
     }
+
+    @Test
+    void skipsNextDocAssetsAndOpenApiDocumentationPaths() {
+        assertThat(filter.shouldNotFilter(new MockHttpServletRequest("GET", "/doc.html"))).isTrue();
+        assertThat(filter.shouldNotFilter(new MockHttpServletRequest("GET", "/nextdoc/jse/index.js"))).isTrue();
+        assertThat(filter.shouldNotFilter(new MockHttpServletRequest("GET", "/v3/api-docs"))).isTrue();
+        assertThat(filter.shouldNotFilter(new MockHttpServletRequest("GET", "/swagger-ui/index.html"))).isFalse();
+    }
 }

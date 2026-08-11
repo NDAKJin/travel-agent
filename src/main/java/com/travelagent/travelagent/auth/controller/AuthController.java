@@ -6,6 +6,8 @@ import com.travelagent.travelagent.auth.dto.LogoutRequest;
 import com.travelagent.travelagent.auth.dto.RefreshTokenRequest;
 import com.travelagent.travelagent.auth.dto.WxLoginRequest;
 import com.travelagent.travelagent.auth.service.AuthService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -16,6 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/auth")
+@Tag(name = "认证", description = "微信用户与管理端登录认证")
 @Slf4j
 @RequiredArgsConstructor
 public class AuthController {
@@ -23,6 +26,7 @@ public class AuthController {
     private final AuthService authService;
 
     @PostMapping("/wx/login")
+    @Operation(summary = "微信小程序登录")
     public AuthResponse wxLogin(@Valid @RequestBody WxLoginRequest request) {
         log.info("WX login request received: codePresent={}, nicknamePresent={}",
                 request.code() != null && !request.code().isBlank(),
@@ -31,18 +35,21 @@ public class AuthController {
     }
 
     @PostMapping("/admin/login")
+    @Operation(summary = "管理端登录")
     public AuthResponse adminLogin(@Valid @RequestBody AdminLoginRequest request) {
         log.info("Admin login request received: username={}", request.username());
         return authService.loginAdmin(request);
     }
 
     @PostMapping("/refresh")
+    @Operation(summary = "刷新访问令牌")
     public AuthResponse refresh(@Valid @RequestBody RefreshTokenRequest request) {
         log.info("Token refresh request received");
         return authService.refresh(request);
     }
 
     @PostMapping("/logout")
+    @Operation(summary = "退出登录")
     public void logout(@Valid @RequestBody LogoutRequest request) {
         log.info("Logout request received");
         authService.logout(request);

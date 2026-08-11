@@ -17,6 +17,7 @@ import com.travelagent.travelagent.admin.service.ServicePointGeoService;
 import com.travelagent.travelagent.admin.service.ServicePointCategoryService;
 import com.travelagent.travelagent.common.dto.PageResponse;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -35,6 +36,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/admin")
+@Tag(name = "管理端", description = "运营数据、景区、服务点与知识库管理")
 @RequiredArgsConstructor
 @Validated
 public class AdminController {
@@ -46,13 +48,15 @@ public class AdminController {
     private final ServicePointCategoryService servicePointCategoryService;
 
     @GetMapping("/service-point-categories")
+    @Operation(summary = "查询便民服务分类")
     public List<String> listServicePointCategories() { return servicePointCategoryService.list(); }
 
     @PostMapping("/service-point-categories")
+    @Operation(summary = "新增便民服务分类")
     public String createServicePointCategory(@RequestBody String name) { return servicePointCategoryService.create(name.replaceAll("^\"|\"$", "")); }
 
     @GetMapping("/service-points")
-    @Operation(summary = "List convenience service points")
+    @Operation(summary = "查询便民服务点")
     public PageResponse<AdminServicePointResponse> listServicePoints(
             @RequestParam(required = false) String category,
             @RequestParam(defaultValue = "1") @Min(1) int page,
@@ -61,23 +65,27 @@ public class AdminController {
     }
 
     @GetMapping("/service-points/{id}")
+    @Operation(summary = "查询便民服务点详情")
     public AdminServicePointResponse getServicePoint(@PathVariable String id) { return servicePointGeoService.get(id); }
 
     @PostMapping("/service-points")
+    @Operation(summary = "新增便民服务点")
     public AdminServicePointResponse createServicePoint(@Valid @RequestBody AdminServicePointRequest request) {
         return servicePointGeoService.save(null, request);
     }
 
     @PutMapping("/service-points/{id}")
+    @Operation(summary = "修改便民服务点")
     public AdminServicePointResponse updateServicePoint(@PathVariable String id, @Valid @RequestBody AdminServicePointRequest request) {
         return servicePointGeoService.save(id, request);
     }
 
     @DeleteMapping("/service-points/{id}")
+    @Operation(summary = "删除便民服务点")
     public void deleteServicePoint(@PathVariable String id) { servicePointGeoService.delete(id); }
 
     @GetMapping("/wx-users")
-    @Operation(summary = "Search wx users")
+    @Operation(summary = "查询微信用户")
     public PageResponse<AdminWxUserResponse> searchWxUsers(@RequestParam(required = false) String keyword,
                                                            @RequestParam(defaultValue = "1") @Min(1) int page,
                                                            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
@@ -85,7 +93,7 @@ public class AdminController {
     }
 
     @GetMapping("/sessions")
-    @Operation(summary = "List sessions")
+    @Operation(summary = "查询用户会话")
     public PageResponse<AdminConversationSummaryResponse> listSessions(@RequestParam(required = false) Long wxUserId,
                                                                        @RequestParam(defaultValue = "1") @Min(1) int page,
                                                                        @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
@@ -93,31 +101,31 @@ public class AdminController {
     }
 
     @GetMapping("/sessions/{conversationId}")
-    @Operation(summary = "Get session detail")
+    @Operation(summary = "查询会话详情")
     public AgentSessionDetailResponse getSessionDetail(@PathVariable long conversationId) {
         return adminManagementService.getSessionDetail(conversationId);
     }
 
     @PostMapping("/rag/scenic-documents")
-    @Operation(summary = "Add a scenic markdown document to RAG")
+    @Operation(summary = "写入景区知识文档")
     public AdminScenicDocumentResponse addScenicDocument(@Valid @RequestBody AdminScenicDocumentCreateRequest request) {
         return adminManagementService.addScenicDocument(request);
     }
 
     @GetMapping("/scenic-spots")
-    @Operation(summary = "List scenic spots")
+    @Operation(summary = "查询景区列表")
     public List<AdminScenicSpotResponse> listScenicSpots() {
         return scenicSpotGeoService.list();
     }
 
     @GetMapping("/scenic-spots/{id}")
-    @Operation(summary = "Get scenic spot detail")
+    @Operation(summary = "查询景区详情")
     public AdminScenicSpotResponse getScenicSpot(@PathVariable String id) {
         return scenicSpotGeoService.get(id);
     }
 
     @GetMapping("/scenic-spots/nearby")
-    @Operation(summary = "Find nearby scenic spots")
+    @Operation(summary = "查询附近景区")
     public List<AdminScenicSpotResponse> nearbyScenicSpots(@RequestParam double longitude,
                                                            @RequestParam double latitude,
                                                            @RequestParam(defaultValue = "20km") String distance) {
@@ -125,26 +133,26 @@ public class AdminController {
     }
 
     @GetMapping("/map/places")
-    @Operation(summary = "Search Amap places")
+    @Operation(summary = "搜索高德地图地点")
     public List<AdminMapPlaceResponse> searchMapPlaces(@RequestParam String keyword) {
         return amapPlaceSearchService.search(keyword);
     }
 
     @PostMapping("/scenic-spots")
-    @Operation(summary = "Create scenic spot")
+    @Operation(summary = "新增景区")
     public AdminScenicSpotResponse createScenicSpot(@Valid @RequestBody AdminScenicSpotRequest request) {
         return scenicSpotGeoService.save(null, request);
     }
 
     @PutMapping("/scenic-spots/{id}")
-    @Operation(summary = "Update scenic spot")
+    @Operation(summary = "修改景区")
     public AdminScenicSpotResponse updateScenicSpot(@PathVariable String id,
                                                     @Valid @RequestBody AdminScenicSpotRequest request) {
         return scenicSpotGeoService.save(id, request);
     }
 
     @DeleteMapping("/scenic-spots/{id}")
-    @Operation(summary = "Delete scenic spot")
+    @Operation(summary = "删除景区")
     public void deleteScenicSpot(@PathVariable String id) {
         scenicSpotGeoService.delete(id);
     }
