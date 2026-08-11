@@ -6,7 +6,6 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.travelagent.travelagent.config.AuthProperties;
 import com.travelagent.travelagent.auth.service.JwtTokenService;
 import jakarta.servlet.FilterChain;
@@ -49,7 +48,7 @@ class AccessTokenAuthenticationFilterTest {
         jwtDecoder.setJwtValidator(token -> OAuth2TokenValidatorResult.success());
 
         jwtTokenService = new JwtTokenService(properties, FIXED_CLOCK, jwtEncoder, jwtDecoder);
-        filter = new AccessTokenAuthenticationFilter(jwtTokenService, new ObjectMapper());
+        filter = new AccessTokenAuthenticationFilter(jwtTokenService);
     }
 
     @Test
@@ -92,5 +91,13 @@ class AccessTokenAuthenticationFilterTest {
 
         assertThat(response.getStatus()).isEqualTo(200);
         verify(filterChain, times(1)).doFilter(request, response);
+    }
+
+    @Test
+    void skipsNextDocAssetsAndOpenApiDocumentationPaths() {
+        assertThat(filter.shouldNotFilter(new MockHttpServletRequest("GET", "/doc.html"))).isTrue();
+        assertThat(filter.shouldNotFilter(new MockHttpServletRequest("GET", "/nextdoc/jse/index.js"))).isTrue();
+        assertThat(filter.shouldNotFilter(new MockHttpServletRequest("GET", "/v3/api-docs"))).isTrue();
+        assertThat(filter.shouldNotFilter(new MockHttpServletRequest("GET", "/swagger-ui/index.html"))).isFalse();
     }
 }

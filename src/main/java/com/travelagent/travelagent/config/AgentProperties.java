@@ -14,8 +14,11 @@ public class AgentProperties {
     private final QwenProperties qwen = new QwenProperties();
     private final RagProperties rag = new RagProperties();
 
+    @Setter
     private int maxMessageChars = 4000;
+    @Setter
     private int maxSessionIdChars = 64;
+    @Setter
     private int maxHistoryMessages = 40;
 
     @Getter
@@ -47,8 +50,6 @@ public class AgentProperties {
     @Setter
     public static class QwenProperties {
 
-        private String baseUrl = "https://dashscope.aliyuncs.com/compatible-mode/v1";
-        private String apiKey;
         private String model = "qwen-plus";
 
     }

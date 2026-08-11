@@ -1,7 +1,7 @@
 package com.travelagent.travelagent.admin.service;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONObject;
 import com.travelagent.travelagent.admin.dto.AdminServicePointRequest;
 import com.travelagent.travelagent.admin.dto.AdminServicePointResponse;
 import com.travelagent.travelagent.config.AgentProperties;
@@ -27,7 +27,6 @@ import org.springframework.util.StringUtils;
 public class ServicePointGeoService {
     private static final String INDEX_CATEGORY = "便民服务";
     private final ObjectProvider<Rest5Client> restClientProvider;
-    private final ObjectMapper objectMapper;
     private final AgentProperties agentProperties;
 
     public PageResponse<AdminServicePointResponse> list(String category, int page, int size) {
@@ -39,20 +38,20 @@ public class ServicePointGeoService {
         if (StringUtils.hasText(category)) {
             query.put("must", List.of(Map.of("term", Map.of("category", category.trim()))));
         }
-        JsonNode root = request("POST", "/" + indexName() + "/_search", Map.of(
+        JSONObject root = request("POST", "/" + indexName() + "/_search", Map.of(
                 "from", offset, "size", safeSize, "track_total_hits", true,
                 "query", Map.of("bool", query),
                 "sort", List.of(Map.of("updatedAt", Map.of("order", "desc")))));
         List<AdminServicePointResponse> result = new ArrayList<>();
-        for (JsonNode hit : root.path("hits").path("hits")) result.add(toResponse(hit.path("_source")));
-        JsonNode totalNode = root.path("hits").path("total");
-        long total = totalNode.isNumber() ? totalNode.asLong() : totalNode.path("value").asLong();
+        for (Object hit : root.getJSONObject("hits").getJSONArray("hits")) result.add(toResponse(((JSONObject) hit).getJSONObject("_source")));
+        Object totalNode = root.getJSONObject("hits").get("total");
+        long total = totalNode instanceof Number number ? number.longValue() : ((JSONObject) totalNode).getLongValue("value");
         return new PageResponse<>(result, total, safePage, safeSize);
     }
 
     public AdminServicePointResponse get(String id) {
-        JsonNode source = request("GET", "/" + indexName() + "/_doc/" + id, null).path("_source");
-        if (source.isMissingNode() || !INDEX_CATEGORY.equals(source.path("categoryGroup").asText()))
+        JSONObject source = request("GET", "/" + indexName() + "/_doc/" + id, null).getJSONObject("_source");
+        if (source == null || !INDEX_CATEGORY.equals(source.getString("categoryGroup")))
             throw new IllegalArgumentException("便民服务点不存在");
         return toResponse(source);
     }
@@ -76,26 +75,26 @@ public class ServicePointGeoService {
         request("DELETE", "/" + indexName() + "/_doc/" + id, null);
     }
 
-    private AdminServicePointResponse toResponse(JsonNode source) {
-        JsonNode location = source.path("location");
-        double longitude = source.has("longitude") ? source.path("longitude").asDouble() : location.path("lon").asDouble();
-        double latitude = source.has("latitude") ? source.path("latitude").asDouble() : location.path("lat").asDouble();
-        return new AdminServicePointResponse(source.path("id").asText(), source.path("name").asText(),
-                source.path("category").asText(), source.path("description").asText(""), source.path("address").asText(""),
-                longitude, latitude, Instant.parse(source.path("updatedAt").asText()));
+    private AdminServicePointResponse toResponse(JSONObject source) {
+        JSONObject location = source.getJSONObject("location");
+        double longitude = source.containsKey("longitude") ? source.getDoubleValue("longitude") : location.getDoubleValue("lon");
+        double latitude = source.containsKey("latitude") ? source.getDoubleValue("latitude") : location.getDoubleValue("lat");
+        return new AdminServicePointResponse(source.getString("id"), source.getString("name"),
+                source.getString("category"), source.getString("description", ""), source.getString("address", ""),
+                longitude, latitude, Instant.parse(source.getString("updatedAt")));
     }
 
-    private JsonNode request(String method, String endpoint, Object body) {
+    private JSONObject request(String method, String endpoint, Object body) {
         Rest5Client client = restClientProvider.getIfAvailable();
         if (client == null) throw new IllegalStateException("Elasticsearch client is not configured");
         try {
             Request request = new Request(method, endpoint);
-            if (body != null) request.setJsonEntity(objectMapper.writeValueAsString(body));
+            if (body != null) request.setJsonEntity(JSON.toJSONString(body));
             var response = client.performRequest(request);
             String payload = response.getEntity() == null ? "{}" : EntityUtils.toString(response.getEntity());
             if (response.getStatusCode() >= 400 && response.getStatusCode() != 404)
                 throw new IllegalStateException("Elasticsearch request failed: " + payload);
-            return payload.isBlank() ? objectMapper.createObjectNode() : objectMapper.readTree(payload);
+            return payload.isBlank() ? new JSONObject() : JSON.parseObject(payload);
         } catch (IOException | ParseException e) {
             throw new IllegalStateException("便民服务地理数据请求失败", e);
         }

@@ -37,7 +37,8 @@ public class SecurityConfiguration {
                                 "/error",
                                 "/doc.html",
                                 "/doc.html/**",
-                                "/swagger-ui/**",
+                                "/nextdoc/**",
+                                "/favicon.ico",
                                 "/v3/api-docs/**").permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated())

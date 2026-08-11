@@ -31,14 +31,13 @@ spring:
       port: ${SPRING_DATA_REDIS_PORT:6379}
 
 mybatis:
+  mapper-locations: classpath*:com/travelagent/travelagent/**/*Mapper.xml
   configuration:
     map-underscore-to-camel-case: true
 
 springdoc:
   api-docs:
     enabled: ${SPRINGDOC_API_DOCS_ENABLED:true}
-  swagger-ui:
-    enabled: ${SPRINGDOC_SWAGGER_UI_ENABLED:true}
 
 nextdoc4j:
   enabled: ${NEXTDOC4J_ENABLED:true}
@@ -68,10 +67,6 @@ travel-agent:
       enabled: ${TRAVEL_AGENT_AGENT_TOOL_ENABLED:true}
     prompt:
       override: ${TRAVEL_AGENT_AGENT_PROMPT_OVERRIDE:}
-    qwen:
-      base-url: ${TRAVEL_AGENT_AGENT_QWEN_BASE_URL:}
-      api-key: ${TRAVEL_AGENT_AGENT_QWEN_API_KEY:}
-      model: ${TRAVEL_AGENT_AGENT_QWEN_MODEL:qwen-plus}
     rag:
       enabled: ${TRAVEL_AGENT_AGENT_RAG_ENABLED:true}
       top-k: ${TRAVEL_AGENT_AGENT_RAG_TOP_K:4}

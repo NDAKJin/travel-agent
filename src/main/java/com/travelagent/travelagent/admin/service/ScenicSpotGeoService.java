@@ -1,7 +1,8 @@
 package com.travelagent.travelagent.admin.service;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONArray;
+import com.alibaba.fastjson2.JSONObject;
 import com.travelagent.travelagent.admin.dto.AdminScenicSpotRequest;
 import com.travelagent.travelagent.admin.dto.AdminScenicSpotResponse;
 import com.travelagent.travelagent.config.AgentProperties;
@@ -29,17 +30,16 @@ public class ScenicSpotGeoService {
     private static final String SCENIC_CATEGORY = "景区";
 
     private final ObjectProvider<Rest5Client> restClientProvider;
-    private final ObjectMapper objectMapper;
     private final AgentProperties agentProperties;
     private final ScenicKnowledgeIngestionService scenicKnowledgeIngestionService;
 
     public List<AdminScenicSpotResponse> list() {
         long startedAt = System.nanoTime();
-        JsonNode root = request("POST", "/" + indexName() + "/_search", Map.of(
+        JSONObject root = request("POST", "/" + indexName() + "/_search", Map.of(
                 "size", 1000, "query", Map.of("bool", Map.of("must_not", List.of(
                         Map.of("match", Map.of("categoryGroup", "便民服务")))))));
         List<AdminScenicSpotResponse> result = new ArrayList<>();
-        for (JsonNode hit : root.path("hits").path("hits")) result.add(toResponse(hit.path("_source"), false));
+        for (Object hit : root.getJSONObject("hits").getJSONArray("hits")) result.add(toResponse(((JSONObject) hit).getJSONObject("_source"), false));
         log.info("Scenic spot list completed: resultCount={}, durationMs={}", result.size(), elapsedMillis(startedAt));
         return result;
     }
@@ -96,9 +96,9 @@ public class ScenicSpotGeoService {
                 "query", Map.of("geo_distance", Map.of(
                         "distance", distance,
                         "location", Map.of("lat", latitude, "lon", longitude))));
-        JsonNode root = request("POST", "/" + indexName() + "/_search", body);
+        JSONObject root = request("POST", "/" + indexName() + "/_search", body);
         List<AdminScenicSpotResponse> result = new ArrayList<>();
-        for (JsonNode hit : root.path("hits").path("hits")) result.add(toResponse(hit.path("_source")));
+        for (Object hit : root.getJSONObject("hits").getJSONArray("hits")) result.add(toResponse(((JSONObject) hit).getJSONObject("_source")));
         log.info("Nearby scenic spot list completed: resultCount={}, distance={}, durationMs={}",
                 result.size(), distance, elapsedMillis(startedAt));
         return result;
@@ -106,8 +106,8 @@ public class ScenicSpotGeoService {
 
     public void ensureIndexReady() {
         String index = indexName();
-        JsonNode mapping = request("GET", "/" + index + "/_mapping", null);
-        if (mapping.path(index).isMissingNode()) createIndex(index);
+        JSONObject mapping = request("GET", "/" + index + "/_mapping", null);
+        if (!mapping.containsKey(index)) createIndex(index);
     }
 
     private void createIndex(String index) {
@@ -124,7 +124,7 @@ public class ScenicSpotGeoService {
                 "updatedAt", Map.of("type", "date")))));
     }
 
-    private JsonNode request(String method, String endpoint, Object body) {
+    private JSONObject request(String method, String endpoint, Object body) {
         Rest5Client restClient = restClientProvider.getIfAvailable();
         if (restClient == null) {
             throw new IllegalStateException("Elasticsearch client is not configured");
@@ -132,7 +132,7 @@ public class ScenicSpotGeoService {
         Request request = new Request(method, endpoint);
         long startedAt = System.nanoTime();
         try {
-            if (body != null) request.setJsonEntity(objectMapper.writeValueAsString(body));
+            if (body != null) request.setJsonEntity(JSON.toJSONString(body));
             Response response = restClient.performRequest(request);
             String payload = response.getEntity() == null ? "{}" : EntityUtils.toString(response.getEntity());
             log.debug("Scenic geo Elasticsearch request completed: method={}, endpoint={}, status={}, durationMs={}",
@@ -142,7 +142,7 @@ public class ScenicSpotGeoService {
                         method, endpoint, response.getStatusCode(), elapsedMillis(startedAt));
                 throw new IllegalStateException("Elasticsearch request failed: " + payload);
             }
-            return payload.isBlank() ? objectMapper.createObjectNode() : objectMapper.readTree(payload);
+            return payload.isBlank() ? new JSONObject() : JSON.parseObject(payload);
         } catch (IOException | ParseException exception) {
             log.error("Scenic geo Elasticsearch request failed: method={}, endpoint={}, durationMs={}",
                     method, endpoint, elapsedMillis(startedAt), exception);
@@ -154,31 +154,31 @@ public class ScenicSpotGeoService {
         return (System.nanoTime() - startedAt) / 1_000_000;
     }
 
-    private AdminScenicSpotResponse toResponse(JsonNode source) {
+    private AdminScenicSpotResponse toResponse(JSONObject source) {
         return toResponse(source, true);
     }
 
-    private AdminScenicSpotResponse toResponse(JsonNode source, boolean includeDescription) {
-        String id = source.path("id").asText();
-        String name = source.path("name").asText();
-        String category = source.path("category").asText(SCENIC_CATEGORY);
+    private AdminScenicSpotResponse toResponse(JSONObject source, boolean includeDescription) {
+        String id = source.getString("id");
+        String name = source.getString("name");
+        String category = source.getString("category", SCENIC_CATEGORY);
         String description = includeDescription ? loadKnowledgeDescription(id, name) : "";
-        JsonNode location = source.path("location");
+        JSONObject location = source.getJSONObject("location");
         return new AdminScenicSpotResponse(id, name, category, description,
-                location.path("lon").asDouble(), location.path("lat").asDouble(),
-                Instant.parse(source.path("updatedAt").asText()));
+                location.getDoubleValue("lon"), location.getDoubleValue("lat"),
+                Instant.parse(source.getString("updatedAt")));
     }
 
     private String loadKnowledgeDescription(String id, String name) {
-        JsonNode byId = request("GET", "/" + knowledgeIndexName() + "/_doc/" + id, null).path("_source");
-        String content = byId.path("content").asText("");
+        JSONObject byId = request("GET", "/" + knowledgeIndexName() + "/_doc/" + id, null).getJSONObject("_source");
+        String content = byId == null ? "" : byId.getString("content", "");
         if (!content.isBlank()) return removeTitleLine(content);
 
-        JsonNode byTitle = request("POST", "/" + knowledgeIndexName() + "/_search", Map.of(
+        JSONArray byTitle = request("POST", "/" + knowledgeIndexName() + "/_search", Map.of(
                 "size", 1,
-                "query", Map.of("match_phrase", Map.of("content", "# " + name)))).path("hits").path("hits");
-        if (byTitle.isArray() && !byTitle.isEmpty()) {
-            return removeTitleLine(byTitle.get(0).path("_source").path("content").asText(""));
+                "query", Map.of("match_phrase", Map.of("content", "# " + name)))).getJSONObject("hits").getJSONArray("hits");
+        if (byTitle != null && !byTitle.isEmpty()) {
+            return removeTitleLine(byTitle.getJSONObject(0).getJSONObject("_source").getString("content", ""));
         }
         return "";
     }
@@ -193,9 +193,9 @@ public class ScenicSpotGeoService {
     }
 
     private AdminScenicSpotResponse findById(String id) {
-        JsonNode root = request("GET", "/" + indexName() + "/_doc/" + id, null);
-        JsonNode source = root.path("_source");
-        return source.isMissingNode() || source.isEmpty() ? null : toResponse(source);
+        JSONObject root = request("GET", "/" + indexName() + "/_doc/" + id, null);
+        JSONObject source = root.getJSONObject("_source");
+        return source == null || source.isEmpty() ? null : toResponse(source);
     }
 
     private String indexName() { return agentProperties.getRag().getElasticsearch().getGeoIndexName(); }

@@ -23,6 +23,7 @@ import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -35,7 +36,7 @@ public class AuthService {
     private final AdminUserMapper adminUserMapper;
     private final JwtTokenService jwtTokenService;
     private final RefreshTokenStore refreshTokenStore;
-    private final PasswordHasher passwordHasher;
+    private final PasswordEncoder passwordEncoder;
     private final WxMiniProgramIdentityResolver wxMiniProgramIdentityResolver;
     private final Clock clock;
 
@@ -60,7 +61,7 @@ public class AuthService {
             log.warn("Admin login rejected because user is disabled: userId={}, username={}", user.getId(), user.getUsername());
             throw new AuthException("Admin user is disabled");
         }
-        if (!passwordHasher.matches(request.password(), user.getPasswordHash())) {
+        if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
             log.warn("Admin login rejected because password does not match: username={}", request.username());
             throw new AuthException("Invalid admin credentials");
         }

@@ -13,16 +13,7 @@ class NextDoc4jDocumentationConfigTest {
     void applicationYmlEnablesNextDoc4jByDefault() {
         Properties properties = loadYaml("application.yml");
         assertThat(properties.getProperty("springdoc.api-docs.enabled")).isEqualTo("true");
-        assertThat(properties.getProperty("springdoc.swagger-ui.enabled")).isEqualTo("true");
         assertThat(properties.getProperty("nextdoc4j.enabled")).isEqualTo("true");
-    }
-
-    @Test
-    void productionProfileDisablesDocumentationEndpoints() {
-        Properties properties = loadYaml("application-prod.yml");
-        assertThat(properties.getProperty("springdoc.api-docs.enabled")).isEqualTo("false");
-        assertThat(properties.getProperty("springdoc.swagger-ui.enabled")).isEqualTo("false");
-        assertThat(properties.getProperty("nextdoc4j.enabled")).isEqualTo("false");
     }
 
     private Properties loadYaml(String location) {

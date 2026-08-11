@@ -29,14 +29,13 @@ import org.springframework.util.StringUtils;
 @Service
 @Slf4j
 @RequiredArgsConstructor
-public class DefaultReactAgentService implements ReactAgentService {
+public class DefaultReactAgentService {
 
     private final AgentProperties agentProperties;
     private final PromptProvider promptProvider;
     private final ChatClient chatClient;
     private final AgentConversationStore conversationStore;
 
-    @Override
     public AgentChatResponse chat(AuthenticatedUser user, AgentChatRequest request) {
         if (request.message().length() > agentProperties.getMaxMessageChars()) {
             throw new IllegalArgumentException("message exceeds the configured maximum length");
@@ -94,7 +93,6 @@ public class DefaultReactAgentService implements ReactAgentService {
         }
     }
 
-    @Override
     public AgentSessionSummaryResponse createSession(AuthenticatedUser user) {
         Instant now = Instant.now();
         String sessionId = UUID.randomUUID().toString();
@@ -102,7 +100,6 @@ public class DefaultReactAgentService implements ReactAgentService {
         return new AgentSessionSummaryResponse(sessionId, "new-chat", "", 0, now);
     }
 
-    @Override
     public List<AgentSessionSummaryResponse> listSessions(AuthenticatedUser user) {
         return conversationStore.list(user.userId()).stream()
                 .map(session -> new AgentSessionSummaryResponse(
@@ -114,7 +111,6 @@ public class DefaultReactAgentService implements ReactAgentService {
                 .toList();
     }
 
-    @Override
     public AgentSessionDetailResponse getSession(AuthenticatedUser user, String sessionId) {
         AgentSessionContext sessionContext = conversationStore.load(user.userId(), sessionId)
                 .orElseThrow(() -> new AuthException("Conversation session not found"));
@@ -128,7 +124,6 @@ public class DefaultReactAgentService implements ReactAgentService {
                 sessionContext.updatedAt());
     }
 
-    @Override
     public void deleteSession(AuthenticatedUser user, String sessionId) {
         conversationStore.delete(user.userId(), normalizeSessionId(sessionId));
     }

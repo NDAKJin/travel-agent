@@ -36,6 +36,8 @@ import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 @ExtendWith(MockitoExtension.class)
 class AuthServiceTest {
@@ -56,7 +58,7 @@ class AuthServiceTest {
 
     private AuthService authService;
     private JwtTokenService jwtTokenService;
-    private PasswordHasher passwordHasher;
+    private PasswordEncoder passwordEncoder;
 
     @BeforeEach
     void setUp() {
@@ -72,13 +74,13 @@ class AuthServiceTest {
                 .build();
         jwtDecoder.setJwtValidator(token -> OAuth2TokenValidatorResult.success());
         jwtTokenService = new JwtTokenService(properties, clock, jwtEncoder, jwtDecoder);
-        passwordHasher = new BCryptPasswordHasher();
+        passwordEncoder = new BCryptPasswordEncoder();
         authService = new AuthService(
                 wxUserMapper,
                 adminUserMapper,
                 jwtTokenService,
                 refreshTokenStore,
-                passwordHasher,
+                passwordEncoder,
                 wxMiniProgramIdentityResolver,
                 clock);
     }
@@ -141,7 +143,7 @@ class AuthServiceTest {
         adminUser.setId(1L);
         adminUser.setUsername("admin");
         adminUser.setDisplayName("ops-admin");
-        adminUser.setPasswordHash(passwordHasher.hash("admin123"));
+        adminUser.setPasswordHash(passwordEncoder.encode("admin123"));
         adminUser.setEnabled(true);
         when(adminUserMapper.findByUsername("admin")).thenReturn(adminUser);
 
@@ -157,7 +159,7 @@ class AuthServiceTest {
         adminUser.setId(1L);
         adminUser.setUsername("admin");
         adminUser.setDisplayName("ops-admin");
-        adminUser.setPasswordHash(passwordHasher.hash("admin123"));
+        adminUser.setPasswordHash(passwordEncoder.encode("admin123"));
         adminUser.setEnabled(true);
         when(adminUserMapper.findByUsername("admin")).thenReturn(adminUser);
 
