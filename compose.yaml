@@ -1,0 +1,91 @@
+services:
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-travelagent}
+      MYSQL_USER: ${MYSQL_USER:?Set MYSQL_USER in .env}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in .env}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD in .env}
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./src/main/resources/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  redis:
+    image: redis:7.4-alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+
+  elasticsearch:
+    profiles: ["rag"]
+    image: docker.elastic.co/elasticsearch/elasticsearch:9.4.3
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms384m -Xmx384m
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9200/_cluster/health >/dev/null"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+
+  api:
+    build:
+      context: .
+      target: api
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-travelagent}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      SPRING_DATASOURCE_USERNAME: ${MYSQL_USER}
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD}
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      SPRING_AI_OPENAI_BASE_URL: ${SPRING_AI_OPENAI_BASE_URL}
+      SPRING_AI_OPENAI_API_KEY: ${SPRING_AI_OPENAI_API_KEY}
+      SPRING_AI_OPENAI_CHAT_MODEL: ${SPRING_AI_OPENAI_CHAT_MODEL}
+      SPRING_AI_OPENAI_EMBEDDING_MODEL: ${SPRING_AI_OPENAI_EMBEDDING_MODEL}
+      TRAVEL_AGENT_AUTH_JWT_SECRET: ${TRAVEL_AGENT_AUTH_JWT_SECRET:?Set TRAVEL_AGENT_AUTH_JWT_SECRET in .env}
+      TRAVEL_AGENT_AUTH_WX_APP_ID: ${TRAVEL_AGENT_AUTH_WX_APP_ID}
+      TRAVEL_AGENT_AUTH_WX_SECRET: ${TRAVEL_AGENT_AUTH_WX_SECRET}
+      TRAVEL_AGENT_AMAP_WEB_SERVICE_KEY: ${TRAVEL_AGENT_AMAP_WEB_SERVICE_KEY}
+      TRAVEL_AGENT_AGENT_RAG_ENABLED: ${TRAVEL_AGENT_AGENT_RAG_ENABLED:-false}
+      TRAVEL_AGENT_AGENT_RAG_ELASTICSEARCH_HOST: elasticsearch
+      TRAVEL_AGENT_AGENT_RAG_ELASTICSEARCH_PORT: 9200
+      JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=35 -XX:InitialRAMPercentage=25
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  web:
+    build:
+      context: .
+      target: web
+      args:
+        VITE_AMAP_KEY: ${VITE_AMAP_KEY}
+        VITE_AMAP_SECURITY_JS_CODE: ${VITE_AMAP_SECURITY_JS_CODE}
+    ports:
+      - "${HTTP_PORT:-80}:80"
+    depends_on:
+      - api
+
+volumes:
+  mysql-data:
+  redis-data:
+  elasticsearch-data:
