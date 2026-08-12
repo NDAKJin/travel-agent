@@ -173,8 +173,7 @@ cp .env.example .env
 sudo sysctl -w vm.max_map_count=262144
 docker compose up -d --build
 ```
-
-2GB 服务器已将 Elasticsearch 堆限制为 384MB。若要启用 RAG，在 `.env` 设置：
+若要启用 RAG，在 `.env` 设置：
 
 ```env
 TRAVEL_AGENT_AGENT_RAG_ENABLED=true

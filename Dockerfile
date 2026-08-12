@@ -2,9 +2,9 @@ FROM docker.m.daocloud.io/library/maven:3.9.11-eclipse-temurin-21 AS backend-bui
 WORKDIR /workspace
 COPY .mvn .mvn
 COPY mvnw pom.xml ./
-RUN chmod +x mvnw && ./mvnw -q -DskipTests dependency:go-offline
+RUN chmod +x mvnw && ./mvnw -s .mvn/settings.xml -DskipTests dependency:go-offline
 COPY src src
-RUN ./mvnw -q -DskipTests package
+RUN ./mvnw -s .mvn/settings.xml -DskipTests package
 
 FROM docker.m.daocloud.io/library/node:22-alpine AS frontend-build
 WORKDIR /workspace
