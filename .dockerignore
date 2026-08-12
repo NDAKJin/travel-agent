@@ -1,0 +1,13 @@
+.git
+.idea
+target
+logs
+tmp-*
+*.log
+src/main/resources/application.yml
+fe/node_modules
+fe/dist
+fe/.env
+miniprogram/project.config.json
+miniprogram/project.private.config.json
+miniprogram/utils/config.js
