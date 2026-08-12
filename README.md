@@ -161,6 +161,41 @@ travel-agent/
 └── LICENSE              MIT License
 ```
 
+## Docker 启动与部署
+
+Docker Compose 会启动管理台、API、MySQL、Redis；启用 RAG 时还会启动 Elasticsearch。首次启动需下载并构建镜像，网络较慢时请耐心等待，后续更新会复用镜像缓存。
+
+```bash
+git clone <仓库地址> travel-agent
+cd travel-agent
+cp .env.example .env
+# 编辑 .env，填入数据库密码、模型 API Key、JWT 密钥及微信/高德配置
+sudo sysctl -w vm.max_map_count=262144
+docker compose up -d --build
+```
+
+2GB 服务器已将 Elasticsearch 堆限制为 384MB。若要启用 RAG，在 `.env` 设置：
+
+```env
+TRAVEL_AGENT_AGENT_RAG_ENABLED=true
+```
+
+查看状态和日志：
+
+```bash
+docker compose ps
+docker compose logs -f
+```
+
+外网访问 `http://<服务器IP>/`，API 文档为 `http://<服务器IP>/doc.html`。安全组放行 `80` 端口。更新部署：
+
+```bash
+git pull
+docker compose up -d --build
+```
+
+数据由 Docker volumes 持久化；不要执行 `docker compose down -v`，否则会删除 MySQL、Redis 与 Elasticsearch 数据。
+
 ## 开发与测试
 
 运行后端测试：
