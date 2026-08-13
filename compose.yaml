@@ -1,6 +1,6 @@
 services:
   mysql:
-    image: docker.jiaxin.site/library/mysql:8.4
+    image: 1r863tsz.mirror.aliyuncs.com/library/mysql:8.4
     environment:
       MYSQL_DATABASE: ${MYSQL_DATABASE:-travelagent}
       MYSQL_USER: ${MYSQL_USER:?Set MYSQL_USER in .env}
@@ -16,7 +16,7 @@ services:
       retries: 12
 
   redis:
-    image: docker.jiaxin.site/library/redis:7.4-alpine
+    image: 1r863tsz.mirror.aliyuncs.com/library/redis:7.4-alpine
     command: redis-server --appendonly yes
     volumes:
       - redis-data:/data
@@ -27,7 +27,7 @@ services:
       retries: 6
 
   elasticsearch:
-    image: docker.jiaxin.site/docker.elastic.co/elasticsearch/elasticsearch:9.4.3
+    image: 1r863tsz.mirror.aliyuncs.com/docker.elastic.co/elasticsearch/elasticsearch:9.4.3
     environment:
       - discovery.type=single-node
       - xpack.security.enabled=false
