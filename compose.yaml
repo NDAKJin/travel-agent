@@ -27,7 +27,7 @@ services:
       retries: 6
 
   elasticsearch:
-    image: docker.m.daocloud.io/docker.elastic.co/elasticsearch/elasticsearch:9.4.3
+    image: docker.m.daocloud.io/elasticsearch/elasticsearch:9.4.3
     environment:
       - discovery.type=single-node
       - xpack.security.enabled=false
