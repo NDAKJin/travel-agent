@@ -163,7 +163,7 @@ travel-agent/
 
 ## Docker 启动与部署
 
-Docker Compose 会启动管理台、API、MySQL、Redis；启用 RAG 时还会启动 Elasticsearch。首次启动需下载并构建镜像，网络较慢时请耐心等待，后续更新会复用镜像缓存。
+Docker Compose 会启动管理台、API、MySQL、Redis 和 Elasticsearch。首次启动需下载并构建镜像，网络较慢时请耐心等待，后续更新会复用镜像缓存。
 
 ```bash
 git clone <仓库地址> travel-agent
@@ -173,7 +173,7 @@ cp .env.example .env
 sudo sysctl -w vm.max_map_count=262144
 docker compose up -d --build
 ```
-若要启用 RAG，在 `.env` 设置：
+RAG 默认已启用；如需显式设置，在 `.env` 中写：
 
 ```env
 TRAVEL_AGENT_AGENT_RAG_ENABLED=true
