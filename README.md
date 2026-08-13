@@ -1,6 +1,6 @@
 <div align="center">
 
-# Travel Agent
+# 行迹 AI 旅行助手
 
 ### 让每一次出发，都有一位懂目的地的 AI 向导
 
@@ -18,7 +18,7 @@
 [![WeChat](https://img.shields.io/badge/WeChat%20Mini%20Program-07C160?logo=wechat&logoColor=white)](https://developers.weixin.qq.com/miniprogram/dev/framework/)
 [![License](https://img.shields.io/badge/license-MIT-2ea44f)](LICENSE)
 
-<a href="https://openjdk.org/"><img src="https://skillicons.dev/icons?i=java,spring,react,ts,mysql,redis,elasticsearch" alt="Travel Agent 技术栈" /></a>
+<a href="https://openjdk.org/"><img src="https://skillicons.dev/icons?i=java,spring,react,ts,mysql,redis,elasticsearch" alt="行迹 AI 旅行助手技术栈" /></a>
 
 **Java 21** · **Spring Boot 4** · **Spring AI** · **React 18** · **微信小程序** · **Elasticsearch**
 
@@ -28,7 +28,7 @@
 
 ## 项目简介
 
-Travel Agent 将旅行问答、目的地知识和运营管理放进同一套系统：
+行迹 AI 旅行助手将旅行问答、目的地知识和运营管理放进同一套系统：
 
 | 使用者 | 能做什么 |
 | --- | --- |
@@ -50,7 +50,7 @@ Travel Agent 将旅行问答、目的地知识和运营管理放进同一套系�
 flowchart LR
     mini[微信小程序]
     admin[React 管理台]
-    api[Travel Agent API<br/>Spring Boot]
+    api[行迹 API<br/>Spring Boot]
     mysql[(MySQL)]
     redis[(Redis)]
     es[(Elasticsearch<br/>RAG + 地理索引)]
