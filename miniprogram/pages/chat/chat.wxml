@@ -57,7 +57,7 @@
     <view class="chat-shell {{sidebarCollapsed ? 'chat-shell-expanded' : ''}}">
       <view class="chat-header">
         <view class="chat-heading">
-          <view class="chat-heading-title">途见 <text>· AI 旅行助手</text></view>
+          <view class="chat-heading-title">行迹 <text>· AI 旅行助手</text></view>
           <view class="chat-heading-subtitle">让每一次出发，都恰到好处</view>
         </view>
         <button class="new-session-button" bindtap="startNewConversation">

@@ -3,7 +3,7 @@ const { requireSession, clearSession } = require("../../utils/auth");
 const { markdownToHtml } = require("../../utils/markdown");
 
 function createGreetingMessage() {
-  const text = "你好，我是你的 AI 旅行助手。告诉我出发地、目的地、天数、预算和偏好，我会帮你生成可执行行程。";
+  const text = "你好，我是行迹 AI 旅行助手。告诉我出发地、目的地、天数、预算和偏好，我会帮你生成可执行行程。";
   return {
     id: `assistant-${Date.now()}`,
     role: "assistant",
