@@ -1,10 +1,11 @@
-FROM docker.m.daocloud.io/library/maven:3.9.11-eclipse-temurin-21 AS backend-build
+FROM docker.m.daocloud.io/library/maven:3.9.16-eclipse-temurin-21 AS backend-build
 WORKDIR /workspace
 COPY .mvn .mvn
 COPY mvnw pom.xml ./
 RUN chmod +x mvnw && ./mvnw -s .mvn/settings.xml -DskipTests dependency:go-offline
 COPY src src
-RUN ./mvnw -s .mvn/settings.xml -DskipTests package
+RUN cp src/main/resources/application.example.yml src/main/resources/application.yml \
+    && ./mvnw -s .mvn/settings.xml -DskipTests package
 
 FROM docker.m.daocloud.io/library/node:22-alpine AS frontend-build
 WORKDIR /workspace
