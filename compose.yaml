@@ -27,7 +27,6 @@ services:
       retries: 6
 
   elasticsearch:
-    profiles: ["rag"]
     image: docker.m.daocloud.io/docker.elastic.co/elasticsearch/elasticsearch:9.4.3
     environment:
       - discovery.type=single-node
@@ -63,7 +62,7 @@ services:
       TRAVEL_AGENT_AUTH_WX_APP_ID: ${TRAVEL_AGENT_AUTH_WX_APP_ID}
       TRAVEL_AGENT_AUTH_WX_SECRET: ${TRAVEL_AGENT_AUTH_WX_SECRET}
       TRAVEL_AGENT_AMAP_WEB_SERVICE_KEY: ${TRAVEL_AGENT_AMAP_WEB_SERVICE_KEY}
-      TRAVEL_AGENT_AGENT_RAG_ENABLED: ${TRAVEL_AGENT_AGENT_RAG_ENABLED:-false}
+      TRAVEL_AGENT_AGENT_RAG_ENABLED: ${TRAVEL_AGENT_AGENT_RAG_ENABLED:-true}
       TRAVEL_AGENT_AGENT_RAG_ELASTICSEARCH_HOST: elasticsearch
       TRAVEL_AGENT_AGENT_RAG_ELASTICSEARCH_PORT: 9200
       JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=35 -XX:InitialRAMPercentage=25
@@ -71,6 +70,8 @@ services:
       mysql:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      elasticsearch:
         condition: service_healthy
 
   web:
