@@ -5,6 +5,7 @@ import com.travelagent.travelagent.agent.prompt.TravelAssistantPromptProvider;
 import com.travelagent.travelagent.agent.tool.CurrentTimeTool;
 import com.travelagent.travelagent.agent.tool.CurrentUserLocationTool;
 import com.travelagent.travelagent.agent.tool.NearbySearchTool;
+import com.travelagent.travelagent.agent.tool.TravelPlanningKnowledgeTool;
 import com.travelagent.travelagent.agent.tool.LocationPermissionTool;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatModel;
@@ -24,9 +25,11 @@ public class AgentBootstrapConfiguration {
                                     CurrentTimeTool currentTimeTool,
                                     CurrentUserLocationTool currentUserLocationTool,
                                     LocationPermissionTool locationPermissionTool,
-                                    NearbySearchTool nearbySearchTool) {
+                                    NearbySearchTool nearbySearchTool,
+                                    TravelPlanningKnowledgeTool travelPlanningKnowledgeTool) {
         return ChatClient.builder(chatModel)
-                .defaultTools(currentTimeTool, currentUserLocationTool, locationPermissionTool, nearbySearchTool)
+                .defaultTools(currentTimeTool, currentUserLocationTool, locationPermissionTool, nearbySearchTool,
+                        travelPlanningKnowledgeTool)
                 .build();
     }
 }

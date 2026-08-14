@@ -29,14 +29,23 @@ public class ScenicSpotGeoService {
 
     private final ObjectProvider<Rest5Client> restClientProvider;
     private final AgentProperties agentProperties;
+    private final com.travelagent.travelagent.agent.service.ScenicSpotKnowledgeGraphService knowledgeGraphService;
 
     public List<AdminScenicSpotResponse> list() {
+        return list(false);
+    }
+
+    public List<AdminScenicSpotResponse> listForKnowledge() {
+        return list(true);
+    }
+
+    private List<AdminScenicSpotResponse> list(boolean includeDescription) {
         long startedAt = System.nanoTime();
         JSONObject root = request("POST", "/" + indexName() + "/_search", Map.of(
                 "size", 1000, "query", Map.of("bool", Map.of("must_not", List.of(
                         Map.of("match", Map.of("categoryGroup", "便民服务")))))));
         List<AdminScenicSpotResponse> result = new ArrayList<>();
-        for (Object hit : root.getJSONObject("hits").getJSONArray("hits")) result.add(toResponse(((JSONObject) hit).getJSONObject("_source"), false));
+        for (Object hit : root.getJSONObject("hits").getJSONArray("hits")) result.add(toResponse(((JSONObject) hit).getJSONObject("_source"), includeDescription));
         log.info("Scenic spot list completed: resultCount={}, durationMs={}", result.size(), elapsedMillis(startedAt));
         return result;
     }
@@ -46,14 +55,16 @@ public class ScenicSpotGeoService {
                 id != null && !id.isBlank(), input.name().length(), input.description().length());
         String spotId = id == null || id.isBlank() ? UUID.randomUUID().toString() : id;
         Instant now = Instant.now();
-        Map<String, Object> source = Map.of("id", spotId, "name", input.name().trim(),
+        Map<String, Object> source = Map.of("id", spotId, "name", input.name().trim(), "city", input.city().trim(),
                 "category", SCENIC_CATEGORY, "categoryGroup", SCENIC_CATEGORY,
                 "description", input.description().trim(),
                 "location", Map.of("lat", input.latitude(), "lon", input.longitude()),
                 "updatedAt", now.toString());
         request("PUT", "/" + indexName() + "/_doc/" + spotId, source);
-        return new AdminScenicSpotResponse(spotId, input.name().trim(), SCENIC_CATEGORY, input.description().trim(),
-                input.longitude(), input.latitude(), now);
+        AdminScenicSpotResponse response = new AdminScenicSpotResponse(spotId, input.name().trim(), input.city().trim(), SCENIC_CATEGORY,
+                input.description().trim(), input.longitude(), input.latitude(), now);
+        knowledgeGraphService.upsert(response);
+        return response;
     }
 
     public AdminScenicSpotResponse get(String id) {
@@ -65,6 +76,7 @@ public class ScenicSpotGeoService {
     public void delete(String id) {
         log.info("Deleting scenic spot: id={}", id);
         request("DELETE", "/" + indexName() + "/_doc/" + id, null);
+        knowledgeGraphService.delete(id);
     }
 
     public List<AdminScenicSpotResponse> nearby(double longitude, double latitude, String distance) {
@@ -96,11 +108,10 @@ public class ScenicSpotGeoService {
                 "id", Map.of("type", "keyword"),
                 "name", Map.of("type", "text"),
                 "category", Map.of("type", "keyword"),
+                "city", Map.of("type", "keyword"),
                 "categoryGroup", Map.of("type", "keyword"),
                 "description", Map.of("type", "text"),
                 "address", Map.of("type", "text"),
-                "longitude", Map.of("type", "double"),
-                "latitude", Map.of("type", "double"),
                 "location", Map.of("type", "geo_point"),
                 "updatedAt", Map.of("type", "date")))));
     }
@@ -142,10 +153,11 @@ public class ScenicSpotGeoService {
     private AdminScenicSpotResponse toResponse(JSONObject source, boolean includeDescription) {
         String id = source.getString("id");
         String name = source.getString("name");
+        String city = source.getString("city", "");
         String category = source.getString("category", SCENIC_CATEGORY);
         String description = includeDescription ? source.getString("description", "") : "";
         JSONObject location = source.getJSONObject("location");
-        return new AdminScenicSpotResponse(id, name, category, description,
+        return new AdminScenicSpotResponse(id, name, city, category, description,
                 location.getDoubleValue("lon"), location.getDoubleValue("lat"),
                 Instant.parse(source.getString("updatedAt")));
     }

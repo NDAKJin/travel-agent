@@ -10,6 +10,10 @@ spring:
       chat:
         options:
           model: ${SPRING_AI_DASHSCOPE_CHAT_OPTIONS_MODEL:qwen-plus}
+      embedding:
+        options:
+          model: ${SPRING_AI_DASHSCOPE_EMBEDDING_OPTIONS_MODEL:text-embedding-v4}
+          dimensions: ${SPRING_AI_DASHSCOPE_EMBEDDING_OPTIONS_DIMENSIONS:1024}
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/travelagent?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC}
     driver-class-name: ${SPRING_DATASOURCE_DRIVER_CLASS_NAME:com.mysql.cj.jdbc.Driver}

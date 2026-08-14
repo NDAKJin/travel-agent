@@ -12,6 +12,7 @@ import com.travelagent.travelagent.admin.service.AmapPlaceSearchService;
 import com.travelagent.travelagent.admin.service.ScenicSpotGeoService;
 import com.travelagent.travelagent.admin.service.ServicePointCategoryService;
 import com.travelagent.travelagent.admin.service.ServicePointGeoService;
+import com.travelagent.travelagent.agent.service.ScenicSpotKnowledgeGraphService;
 import com.travelagent.travelagent.agent.dto.AgentSessionDetailResponse;
 import com.travelagent.travelagent.common.dto.PageResponse;
 import jakarta.validation.Valid;
@@ -41,6 +42,7 @@ public class AdminController {
     private final AmapPlaceSearchService amapPlaceSearchService;
     private final ServicePointGeoService servicePointGeoService;
     private final ServicePointCategoryService servicePointCategoryService;
+    private final ScenicSpotKnowledgeGraphService scenicSpotKnowledgeGraphService;
 
     @GetMapping("/service-point-categories")
     public List<String> listServicePointCategories() { return servicePointCategoryService.list(); }
@@ -123,4 +125,9 @@ public class AdminController {
 
     @DeleteMapping("/scenic-spots/{id}")
     public void deleteScenicSpot(@PathVariable String id) { scenicSpotGeoService.delete(id); }
+
+    @PostMapping("/scenic-spots/reindex-knowledge")
+    public void reindexScenicSpotKnowledge() {
+        scenicSpotKnowledgeGraphService.reindex(scenicSpotGeoService.listForKnowledge());
+    }
 }

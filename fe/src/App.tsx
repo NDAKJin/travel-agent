@@ -210,6 +210,7 @@ export default function App() {
   const scenicLoadSequenceRef = useRef(0);
   const [scenicPage, setScenicPage] = useState(1);
   const [scenicName, setScenicName] = useState("");
+  const [scenicCity, setScenicCity] = useState("");
   const [scenicDescription, setScenicDescription] = useState("");
   const [scenicLongitude, setScenicLongitude] = useState("");
   const [scenicLatitude, setScenicLatitude] = useState("");
@@ -217,6 +218,7 @@ export default function App() {
   const [scenicError, setScenicError] = useState("");
   const [selectedScenicSpot, setSelectedScenicSpot] = useState<AdminScenicSpot | null>(null);
   const [scenicEditName, setScenicEditName] = useState("");
+  const [scenicEditCity, setScenicEditCity] = useState("");
   const [scenicEditDescription, setScenicEditDescription] = useState("");
   const [scenicEditLongitude, setScenicEditLongitude] = useState("");
   const [scenicEditLatitude, setScenicEditLatitude] = useState("");
@@ -436,6 +438,7 @@ export default function App() {
 
   const openScenicCreate = () => {
     setScenicName("");
+    setScenicCity("");
     setScenicDescription("");
     setScenicLongitude("");
     setScenicLatitude("");
@@ -451,6 +454,10 @@ export default function App() {
   const saveScenicSpot = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (scenicSaving) return;
+    if (!scenicCity.trim()) {
+      setScenicError("请填写所属城市");
+      return;
+    }
     const longitude = Number(scenicLongitude);
     const latitude = Number(scenicLatitude);
     if (!Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
@@ -465,12 +472,12 @@ export default function App() {
     setScenicError("");
     try {
       const createdSpot = await withAuthorizedRequest(accessToken => api.createScenicSpot(accessToken, {
-        name: scenicName.trim(), description: scenicDescription.trim(), longitude, latitude
+        name: scenicName.trim(), city: scenicCity.trim(), description: scenicDescription.trim(), longitude, latitude
       }));
       scenicLoadSequenceRef.current += 1;
       setScenicSpots(current => [createdSpot, ...current.filter(spot => spot.id !== createdSpot.id)]);
       setScenicPage(1);
-      setScenicName(""); setScenicDescription(""); setScenicLongitude(""); setScenicLatitude("");
+      setScenicName(""); setScenicCity(""); setScenicDescription(""); setScenicLongitude(""); setScenicLatitude("");
       setScreen("dashboard");
       setAdminView("scenic");
       showToast("景区已创建");
@@ -496,6 +503,7 @@ export default function App() {
       const detail = await withAuthorizedRequest(accessToken => api.getScenicSpot(accessToken, spot.id));
       setSelectedScenicSpot(detail);
       setScenicEditName(detail.name);
+      setScenicEditCity(detail.city);
       setScenicEditDescription(detail.description);
       setScenicEditLongitude(String(detail.longitude));
       setScenicEditLatitude(String(detail.latitude));
@@ -509,6 +517,10 @@ export default function App() {
   const saveScenicEdit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!selectedScenicSpot || scenicEditSaving) return;
+    if (!scenicEditCity.trim()) {
+      showToast("请填写所属城市");
+      return;
+    }
     const longitude = Number(scenicEditLongitude);
     const latitude = Number(scenicEditLatitude);
     if (!Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
@@ -523,6 +535,7 @@ export default function App() {
     try {
       const updated = await withAuthorizedRequest(accessToken => api.updateScenicSpot(accessToken, selectedScenicSpot.id, {
         name: scenicEditName.trim(),
+        city: scenicEditCity.trim(),
         description: scenicEditDescription.trim(),
         longitude,
         latitude
@@ -670,6 +683,7 @@ export default function App() {
             <div className={styles.scenicEditorFields}>
             <div className={styles.cardHeader}>景区基础信息</div>
             <label className={styles.field}><span>景区名</span><input value={scenicName} onChange={event => setScenicName(event.target.value)} placeholder="例如：西湖景区" /></label>
+            <label className={styles.field}><span>所属城市</span><input value={scenicCity} onChange={event => setScenicCity(event.target.value)} placeholder="例如：杭州" /></label>
             <label className={styles.field}><span>景区介绍</span><textarea className={styles.scenicDescriptionTextarea} value={scenicDescription} onChange={event => setScenicDescription(event.target.value)} rows={8} placeholder="景区简介、亮点和游玩建议" /></label>
             </div>
               <div className={styles.editorMapPanel}>
@@ -692,7 +706,7 @@ export default function App() {
               <div className={styles.helperText}>点击地图即可自动填入经纬度，也可以在下方手动微调。</div>
               <div className={styles.formActions}>
                 <button type="button" className={styles.secondaryButton} onClick={backToScenicManagement}>取消</button>
-                <button className={styles.primaryButton} type="submit" disabled={scenicSaving || !scenicName.trim() || !scenicDescription.trim() || !scenicLongitude || !scenicLatitude}>{scenicSaving ? "保存中..." : "保存景区"}</button>
+                <button className={styles.primaryButton} type="submit" disabled={scenicSaving || !scenicName.trim() || !scenicCity.trim() || !scenicDescription.trim() || !scenicLongitude || !scenicLatitude}>{scenicSaving ? "保存中..." : "保存景区"}</button>
               </div>
             </div>
           </form>
@@ -718,6 +732,7 @@ export default function App() {
             <div className={styles.scenicEditorFields}>
             <div className={styles.cardHeader}>编辑景区信息</div>
             <label className={styles.field}><span>景区名</span><input value={scenicEditName} onChange={event => setScenicEditName(event.target.value)} /></label>
+            <label className={styles.field}><span>所属城市</span><input value={scenicEditCity} onChange={event => setScenicEditCity(event.target.value)} /></label>
             <label className={styles.field}><span>景区介绍</span><textarea className={styles.scenicDescriptionTextarea} rows={14} value={scenicEditDescription} onChange={event => setScenicEditDescription(event.target.value)} placeholder="填写景区亮点、游览建议和注意事项..." /></label>
             </div>
               <div className={styles.editorMapPanel}>
@@ -738,7 +753,7 @@ export default function App() {
               </div>
             <div className={styles.editorFooter}>
               <div className={styles.helperText}>保存后会更新 geo 地理索引。</div>
-              <button className={styles.primaryButton} type="submit" disabled={scenicEditSaving || !scenicEditName.trim() || !scenicEditDescription.trim()}>{scenicEditSaving ? "保存中..." : "保存修改"}</button>
+              <button className={styles.primaryButton} type="submit" disabled={scenicEditSaving || !scenicEditName.trim() || !scenicEditCity.trim() || !scenicEditDescription.trim()}>{scenicEditSaving ? "保存中..." : "保存修改"}</button>
             </div>
           </form>
         </section>
