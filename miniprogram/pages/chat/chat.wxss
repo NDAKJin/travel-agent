@@ -643,14 +643,14 @@ page {
 }
 
 .sidebar {
-  width: 224rpx;
+  width: 184rpx;
   padding: 24rpx 12rpx;
   background: linear-gradient(180deg, #f1f8ef 0%, #eaf4e9 100%);
   border-right-color: rgba(73, 137, 83, 0.1);
 }
 
 .sidebar-collapsed {
-  width: 112rpx;
+  width: 80rpx;
   padding-left: 12rpx;
   padding-right: 12rpx;
 }

@@ -11,7 +11,6 @@ public class AgentProperties {
     private final ProfileProperties profile = new ProfileProperties();
     private final ToolProperties tool = new ToolProperties();
     private final PromptProperties prompt = new PromptProperties();
-    private final QwenProperties qwen = new QwenProperties();
     private final ElasticsearchProperties elasticsearch = new ElasticsearchProperties();
 
     @Setter
@@ -43,14 +42,6 @@ public class AgentProperties {
     public static class PromptProperties {
 
         private String override;
-
-    }
-
-    @Getter
-    @Setter
-    public static class QwenProperties {
-
-        private String model = "qwen-plus";
 
     }
 
