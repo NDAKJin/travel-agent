@@ -188,14 +188,14 @@ export const api = {
     const query = new URLSearchParams({ keyword });
     return request<AdminMapPlace[]>(`/api/admin/map/places?${query.toString()}`, { accessToken });
   },
-  createScenicSpot(accessToken: string, payload: { name: string; description: string; longitude: number; latitude: number }) {
+  createScenicSpot(accessToken: string, payload: { name: string; city: string; description: string; longitude: number; latitude: number }) {
     return request<AdminScenicSpot>("/api/admin/scenic-spots", {
       method: "POST",
       body: payload,
       accessToken
     });
   },
-  updateScenicSpot(accessToken: string, id: string, payload: { name: string; description: string; longitude: number; latitude: number }) {
+  updateScenicSpot(accessToken: string, id: string, payload: { name: string; city: string; description: string; longitude: number; latitude: number }) {
     return request<AdminScenicSpot>(`/api/admin/scenic-spots/${id}`, {
       method: "PUT",
       body: payload,

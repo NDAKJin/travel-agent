@@ -84,6 +84,7 @@ export type AdminConversationSummary = {
 export type AdminScenicSpot = {
   id: string;
   name: string;
+  city: string;
   category: string;
   description: string;
   longitude: number;

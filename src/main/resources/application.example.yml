@@ -9,7 +9,11 @@ spring:
       api-key: ${SPRING_AI_DASHSCOPE_API_KEY:}
       chat:
         options:
-          model: ${SPRING_AI_DASHSCOPE_CHAT_OPTIONS_MODEL:qwen-plus}
+          model: ${SPRING_AI_DASHSCOPE_CHAT_OPTIONS_MODEL:qwen3.7-flash}
+      embedding:
+        options:
+          model: ${SPRING_AI_DASHSCOPE_EMBEDDING_OPTIONS_MODEL:text-embedding-v4}
+          dimensions: ${SPRING_AI_DASHSCOPE_EMBEDDING_OPTIONS_DIMENSIONS:1024}
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/travelagent?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC}
     driver-class-name: ${SPRING_DATASOURCE_DRIVER_CLASS_NAME:com.mysql.cj.jdbc.Driver}
@@ -45,6 +49,8 @@ nextdoc4j:
   enabled: ${NEXTDOC4J_ENABLED:true}
 
 travel-agent:
+  neo4j:
+    enabled: ${TRAVEL_AGENT_NEO4J_ENABLED:false}
   amap:
     web-service-key: ${TRAVEL_AGENT_AMAP_WEB_SERVICE_KEY:}
     city: ${AMAP_SEARCH_CITY:全国}

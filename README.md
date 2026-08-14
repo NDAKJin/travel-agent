@@ -21,7 +21,7 @@
 
 <a href="https://openjdk.org/"><img src="https://skillicons.dev/icons?i=java,spring,react,ts,mysql,redis,elasticsearch" alt="行迹 AI 旅行助手技术栈" /></a>
 
-**Java 21** · **Spring Boot 4** · **Spring AI** · **React 18** · **微信小程序** · **Elasticsearch**
+**Java 21** · **Spring Boot 4** · **Spring AI Alibaba** · **React 18** · **微信小程序** · **Elasticsearch**
 
 [快速开始](#快速开始) · [系统架构](#系统架构) · [API 文档](#api-文档) · [项目结构](#项目结构)
 
@@ -38,8 +38,9 @@
 
 ## 核心能力
 
-- **上下文旅行对话**：基于 OpenAI 兼容模型生成旅行建议，支持多轮会话。
+- **多智能体旅行对话**：Supervisor 统筹旅行知识、路线、POI 与预算专员，支持多轮会话。
 - **附近地点推荐**：结合用户位置与高德地图服务搜索周边景点和文旅服务。
+- **可选图谱能力**：Neo4j 启用后提供景点知识检索、城市归属与景点间最短路径；关闭时不影响基础对话和 POI 搜索。
 - **运营管理台**：React + TypeScript 管理会话、景区、服务点和知识内容。
 - **微信小程序入口**：原生 WXML / WXSS / JavaScript，完成登录、聊天和历史会话。
 - **安全认证**：微信登录与管理端登录统一使用 JWT，刷新令牌存储在 Redis。
@@ -51,6 +52,11 @@ flowchart LR
     mini[微信小程序]
     admin[React 管理台]
     api[行迹 API<br/>Spring Boot]
+    supervisor[Supervisor]
+    knowledge[旅行知识专员]
+    route[路线规划专员]
+    poi[POI 搜索专员]
+    budget[预算专员]
     mysql[(MySQL)]
     redis[(Redis)]
     es[(Elasticsearch<br/>地理索引)]
@@ -60,6 +66,11 @@ flowchart LR
 
     mini --> api
     admin --> api
+    api --> supervisor
+    supervisor --> knowledge
+    supervisor --> route
+    supervisor --> poi
+    supervisor --> budget
     api --> mysql
     api --> redis
     api --> es
@@ -68,11 +79,37 @@ flowchart LR
     api --> model
 ```
 
+## 多智能体协作
+
+原有聊天 Agent 现在是 **Supervisor**：它保留用户会话、判断任务，并通过工具委派给子智能体。子智能体不直接互相聊天，所有结果都回传给 Supervisor 统一生成最终答复。
+
+| 角色 | 工具与职责 | 启用条件 |
+| --- | --- | --- |
+| Supervisor | 理解需求、调度子智能体、汇总最终行程 | 始终启用 |
+| 旅行知识规划专员 | 查询 Neo4j 景点、城市和兴趣知识 | `TRAVEL_AGENT_NEO4J_ENABLED=true` |
+| 路线规划专员 | 查询 `CONNECTED_TO` 与景点最短路径 | `TRAVEL_AGENT_NEO4J_ENABLED=true` |
+| POI 搜索专员 | 查询附近景点、餐厅、酒店和便民服务 | 始终启用 |
+| 预算专员 | 汇总已知门票、住宿、餐饮与交通费用；缺失价格标记待确认 | 始终启用 |
+
+子智能体统一返回 JSON，供 Supervisor 可靠消费：
+
+```json
+{
+  "agent": "route",
+  "status": "success",
+  "summary": "已找到路线",
+  "data": {},
+  "warnings": []
+}
+```
+
+`status` 可为 `success`、`partial`、`no_data` 或 `error`。提示词位于 `src/main/resources/prompt/`，分别维护 Supervisor 和各专员的职责与返回格式。
+
 ## 技术栈
 
 | 层次 | 技术 |
 | --- | --- |
-| Backend | Java 21、Spring Boot 4、Spring AI、Spring Security、MyBatis |
+| Backend | Java 21、Spring Boot 4、Spring AI Alibaba、Spring Security、MyBatis |
 | Data | MySQL、Redis、Elasticsearch、Neo4j |
 | Admin console | React 18、TypeScript、Vite、高德地图 JS API |
 | Mini program | 原生 JavaScript、WXML、WXSS |
@@ -84,8 +121,9 @@ flowchart LR
 
 - JDK 21+
 - Node.js 18+
-- MySQL、Redis、Elasticsearch、Neo4j
-- OpenAI 兼容模型服务 API Key
+- MySQL、Redis，以及可访问的 Elasticsearch
+- 可选：Neo4j（启用旅行知识与路线专员时需要）
+- 阿里云百炼 DashScope API Key
 - 使用微信登录时，需要小程序 AppID / AppSecret；使用地图功能时，需要高德 Web 服务 Key
 
 ### 1. 配置并启动后端
@@ -96,9 +134,12 @@ flowchart LR
 Copy-Item src/main/resources/application.example.yml src/main/resources/application.yml
 ```
 
-在 `application.yml` 中填写数据库、Redis、模型服务、微信、高德地图和 Elasticsearch 配置。
+在 `application.yml` 中填写数据库、Redis、模型服务、微信、高德地图和 Elasticsearch 配置。Neo4j 默认关闭；需要图谱能力时设置：
 
-```powershell
+```yaml
+travel-agent:
+  neo4j:
+    enabled: true
 ```
 
 启动 API：
@@ -163,18 +204,23 @@ travel-agent/
 
 ## Docker 启动与部署
 
-Docker Compose 会启动管理台、API、MySQL、Redis、Elasticsearch 和 Neo4j。首次启动需下载并构建镜像，网络较慢时请耐心等待，后续更新会复用镜像缓存。
+Docker Compose 会启动管理台、API、MySQL 和 Redis。Elasticsearch 与 Neo4j 可部署在独立服务器，通过 `.env` 中的公网地址连接。
 
 ```bash
 git clone <仓库地址> travel-agent
 cd travel-agent
 cp .env.example .env
-# 编辑 .env，填入数据库密码、模型 API Key、JWT 密钥及微信/高德配置
-sudo sysctl -w vm.max_map_count=262144
+# 编辑 .env，填入数据库密码、模型 API Key、JWT 密钥、微信/高德与 Elasticsearch 配置
+# 图谱默认关闭；需要启用时设置 TRAVEL_AGENT_NEO4J_ENABLED=true
 docker compose up -d --build
 ```
 
 ```env
+TRAVEL_AGENT_AGENT_ELASTICSEARCH_HOST=<ES 公网地址>
+TRAVEL_AGENT_NEO4J_ENABLED=false
+# 仅启用图谱时需要：
+SPRING_NEO4J_URI=bolt://<Neo4j 公网地址>:7687
+NEO4J_PASSWORD=<Neo4j 密码>
 ```
 
 查看状态和日志：
@@ -191,7 +237,7 @@ git pull
 docker compose up -d --build
 ```
 
-数据由 Docker volumes 持久化；不要执行 `docker compose down -v`，否则会删除 MySQL、Redis 与 Elasticsearch 数据。
+数据由 Docker volumes 持久化；不要执行 `docker compose down -v`，否则会删除 MySQL 与 Redis 数据。
 
 ## 开发与测试
 
