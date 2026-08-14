@@ -35,44 +35,6 @@ services:
       timeout: 5s
       retries: 6
 
-  elasticsearch:
-    image: elastic.m.daocloud.io/elasticsearch/elasticsearch:9.4.3
-    restart: unless-stopped
-    environment:
-      - discovery.type=single-node
-      - xpack.security.enabled=false
-      - ES_JAVA_OPTS=-Xms256m -Xmx256m
-    volumes:
-      - elasticsearch-data:/usr/share/elasticsearch/data
-    mem_limit: 600m
-    mem_reservation: 350m
-    healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:9200/_cluster/health >/dev/null"]
-      interval: 15s
-      timeout: 5s
-      retries: 20
-
-  neo4j:
-    image: neo4j:5-community
-    restart: unless-stopped
-    environment:
-      NEO4J_AUTH: neo4j/${NEO4J_PASSWORD:?Set NEO4J_PASSWORD in .env}
-      NEO4J_server_memory_heap_initial__size: 256m
-      NEO4J_server_memory_heap_max__size: 256m
-      NEO4J_server_memory_pagecache_size: 256m
-    volumes:
-      - neo4j-data:/data
-    ports:
-      - "127.0.0.1:7474:7474"
-      - "127.0.0.1:7687:7687"
-    mem_limit: 700m
-    mem_reservation: 400m
-    healthcheck:
-      test: ["CMD-SHELL", "cypher-shell -u neo4j -p \"$$(echo \"$$NEO4J_AUTH\" | cut -d/ -f2)\" 'RETURN 1' >/dev/null"]
-      interval: 15s
-      timeout: 10s
-      retries: 20
-
   api:
     build:
       context: .
@@ -89,9 +51,9 @@ services:
       TRAVEL_AGENT_AUTH_WX_APP_ID: ${TRAVEL_AGENT_AUTH_WX_APP_ID}
       TRAVEL_AGENT_AUTH_WX_SECRET: ${TRAVEL_AGENT_AUTH_WX_SECRET}
       TRAVEL_AGENT_AMAP_WEB_SERVICE_KEY: ${TRAVEL_AGENT_AMAP_WEB_SERVICE_KEY}
-      TRAVEL_AGENT_AGENT_ELASTICSEARCH_HOST: elasticsearch
-      TRAVEL_AGENT_AGENT_ELASTICSEARCH_PORT: 9200
-      SPRING_NEO4J_URI: bolt://neo4j:7687
+      TRAVEL_AGENT_AGENT_ELASTICSEARCH_HOST: ${TRAVEL_AGENT_AGENT_ELASTICSEARCH_HOST:?Set TRAVEL_AGENT_AGENT_ELASTICSEARCH_HOST in .env}
+      TRAVEL_AGENT_AGENT_ELASTICSEARCH_PORT: ${TRAVEL_AGENT_AGENT_ELASTICSEARCH_PORT:-9200}
+      SPRING_NEO4J_URI: ${SPRING_NEO4J_URI:?Set SPRING_NEO4J_URI in .env}
       SPRING_NEO4J_AUTHENTICATION_USERNAME: neo4j
       SPRING_NEO4J_AUTHENTICATION_PASSWORD: ${NEO4J_PASSWORD}
       JAVA_TOOL_OPTIONS: -Xms128m -Xmx256m
@@ -102,10 +64,6 @@ services:
       mysql:
         condition: service_healthy
       redis:
-        condition: service_healthy
-      elasticsearch:
-        condition: service_healthy
-      neo4j:
         condition: service_healthy
     ports:
       - "127.0.0.1:18080:8080"
@@ -127,5 +85,3 @@ services:
 
 volumes:
   mysql-data:
-  elasticsearch-data:
-  neo4j-data:
