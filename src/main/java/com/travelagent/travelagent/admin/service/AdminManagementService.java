@@ -7,18 +7,12 @@ import com.travelagent.travelagent.agent.model.AgentConversationMessage;
 import com.travelagent.travelagent.admin.model.AdminConversationSessionView;
 import com.travelagent.travelagent.admin.dto.AdminConversationSummaryResponse;
 import com.travelagent.travelagent.admin.dto.AdminConversationUserResponse;
-import com.travelagent.travelagent.admin.dto.AdminScenicDocumentCreateRequest;
-import com.travelagent.travelagent.admin.dto.AdminScenicDocumentResponse;
 import com.travelagent.travelagent.admin.dto.AdminWxUserResponse;
 import com.travelagent.travelagent.common.dto.PageResponse;
 import com.travelagent.travelagent.auth.mapper.WxUserMapper;
 import com.travelagent.travelagent.auth.model.WxUser;
-import com.travelagent.travelagent.rag.service.ScenicKnowledgeIngestionService;
-import java.text.Normalizer;
 import java.time.Instant;
 import java.util.List;
-import java.util.Locale;
-import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -27,11 +21,8 @@ import org.springframework.util.StringUtils;
 @RequiredArgsConstructor
 public class AdminManagementService {
 
-    private static final Pattern SAFE_FILE_NAME = Pattern.compile("[^a-z0-9._-]+");
-
     private final WxUserMapper wxUserMapper;
     private final AgentConversationSessionMapper conversationSessionMapper;
-    private final ScenicKnowledgeIngestionService scenicKnowledgeIngestionService;
 
     public PageResponse<AdminWxUserResponse> searchWxUsers(String keyword, int page, int size) {
         String normalized = normalizeKeyword(keyword);
@@ -75,12 +66,6 @@ public class AdminManagementService {
                 session.getCreatedAt(), session.getUpdatedAt());
     }
 
-    public AdminScenicDocumentResponse addScenicDocument(AdminScenicDocumentCreateRequest request) {
-        String fileName = buildFileName(request.title());
-        scenicKnowledgeIngestionService.publishDocument(fileName, buildMarkdown(request.title(), request.content()));
-        return new AdminScenicDocumentResponse(fileName, "elasticsearch:" + fileName, Instant.now());
-    }
-
     private AdminWxUserResponse toWxUserResponse(WxUser user) {
         return new AdminWxUserResponse(user.getId(), user.getOpenId(), user.getNickname(), user.isEnabled(), user.getUpdatedAt());
     }
@@ -117,23 +102,6 @@ public class AdminManagementService {
 
     private String normalizeKeyword(String keyword) {
         return StringUtils.hasText(keyword) ? keyword.trim() : "";
-    }
-
-    private String buildFileName(String title) {
-        String normalized = Normalizer.normalize(title, Normalizer.Form.NFKD)
-                .toLowerCase(Locale.ROOT)
-                .replaceAll("\\p{M}", "");
-        String slug = SAFE_FILE_NAME.matcher(normalized).replaceAll("-")
-                .replaceAll("^-+", "")
-                .replaceAll("-+$", "");
-        if (!StringUtils.hasText(slug)) {
-            slug = "scenic-document";
-        }
-        return slug + "-" + Instant.now().toEpochMilli() + ".md";
-    }
-
-    private String buildMarkdown(String title, String content) {
-        return "# " + title.trim() + "\n\n" + content.trim() + "\n";
     }
 
     private AgentSessionDetailResponse toDetail(String sessionId, List<AgentConversationMessage> messages,

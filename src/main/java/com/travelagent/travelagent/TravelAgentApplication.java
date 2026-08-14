@@ -2,11 +2,10 @@ package com.travelagent.travelagent;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.ai.vectorstore.elasticsearch.autoconfigure.ElasticsearchVectorStoreAutoConfiguration;
 import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 import org.mybatis.spring.annotation.MapperScan;
 
-@SpringBootApplication(exclude = ElasticsearchVectorStoreAutoConfiguration.class)
+@SpringBootApplication
 @ConfigurationPropertiesScan
 @MapperScan({
         "com.travelagent.travelagent.auth.mapper",

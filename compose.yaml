@@ -1,6 +1,7 @@
 services:
   mysql:
     image: docker.m.daocloud.io/library/mysql:8.4
+    restart: unless-stopped
     environment:
       MYSQL_DATABASE: ${MYSQL_DATABASE:-travelagent}
       MYSQL_USER: ${MYSQL_USER:?Set MYSQL_USER in .env}
@@ -9,6 +10,13 @@ services:
     volumes:
       - mysql-data:/var/lib/mysql
       - ./src/main/resources/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    command:
+      - --innodb-buffer-pool-size=128M
+      - --max-connections=20
+      - --performance-schema=OFF
+      - --table-open-cache=200
+    mem_limit: 512m
+    mem_reservation: 256m
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${MYSQL_ROOT_PASSWORD}"]
       interval: 10s
@@ -17,9 +25,10 @@ services:
 
   redis:
     image: docker.m.daocloud.io/library/redis:7.4-alpine
-    command: redis-server --appendonly yes
-    volumes:
-      - redis-data:/data
+    restart: unless-stopped
+    command: redis-server --maxmemory 128mb --maxmemory-policy allkeys-lru --save "" --appendonly no
+    mem_limit: 256m
+    mem_reservation: 128m
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -28,20 +37,40 @@ services:
 
   elasticsearch:
     image: elastic.m.daocloud.io/elasticsearch/elasticsearch:9.4.3
+    restart: unless-stopped
     environment:
       - discovery.type=single-node
       - xpack.security.enabled=false
-      - ES_JAVA_OPTS=-Xms384m -Xmx384m
-    ulimits:
-      memlock:
-        soft: -1
-        hard: -1
+      - ES_JAVA_OPTS=-Xms256m -Xmx256m
     volumes:
       - elasticsearch-data:/usr/share/elasticsearch/data
+    mem_limit: 600m
+    mem_reservation: 350m
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:9200/_cluster/health >/dev/null"]
       interval: 15s
       timeout: 5s
+      retries: 20
+
+  neo4j:
+    image: neo4j:5-community
+    restart: unless-stopped
+    environment:
+      NEO4J_AUTH: neo4j/${NEO4J_PASSWORD:?Set NEO4J_PASSWORD in .env}
+      NEO4J_server_memory_heap_initial__size: 256m
+      NEO4J_server_memory_heap_max__size: 256m
+      NEO4J_server_memory_pagecache_size: 256m
+    volumes:
+      - neo4j-data:/data
+    ports:
+      - "127.0.0.1:7474:7474"
+      - "127.0.0.1:7687:7687"
+    mem_limit: 700m
+    mem_reservation: 400m
+    healthcheck:
+      test: ["CMD-SHELL", "cypher-shell -u neo4j -p \"$$(echo \"$$NEO4J_AUTH\" | cut -d/ -f2)\" 'RETURN 1' >/dev/null"]
+      interval: 15s
+      timeout: 10s
       retries: 20
 
   api:
@@ -57,21 +86,27 @@ services:
       SPRING_AI_OPENAI_BASE_URL: ${SPRING_AI_OPENAI_BASE_URL}
       SPRING_AI_OPENAI_API_KEY: ${SPRING_AI_OPENAI_API_KEY}
       SPRING_AI_OPENAI_CHAT_MODEL: ${SPRING_AI_OPENAI_CHAT_MODEL}
-      SPRING_AI_OPENAI_EMBEDDING_MODEL: ${SPRING_AI_OPENAI_EMBEDDING_MODEL}
       TRAVEL_AGENT_AUTH_JWT_SECRET: ${TRAVEL_AGENT_AUTH_JWT_SECRET:?Set TRAVEL_AGENT_AUTH_JWT_SECRET in .env}
       TRAVEL_AGENT_AUTH_WX_APP_ID: ${TRAVEL_AGENT_AUTH_WX_APP_ID}
       TRAVEL_AGENT_AUTH_WX_SECRET: ${TRAVEL_AGENT_AUTH_WX_SECRET}
       TRAVEL_AGENT_AMAP_WEB_SERVICE_KEY: ${TRAVEL_AGENT_AMAP_WEB_SERVICE_KEY}
-      TRAVEL_AGENT_AGENT_RAG_ENABLED: ${TRAVEL_AGENT_AGENT_RAG_ENABLED:-true}
-      TRAVEL_AGENT_AGENT_RAG_ELASTICSEARCH_HOST: elasticsearch
-      TRAVEL_AGENT_AGENT_RAG_ELASTICSEARCH_PORT: 9200
-      JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=35 -XX:InitialRAMPercentage=25
+      TRAVEL_AGENT_AGENT_ELASTICSEARCH_HOST: elasticsearch
+      TRAVEL_AGENT_AGENT_ELASTICSEARCH_PORT: 9200
+      SPRING_NEO4J_URI: bolt://neo4j:7687
+      SPRING_NEO4J_AUTHENTICATION_USERNAME: neo4j
+      SPRING_NEO4J_AUTHENTICATION_PASSWORD: ${NEO4J_PASSWORD}
+      JAVA_TOOL_OPTIONS: -Xms128m -Xmx256m
+    restart: unless-stopped
+    mem_limit: 400m
+    mem_reservation: 256m
     depends_on:
       mysql:
         condition: service_healthy
       redis:
         condition: service_healthy
       elasticsearch:
+        condition: service_healthy
+      neo4j:
         condition: service_healthy
     ports:
       - "127.0.0.1:18080:8080"
@@ -87,8 +122,11 @@ services:
       - "127.0.0.1:8081:80"
     depends_on:
       - api
+    restart: unless-stopped
+    mem_limit: 128m
+    mem_reservation: 64m
 
 volumes:
   mysql-data:
-  redis-data:
   elasticsearch-data:
+  neo4j-data:

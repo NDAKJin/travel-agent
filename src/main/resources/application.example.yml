@@ -11,8 +11,6 @@ spring:
       api-key: ${SPRING_AI_OPENAI_API_KEY:}
       chat:
         model: ${SPRING_AI_OPENAI_CHAT_MODEL:qwen-plus}
-      embedding:
-        model: ${SPRING_AI_OPENAI_EMBEDDING_MODEL:text-embedding-v3}
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/travelagent?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC}
     driver-class-name: ${SPRING_DATASOURCE_DRIVER_CLASS_NAME:com.mysql.cj.jdbc.Driver}
@@ -29,6 +27,11 @@ spring:
     redis:
       host: ${SPRING_DATA_REDIS_HOST:localhost}
       port: ${SPRING_DATA_REDIS_PORT:6379}
+  neo4j:
+    uri: ${SPRING_NEO4J_URI:bolt://localhost:7687}
+    authentication:
+      username: ${SPRING_NEO4J_AUTHENTICATION_USERNAME:neo4j}
+      password: ${SPRING_NEO4J_AUTHENTICATION_PASSWORD:}
 
 mybatis:
   mapper-locations: classpath*:com/travelagent/travelagent/**/*Mapper.xml
@@ -67,15 +70,8 @@ travel-agent:
       enabled: ${TRAVEL_AGENT_AGENT_TOOL_ENABLED:true}
     prompt:
       override: ${TRAVEL_AGENT_AGENT_PROMPT_OVERRIDE:}
-    rag:
-      enabled: ${TRAVEL_AGENT_AGENT_RAG_ENABLED:true}
-      top-k: ${TRAVEL_AGENT_AGENT_RAG_TOP_K:4}
-      similarity-threshold: ${TRAVEL_AGENT_AGENT_RAG_SIMILARITY_THRESHOLD:0.55}
-      max-context-chars: ${TRAVEL_AGENT_AGENT_RAG_MAX_CONTEXT_CHARS:4000}
-      embedding-dimensions: ${TRAVEL_AGENT_AGENT_RAG_EMBEDDING_DIMENSIONS:1024}
-      elasticsearch:
-        host: ${TRAVEL_AGENT_AGENT_RAG_ELASTICSEARCH_HOST:localhost}
-        port: ${TRAVEL_AGENT_AGENT_RAG_ELASTICSEARCH_PORT:9200}
-        scheme: ${TRAVEL_AGENT_AGENT_RAG_ELASTICSEARCH_SCHEME:http}
-        index-name: ${TRAVEL_AGENT_AGENT_RAG_ELASTICSEARCH_INDEX_NAME:travel-agent-scenic}
-        geo-index-name: ${TRAVEL_AGENT_AGENT_RAG_ELASTICSEARCH_GEO_INDEX_NAME:travel-agent-geo}
+    elasticsearch:
+      host: ${TRAVEL_AGENT_AGENT_ELASTICSEARCH_HOST:localhost}
+      port: ${TRAVEL_AGENT_AGENT_ELASTICSEARCH_PORT:9200}
+      scheme: ${TRAVEL_AGENT_AGENT_ELASTICSEARCH_SCHEME:http}
+      geo-index-name: ${TRAVEL_AGENT_AGENT_ELASTICSEARCH_GEO_INDEX_NAME:travel-agent-geo}

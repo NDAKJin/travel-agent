@@ -3,7 +3,6 @@ package com.travelagent.travelagent.config;
 import com.travelagent.travelagent.agent.prompt.PromptProvider;
 import com.travelagent.travelagent.agent.prompt.TravelAssistantPromptProvider;
 import com.travelagent.travelagent.agent.tool.CurrentTimeTool;
-import com.travelagent.travelagent.agent.tool.ScenicIntroTool;
 import com.travelagent.travelagent.agent.tool.CurrentUserLocationTool;
 import com.travelagent.travelagent.agent.tool.NearbySearchTool;
 import com.travelagent.travelagent.agent.tool.LocationPermissionTool;
@@ -24,12 +23,11 @@ public class AgentBootstrapConfiguration {
     @Bean
     ChatClient reactAgentChatClient(ChatModel chatModel,
                                     CurrentTimeTool currentTimeTool,
-                                    ScenicIntroTool scenicIntroTool,
                                     CurrentUserLocationTool currentUserLocationTool,
                                     LocationPermissionTool locationPermissionTool,
                                     NearbySearchTool nearbySearchTool) {
         return ChatClient.builder(chatModel)
-                .defaultTools(currentTimeTool, scenicIntroTool, currentUserLocationTool, locationPermissionTool, nearbySearchTool)
+                .defaultTools(currentTimeTool, currentUserLocationTool, locationPermissionTool, nearbySearchTool)
                 .defaultAdvisors(ToolCallingAdvisor.builder().build())
                 .build();
     }
