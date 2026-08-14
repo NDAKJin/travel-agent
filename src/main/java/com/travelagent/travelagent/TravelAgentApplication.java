@@ -5,7 +5,8 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 import org.mybatis.spring.annotation.MapperScan;
 
-@SpringBootApplication
+// Spring AI Alibaba 2.0.0-M1.1 registers this nonexistent auto-configuration class.
+@SpringBootApplication(excludeName = "com.alibaba.cloud.ai.autoconfigure.dashscope.DashScopeMultimodalEmbeddingAutoConfiguration")
 @ConfigurationPropertiesScan
 @MapperScan({
         "com.travelagent.travelagent.auth.mapper",
