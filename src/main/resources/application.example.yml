@@ -10,6 +10,7 @@ spring:
       chat:
         options:
           model: ${SPRING_AI_DASHSCOPE_CHAT_OPTIONS_MODEL:qwen3.8-max}
+          multi-model: ${SPRING_AI_DASHSCOPE_CHAT_OPTIONS_MULTI_MODEL:true}
       embedding:
         options:
           model: ${SPRING_AI_DASHSCOPE_EMBEDDING_OPTIONS_MODEL:text-embedding-v4}
