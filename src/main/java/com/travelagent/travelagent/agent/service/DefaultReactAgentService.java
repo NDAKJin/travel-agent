@@ -15,7 +15,6 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.AssistantMessage;
@@ -24,17 +23,30 @@ import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.util.StringUtils;
 
 @Service
 @Slf4j
-@RequiredArgsConstructor
 public class DefaultReactAgentService {
 
     private final AgentProperties agentProperties;
     private final PromptProvider promptProvider;
     private final ChatClient chatClient;
     private final AgentConversationStore conversationStore;
+    private final String model;
+
+    public DefaultReactAgentService(AgentProperties agentProperties,
+                                    PromptProvider promptProvider,
+                                    ChatClient chatClient,
+                                    AgentConversationStore conversationStore,
+                                    @Value("${SPRING_AI_DASHSCOPE_CHAT_OPTIONS_MODEL:qwen3.7-flash}") String model) {
+        this.agentProperties = agentProperties;
+        this.promptProvider = promptProvider;
+        this.chatClient = chatClient;
+        this.conversationStore = conversationStore;
+        this.model = model;
+    }
 
     public AgentChatResponse chat(AuthenticatedUser user, AgentChatRequest request) {
         if (request.message().length() > agentProperties.getMaxMessageChars()) {
@@ -77,7 +89,7 @@ public class DefaultReactAgentService {
                     sessionId,
                     reply,
                     agentProperties.getProfile().getName(),
-                    agentProperties.getQwen().getModel(),
+                    model,
                     agentProperties.getTool().isEnabled(),
                     NearbySearchContext.get(),
                     locationPermissionRequired);
@@ -132,7 +144,7 @@ public class DefaultReactAgentService {
         List<Message> messages = toChatMessages(promptProvider.systemPrompt(), history);
         try {
             log.debug("Calling chat model: model={}, sessionMessageCount={}, toolEnabled={}",
-                    agentProperties.getQwen().getModel(),
+                    model,
                     messages.size(),
                     agentProperties.getTool().isEnabled());
             ChatResponse response = chatClient.prompt()
@@ -140,13 +152,13 @@ public class DefaultReactAgentService {
                     .call()
                     .chatResponse();
             log.info("Chat model completed: model={}, hasToolCalls={}, generationCount={}",
-                    agentProperties.getQwen().getModel(),
+                    model,
                     response.hasToolCalls(),
                     response.getResults().size());
             return response.getResult().getOutput().getText();
         }
         catch (RuntimeException exception) {
-            log.error("Chat model call failed: model={}", agentProperties.getQwen().getModel(), exception);
+            log.error("Chat model call failed: model={}", model, exception);
             throw exception;
         }
     }

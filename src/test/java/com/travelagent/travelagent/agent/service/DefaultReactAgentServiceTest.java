@@ -50,9 +50,8 @@ class DefaultReactAgentServiceTest {
         AgentProperties properties = new AgentProperties();
         properties.getProfile().setName("Travel Buddy");
         properties.getTool().setEnabled(true);
-        properties.getQwen().setModel("qwen-plus");
         reactAgentService = new DefaultReactAgentService(
-                properties, promptProvider, chatClient, new InMemoryAgentConversationStore());
+                properties, promptProvider, chatClient, new InMemoryAgentConversationStore(), "qwen-plus");
     }
 
     @Test
