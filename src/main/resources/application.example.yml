@@ -49,6 +49,8 @@ nextdoc4j:
   enabled: ${NEXTDOC4J_ENABLED:true}
 
 travel-agent:
+  neo4j:
+    enabled: ${TRAVEL_AGENT_NEO4J_ENABLED:false}
   amap:
     web-service-key: ${TRAVEL_AGENT_AMAP_WEB_SERVICE_KEY:}
     city: ${AMAP_SEARCH_CITY:全国}

@@ -4,9 +4,11 @@ import com.alibaba.fastjson2.JSON;
 import com.travelagent.travelagent.agent.service.ScenicSpotKnowledgeGraphService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.ai.tool.annotation.Tool;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 @Component
+@ConditionalOnProperty(prefix = "travel-agent.neo4j", name = "enabled", havingValue = "true")
 @RequiredArgsConstructor
 public class TravelPlanningKnowledgeTool {
 

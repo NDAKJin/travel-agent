@@ -29,7 +29,7 @@ public class ScenicSpotGeoService {
 
     private final ObjectProvider<Rest5Client> restClientProvider;
     private final AgentProperties agentProperties;
-    private final com.travelagent.travelagent.agent.service.ScenicSpotKnowledgeGraphService knowledgeGraphService;
+    private final ObjectProvider<com.travelagent.travelagent.agent.service.ScenicSpotKnowledgeGraphService> knowledgeGraphServiceProvider;
 
     public List<AdminScenicSpotResponse> list() {
         return list(false);
@@ -63,7 +63,8 @@ public class ScenicSpotGeoService {
         request("PUT", "/" + indexName() + "/_doc/" + spotId, source);
         AdminScenicSpotResponse response = new AdminScenicSpotResponse(spotId, input.name().trim(), input.city().trim(), SCENIC_CATEGORY,
                 input.description().trim(), input.longitude(), input.latitude(), now);
-        knowledgeGraphService.upsert(response);
+        var knowledgeGraphService = knowledgeGraphServiceProvider.getIfAvailable();
+        if (knowledgeGraphService != null) knowledgeGraphService.upsert(response);
         return response;
     }
 
@@ -76,7 +77,8 @@ public class ScenicSpotGeoService {
     public void delete(String id) {
         log.info("Deleting scenic spot: id={}", id);
         request("DELETE", "/" + indexName() + "/_doc/" + id, null);
-        knowledgeGraphService.delete(id);
+        var knowledgeGraphService = knowledgeGraphServiceProvider.getIfAvailable();
+        if (knowledgeGraphService != null) knowledgeGraphService.delete(id);
     }
 
     public List<AdminScenicSpotResponse> nearby(double longitude, double latitude, String distance) {

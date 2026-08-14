@@ -7,9 +7,11 @@ import java.util.Map;
 import org.neo4j.driver.Driver;
 import org.neo4j.driver.Session;
 import org.springframework.ai.embedding.EmbeddingModel;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
 @Service
+@ConditionalOnProperty(prefix = "travel-agent.neo4j", name = "enabled", havingValue = "true")
 public class ScenicSpotKnowledgeGraphService {
 
     private static final String VECTOR_INDEX = "scenic_spot_embedding";
@@ -30,6 +32,21 @@ public class ScenicSpotKnowledgeGraphService {
         this.embeddingModel = embeddingModel;
     }
 
+    public void ensureSchema() {
+        try (Session session = driver.session()) {
+            session.executeWrite(tx -> {
+                tx.run("CREATE CONSTRAINT scenic_spot_id IF NOT EXISTS FOR (s:ScenicSpot) REQUIRE s.id IS UNIQUE");
+                tx.run("CREATE CONSTRAINT attraction_id IF NOT EXISTS FOR (a:Attraction) REQUIRE a.id IS UNIQUE");
+                tx.run("CREATE CONSTRAINT city_name IF NOT EXISTS FOR (c:City) REQUIRE c.name IS UNIQUE");
+                tx.run("CREATE CONSTRAINT hotel_id IF NOT EXISTS FOR (h:Hotel) REQUIRE h.id IS UNIQUE");
+                tx.run("CREATE CONSTRAINT restaurant_id IF NOT EXISTS FOR (r:Restaurant) REQUIRE r.id IS UNIQUE");
+                tx.run("CREATE CONSTRAINT interest_name IF NOT EXISTS FOR (i:Interest) REQUIRE i.name IS UNIQUE");
+                tx.run("MATCH (s:ScenicSpot) SET s:Attraction");
+                return null;
+            });
+        }
+    }
+
     public void upsert(AdminScenicSpotResponse spot) {
         float[] embedding = embeddingModel.embed(knowledgeText(spot.name(), spot.city(), spot.description()));
         try (Session session = driver.session()) {
@@ -39,14 +56,16 @@ public class ScenicSpotKnowledgeGraphService {
                 tx.run("CREATE VECTOR INDEX " + VECTOR_INDEX + " IF NOT EXISTS FOR (s:ScenicSpot) ON (s.embedding) "
                         + "OPTIONS {indexConfig: {`vector.dimensions`: " + embedding.length
                         + ", `vector.similarity_function`: 'cosine'}}");
-                tx.run("MERGE (s:ScenicSpot {id: $id}) "
+                tx.run("MERGE (s:ScenicSpot:Attraction {id: $id}) "
                                 + "SET s.name = $name, s.description = $description, s.longitude = $longitude, "
                                 + "s.latitude = $latitude, s.embedding = $embedding, s.updatedAt = $updatedAt",
                         Map.of("id", spot.id(), "name", spot.name(), "description", spot.description(),
                                 "longitude", spot.longitude(), "latitude", spot.latitude(),
                                 "embedding", toList(embedding), "updatedAt", spot.updatedAt().toString()));
-                tx.run("MATCH (s:ScenicSpot {id: $id})-[r:LOCATED_IN]->() DELETE r "
-                                + "WITH s MERGE (c:City {name: $city}) MERGE (s)-[:LOCATED_IN]->(c)",
+                tx.run("MATCH (s:ScenicSpot {id: $id})-[r:LOCATED_IN]->() DELETE r", Map.of("id", spot.id()));
+                tx.run("MATCH ()-[r:HAS_ATTRACTION]->(s:ScenicSpot {id: $id}) DELETE r", Map.of("id", spot.id()));
+                tx.run("MATCH (s:ScenicSpot {id: $id}) MERGE (c:City {name: $city}) "
+                                + "MERGE (s)-[:LOCATED_IN]->(c) MERGE (c)-[:HAS_ATTRACTION]->(s)",
                         Map.of("id", spot.id(), "city", spot.city()));
                 tx.run("MATCH (source:ScenicSpot {id: $id})-[r:NEARBY|CONNECTED_TO]->() DELETE r", Map.of("id", spot.id()));
                 tx.run("MATCH (source:ScenicSpot {id: $id}), (other:ScenicSpot) "

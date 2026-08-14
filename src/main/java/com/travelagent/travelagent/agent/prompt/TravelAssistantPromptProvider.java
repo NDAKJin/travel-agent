@@ -16,11 +16,13 @@ public class TravelAssistantPromptProvider implements PromptProvider {
             """;
 
     private final AgentProperties agentProperties;
+    private final boolean neo4jEnabled;
 
     @Override
     public String systemPrompt() {
         String override = agentProperties.getPrompt().getOverride();
         String prompt = override != null && !override.isBlank() ? override : DEFAULT_PROMPT;
+        if (!neo4jEnabled) return prompt;
         return prompt + "\n当用户要求旅游规划、行程安排、景点推荐或路线建议时，先调用 search_travel_knowledge 工具，并且只根据工具返回的景点安排路线。若用户指定两个景点并要求路径，再使用返回的景点 ID 调用 find_scenic_shortest_path。";
     }
 }

@@ -20,6 +20,7 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -42,7 +43,7 @@ public class AdminController {
     private final AmapPlaceSearchService amapPlaceSearchService;
     private final ServicePointGeoService servicePointGeoService;
     private final ServicePointCategoryService servicePointCategoryService;
-    private final ScenicSpotKnowledgeGraphService scenicSpotKnowledgeGraphService;
+    private final ObjectProvider<ScenicSpotKnowledgeGraphService> scenicSpotKnowledgeGraphServiceProvider;
 
     @GetMapping("/service-point-categories")
     public List<String> listServicePointCategories() { return servicePointCategoryService.list(); }
@@ -128,6 +129,8 @@ public class AdminController {
 
     @PostMapping("/scenic-spots/reindex-knowledge")
     public void reindexScenicSpotKnowledge() {
-        scenicSpotKnowledgeGraphService.reindex(scenicSpotGeoService.listForKnowledge());
+        ScenicSpotKnowledgeGraphService knowledgeGraphService = scenicSpotKnowledgeGraphServiceProvider.getIfAvailable();
+        if (knowledgeGraphService == null) throw new IllegalStateException("Neo4j knowledge graph is disabled");
+        knowledgeGraphService.reindex(scenicSpotGeoService.listForKnowledge());
     }
 }
