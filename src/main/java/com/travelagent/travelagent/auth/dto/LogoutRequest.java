@@ -1,6 +1,8 @@
 package com.travelagent.travelagent.auth.dto;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 
-public record LogoutRequest(@NotBlank String refreshToken) {
+@Schema(description = "退出登录请求")
+public record LogoutRequest(@Schema(description = "需要失效的刷新令牌") @NotBlank String refreshToken) {
 }

@@ -2,15 +2,15 @@ package com.travelagent.travelagent.agent.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 
-@Schema(name = "AgentChatResponse", description = "Travel assistant chat response")
+@Schema(name = "AgentChatResponse", description = "旅行助手对话响应")
 public record AgentChatResponse(
-        @Schema(description = "Conversation session id", example = "session-1") String sessionId,
-        @Schema(description = "Assistant reply", example = "Start with West Lake") String reply,
-        @Schema(description = "Agent name", example = "Travel Buddy") String agentName,
-        @Schema(description = "Model name", example = "qwen3.7-flash") String model,
-        @Schema(description = "Whether tools are enabled", example = "false") boolean toolEnabled,
-        NearbySearchResult nearbySearch,
-        @Schema(description = "Whether the mini program should request location permission") boolean locationPermissionRequired) {
+        @Schema(description = "会话标识", example = "session-1") String sessionId,
+        @Schema(description = "助手回复", example = "第一天可游览西湖和灵隐寺。") String reply,
+        @Schema(description = "助手名称", example = "Travel Buddy") String agentName,
+        @Schema(description = "本次调用的模型名称", example = "qwen3.8-max") String model,
+        @Schema(description = "是否启用工具调用", example = "true") boolean toolEnabled,
+        @Schema(description = "附近地点搜索结果；未搜索时为空") NearbySearchResult nearbySearch,
+        @Schema(description = "小程序是否应请求位置授权") boolean locationPermissionRequired) {
     public AgentChatResponse(String sessionId, String reply, String agentName, String model, boolean toolEnabled) {
         this(sessionId, reply, agentName, model, toolEnabled, null, false);
     }
