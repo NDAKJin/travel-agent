@@ -4,13 +4,11 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 @Component
 @RequiredArgsConstructor
 @Slf4j
-@ConditionalOnProperty(prefix = "travel-agent.agent.rag", name = "enabled", havingValue = "true", matchIfMissing = true)
 public class ScenicSpotGeoIndexBootstrap implements ApplicationRunner {
 
     private final ScenicSpotGeoService scenicSpotGeoService;

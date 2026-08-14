@@ -7,7 +7,6 @@ import ServicePointsPage from "./components/ServicePointsPage";
 import { api, ApiError } from "./services/api";
 import type {
   AdminConversationSummary,
-  AdminScenicDocumentResponse,
   AdminScenicSpot,
   AdminWxUser,
   AgentSessionDetail,
@@ -19,7 +18,7 @@ const STORAGE_KEY = "travel-agent-session";
 const SESSION_EXPIRED = "__SESSION_EXPIRED__";
 const PAGE_SIZE = 6;
 
-type AdminView = "sessions" | "scenic" | "services" | "rag";
+type AdminView = "sessions" | "scenic" | "services";
 type Screen = "dashboard" | "detail" | "scenicDetail" | "scenicCreate" | "serviceCreate";
 
 const readStoredSession = (): AuthSession | null => {
@@ -207,11 +206,6 @@ export default function App() {
   const [sessionError, setSessionError] = useState("");
   const [detailLoading, setDetailLoading] = useState(false);
 
-  const [docTitle, setDocTitle] = useState("");
-  const [docContent, setDocContent] = useState("");
-  const [docSaving, setDocSaving] = useState(false);
-  const [docResult, setDocResult] = useState<AdminScenicDocumentResponse | null>(null);
-  const [docError, setDocError] = useState("");
   const [scenicSpots, setScenicSpots] = useState<AdminScenicSpot[]>([]);
   const scenicLoadSequenceRef = useRef(0);
   const [scenicPage, setScenicPage] = useState(1);
@@ -263,9 +257,9 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const message = [loginError, userError, sessionError, docError, scenicError].find(Boolean);
+    const message = [loginError, userError, sessionError, scenicError].find(Boolean);
     if (message) showToast(message);
-  }, [loginError, userError, sessionError, docError, scenicError]);
+  }, [loginError, userError, sessionError, scenicError]);
 
   const clearAdminState = () => {
     setUserPageResult(null);
@@ -275,8 +269,6 @@ export default function App() {
     setSelectedConversationDetail(null);
     setUserError("");
     setSessionError("");
-    setDocError("");
-    setDocResult(null);
     setScenicSpots([]);
     setScenicError("");
     setSelectedScenicSpot(null);
@@ -456,27 +448,6 @@ export default function App() {
     setScreen("dashboard");
   };
 
-  const saveDocument = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!docTitle.trim() || !docContent.trim() || docSaving) return;
-    setDocSaving(true);
-    setDocError("");
-    setDocResult(null);
-    try {
-      const result = await withAuthorizedRequest(accessToken =>
-        api.addScenicDocument(accessToken, { title: docTitle.trim(), content: docContent.trim() })
-      );
-      setDocResult(result);
-      setDocTitle("");
-      setDocContent("");
-    } catch (error) {
-      const message = readErrorMessage(error, "保存失败");
-      if (message !== SESSION_EXPIRED) setDocError(message);
-    } finally {
-      setDocSaving(false);
-    }
-  };
-
   const saveScenicSpot = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (scenicSaving) return;
@@ -581,7 +552,6 @@ export default function App() {
             <div className={styles.heroBadgeRow}>
               <span className={styles.heroBadge}>会话管理</span>
               <span className={styles.heroBadge}>知识维护</span>
-              <span className={styles.heroBadge}>RAG 同步</span>
             </div>
             <div className={styles.heroMetrics}>
               <article className={styles.heroMetricCard}>
@@ -767,7 +737,7 @@ export default function App() {
                 </div>
               </div>
             <div className={styles.editorFooter}>
-              <div className={styles.helperText}>保存后会同步更新 RAG 索引和 geo 地理索引。</div>
+              <div className={styles.helperText}>保存后会更新 geo 地理索引。</div>
               <button className={styles.primaryButton} type="submit" disabled={scenicEditSaving || !scenicEditName.trim() || !scenicEditDescription.trim()}>{scenicEditSaving ? "保存中..." : "保存修改"}</button>
             </div>
           </form>
@@ -803,13 +773,6 @@ export default function App() {
             <button type="button" className={adminView === "services" ? styles.navButtonActive : styles.navButton} onClick={() => setAdminView("services")}>
               <span>便民服务</span>
             </button>
-            <button
-              type="button"
-              className={adminView === "rag" ? styles.navButtonActive : styles.navButton}
-              onClick={() => setAdminView("rag")}
-            >
-              <span>知识管理</span>
-            </button>
           </div>
 
           <div className={styles.navSpacer} />
@@ -822,9 +785,9 @@ export default function App() {
         <section className={styles.contentPanel}>
           <div className={adminView === "services" ? styles.panelHeaderHidden : styles.panelHeader}>
             <div>
-              <div className={styles.eyebrow}>{adminView === "sessions" ? "会话管理" : adminView === "scenic" ? "景区管理" : adminView === "services" ? "便民服务" : "知识管理"}</div>
+              <div className={styles.eyebrow}>{adminView === "sessions" ? "会话管理" : adminView === "scenic" ? "景区管理" : "便民服务"}</div>
               <h2 className={styles.sectionTitle}>
-                {adminView === "sessions" ? (selectedUser ? `${selectedUser.nickname} 的会话` : "全部会话") : adminView === "scenic" ? "景区地理数据与知识" : adminView === "services" ? "服务点地图与列表" : "新增景区 Markdown"}
+                {adminView === "sessions" ? (selectedUser ? `${selectedUser.nickname} 的会话` : "全部会话") : adminView === "scenic" ? "景区地理数据" : "服务点地图与列表"}
               </h2>
             </div>
             {adminView === "sessions" && selectedUser ? <div className={styles.panelMeta}>{selectedUser.openId}</div> : null}
@@ -945,37 +908,7 @@ export default function App() {
                 <ScenicSpotsMap spots={scenicSpots} onSpotClick={spot => void openScenicSpot(spot)} />
               </div>
             </div>
-          ) : (
-            <form className={styles.editorCard} onSubmit={saveDocument}>
-              <div className={styles.cardHeader}>Markdown 内容</div>
-              <label className={styles.field}>
-                <span>标题</span>
-                <input value={docTitle} onChange={event => setDocTitle(event.target.value)} placeholder="例如：西湖景区介绍" />
-              </label>
-              <label className={styles.field}>
-                <span>正文</span>
-                <textarea
-                  value={docContent}
-                  onChange={event => setDocContent(event.target.value)}
-                  placeholder={"# 西湖景区介绍\n\n## 简介\n...\n\n## 游玩建议\n..."}
-                  rows={12}
-                />
-              </label>
-              {docResult ? (
-                <div className={styles.successBox}>
-                  已保存 {docResult.fileName}
-                  <br />
-                  {docResult.path}
-                </div>
-              ) : null}
-              <div className={styles.editorFooter}>
-                <div className={styles.helperText}>保存后只写入 Elasticsearch RAG 索引，不会在本地保存 Markdown 文件。</div>
-                <button className={styles.primaryButton} type="submit" disabled={docSaving || !docTitle.trim() || !docContent.trim()}>
-                  {docSaving ? "保存中..." : "添加"}
-                </button>
-              </div>
-            </form>
-          )}
+          ) : null}
         </section>
       </section>
     </main>

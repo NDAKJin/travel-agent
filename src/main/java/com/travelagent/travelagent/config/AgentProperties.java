@@ -12,7 +12,7 @@ public class AgentProperties {
     private final ToolProperties tool = new ToolProperties();
     private final PromptProperties prompt = new PromptProperties();
     private final QwenProperties qwen = new QwenProperties();
-    private final RagProperties rag = new RagProperties();
+    private final ElasticsearchProperties elasticsearch = new ElasticsearchProperties();
 
     @Setter
     private int maxMessageChars = 4000;
@@ -56,25 +56,11 @@ public class AgentProperties {
 
     @Getter
     @Setter
-    public static class RagProperties {
-
-        private boolean enabled = true;
-        private int topK = 4;
-        private double similarityThreshold = 0.55d;
-        private int maxContextChars = 4000;
-        private int embeddingDimensions = 1024;
-        private final ElasticsearchProperties elasticsearch = new ElasticsearchProperties();
-
-    }
-
-    @Getter
-    @Setter
     public static class ElasticsearchProperties {
 
         private String host = "localhost";
         private int port = 9200;
         private String scheme = "http";
-        private String indexName = "travel-agent-scenic";
         private String geoIndexName = "travel-agent-geo";
 
     }

@@ -2,11 +2,11 @@ package com.travelagent.travelagent;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.ai.vectorstore.elasticsearch.autoconfigure.ElasticsearchVectorStoreAutoConfiguration;
 import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 import org.mybatis.spring.annotation.MapperScan;
 
-@SpringBootApplication(exclude = ElasticsearchVectorStoreAutoConfiguration.class)
+// Spring AI Alibaba 2.0.0-M1.1 registers this nonexistent auto-configuration class.
+@SpringBootApplication(excludeName = "com.alibaba.cloud.ai.autoconfigure.dashscope.DashScopeMultimodalEmbeddingAutoConfiguration")
 @ConfigurationPropertiesScan
 @MapperScan({
         "com.travelagent.travelagent.auth.mapper",

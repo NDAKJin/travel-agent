@@ -100,5 +100,5 @@ public class ServicePointGeoService {
         }
     }
 
-    private String indexName() { return agentProperties.getRag().getElasticsearch().getGeoIndexName(); }
+    private String indexName() { return agentProperties.getElasticsearch().getGeoIndexName(); }
 }

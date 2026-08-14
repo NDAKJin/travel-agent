@@ -81,12 +81,6 @@ export type AdminConversationSummary = {
   user: AdminConversationUser;
 };
 
-export type AdminScenicDocumentResponse = {
-  fileName: string;
-  path: string;
-  updatedAt: string;
-};
-
 export type AdminScenicSpot = {
   id: string;
   name: string;

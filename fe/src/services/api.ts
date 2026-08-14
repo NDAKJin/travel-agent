@@ -3,7 +3,6 @@ import type {
   AgentSession,
   AgentSessionDetail,
   AdminConversationSummary,
-  AdminScenicDocumentResponse,
   AdminScenicSpot,
   AdminServicePoint,
   AdminWxUser,
@@ -176,13 +175,6 @@ export const api = {
   },
   getSessionDetail(accessToken: string, conversationId: number) {
     return request<AgentSessionDetail>(`/api/admin/sessions/${conversationId}`, {
-      accessToken
-    });
-  },
-  addScenicDocument(accessToken: string, payload: { title: string; content: string }) {
-    return request<AdminScenicDocumentResponse>("/api/admin/rag/scenic-documents", {
-      method: "POST",
-      body: payload,
       accessToken
     });
   },

@@ -1,10 +1,10 @@
 <div align="center">
 
-# Travel Agent
+# 行迹 AI 旅行助手
 
 ### 让每一次出发，都有一位懂目的地的 AI 向导
 
-面向旅行场景的智能助手与运营管理平台：在微信小程序中对话、规划行程、发现附近地点；在管理台维护景区、服务点与 RAG 知识库。
+面向旅行场景的智能助手与运营管理平台：在微信小程序中对话、规划行程、发现附近地点；在管理台维护景区和服务点。
 
 [![Java](https://img.shields.io/badge/Java-21-ED8B00?logo=openjdk&logoColor=white)](https://openjdk.org/)
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.1-6DB33F?logo=springboot&logoColor=white)](https://spring.io/projects/spring-boot)
@@ -14,11 +14,12 @@
 [![MySQL](https://img.shields.io/badge/MySQL-4479A1?logo=mysql&logoColor=white)](https://www.mysql.com/)
 [![Redis](https://img.shields.io/badge/Redis-DC382D?logo=redis&logoColor=white)](https://redis.io/)
 [![Elasticsearch](https://img.shields.io/badge/Elasticsearch-005571?logo=elasticsearch&logoColor=white)](https://www.elastic.co/elasticsearch)
+[![Neo4j](https://img.shields.io/badge/Neo4j-008CC1?logo=neo4j&logoColor=white)](https://neo4j.com/)
 [![Vite](https://img.shields.io/badge/Vite-7-646CFF?logo=vite&logoColor=white)](https://vite.dev/)
 [![WeChat](https://img.shields.io/badge/WeChat%20Mini%20Program-07C160?logo=wechat&logoColor=white)](https://developers.weixin.qq.com/miniprogram/dev/framework/)
 [![License](https://img.shields.io/badge/license-MIT-2ea44f)](LICENSE)
 
-<a href="https://openjdk.org/"><img src="https://skillicons.dev/icons?i=java,spring,react,ts,mysql,redis,elasticsearch" alt="Travel Agent 技术栈" /></a>
+<a href="https://openjdk.org/"><img src="https://skillicons.dev/icons?i=java,spring,react,ts,mysql,redis,elasticsearch" alt="行迹 AI 旅行助手技术栈" /></a>
 
 **Java 21** · **Spring Boot 4** · **Spring AI** · **React 18** · **微信小程序** · **Elasticsearch**
 
@@ -28,7 +29,7 @@
 
 ## 项目简介
 
-Travel Agent 将旅行问答、目的地知识和运营管理放进同一套系统：
+行迹 AI 旅行助手将旅行问答、目的地知识和运营管理放进同一套系统：
 
 | 使用者 | 能做什么 |
 | --- | --- |
@@ -38,7 +39,6 @@ Travel Agent 将旅行问答、目的地知识和运营管理放进同一套系�
 ## 核心能力
 
 - **上下文旅行对话**：基于 OpenAI 兼容模型生成旅行建议，支持多轮会话。
-- **RAG 目的地知识**：景区文档写入 Elasticsearch 向量索引，为回答提供可检索的本地知识。
 - **附近地点推荐**：结合用户位置与高德地图服务搜索周边景点和文旅服务。
 - **运营管理台**：React + TypeScript 管理会话、景区、服务点和知识内容。
 - **微信小程序入口**：原生 WXML / WXSS / JavaScript，完成登录、聊天和历史会话。
@@ -50,10 +50,11 @@ Travel Agent 将旅行问答、目的地知识和运营管理放进同一套系�
 flowchart LR
     mini[微信小程序]
     admin[React 管理台]
-    api[Travel Agent API<br/>Spring Boot]
+    api[行迹 API<br/>Spring Boot]
     mysql[(MySQL)]
     redis[(Redis)]
-    es[(Elasticsearch<br/>RAG + 地理索引)]
+    es[(Elasticsearch<br/>地理索引)]
+    neo4j[(Neo4j<br/>图关系)]
     amap[高德地图 API]
     model[OpenAI 兼容模型]
 
@@ -62,6 +63,7 @@ flowchart LR
     api --> mysql
     api --> redis
     api --> es
+    api --> neo4j
     api --> amap
     api --> model
 ```
@@ -71,7 +73,7 @@ flowchart LR
 | 层次 | 技术 |
 | --- | --- |
 | Backend | Java 21、Spring Boot 4、Spring AI、Spring Security、MyBatis |
-| Data | MySQL、Redis、Elasticsearch |
+| Data | MySQL、Redis、Elasticsearch、Neo4j |
 | Admin console | React 18、TypeScript、Vite、高德地图 JS API |
 | Mini program | 原生 JavaScript、WXML、WXSS |
 | API docs | Springdoc OpenAPI、NextDoc4j |
@@ -82,7 +84,7 @@ flowchart LR
 
 - JDK 21+
 - Node.js 18+
-- MySQL、Redis、Elasticsearch
+- MySQL、Redis、Elasticsearch、Neo4j
 - OpenAI 兼容模型服务 API Key
 - 使用微信登录时，需要小程序 AppID / AppSecret；使用地图功能时，需要高德 Web 服务 Key
 
@@ -94,10 +96,9 @@ flowchart LR
 Copy-Item src/main/resources/application.example.yml src/main/resources/application.yml
 ```
 
-在 `application.yml` 中填写数据库、Redis、模型服务、微信、高德地图和 Elasticsearch 配置。暂时不使用 RAG 时可关闭：
+在 `application.yml` 中填写数据库、Redis、模型服务、微信、高德地图和 Elasticsearch 配置。
 
 ```powershell
-$env:TRAVEL_AGENT_AGENT_RAG_ENABLED = "false"
 ```
 
 启动 API：
@@ -147,13 +148,12 @@ npm run dev
 | 认证 | `POST /api/auth/wx/login`、`POST /api/auth/admin/login`、`POST /api/auth/refresh` |
 | AI 助手 | `POST /api/agent/chat`、`GET /api/agent/sessions`、`POST /api/agent/nearby/next` |
 | 运营管理 | `/api/admin/scenic-spots`、`/api/admin/service-points`、`/api/admin/sessions` |
-| 知识库 | `POST /api/admin/rag/scenic-documents` |
 
 ## 项目结构
 
 ```text
 travel-agent/
-├── src/                 Spring Boot API：认证、Agent、RAG、管理端
+├── src/                 Spring Boot API：认证、Agent、管理端
 ├── fe/                  React + TypeScript 管理台
 ├── miniprogram/         原生微信小程序
 ├── scripts/             部署与辅助脚本
@@ -163,7 +163,7 @@ travel-agent/
 
 ## Docker 启动与部署
 
-Docker Compose 会启动管理台、API、MySQL、Redis 和 Elasticsearch。首次启动需下载并构建镜像，网络较慢时请耐心等待，后续更新会复用镜像缓存。
+Docker Compose 会启动管理台、API、MySQL、Redis、Elasticsearch 和 Neo4j。首次启动需下载并构建镜像，网络较慢时请耐心等待，后续更新会复用镜像缓存。
 
 ```bash
 git clone <仓库地址> travel-agent
@@ -173,10 +173,8 @@ cp .env.example .env
 sudo sysctl -w vm.max_map_count=262144
 docker compose up -d --build
 ```
-RAG 默认已启用；如需显式设置，在 `.env` 中写：
 
 ```env
-TRAVEL_AGENT_AGENT_RAG_ENABLED=true
 ```
 
 查看状态和日志：

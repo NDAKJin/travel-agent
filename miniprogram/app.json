@@ -4,7 +4,7 @@
     "pages/chat/chat"
   ],
   "window": {
-    "navigationBarTitleText": "AI 旅行助手",
+    "navigationBarTitleText": "行迹 AI 旅行助手",
     "navigationBarBackgroundColor": "#f4fbf4",
     "navigationBarTextStyle": "black",
     "backgroundColor": "#eef8ef",

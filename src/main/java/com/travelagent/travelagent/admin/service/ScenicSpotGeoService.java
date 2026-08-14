@@ -1,12 +1,10 @@
 package com.travelagent.travelagent.admin.service;
 
 import com.alibaba.fastjson2.JSON;
-import com.alibaba.fastjson2.JSONArray;
 import com.alibaba.fastjson2.JSONObject;
 import com.travelagent.travelagent.admin.dto.AdminScenicSpotRequest;
 import com.travelagent.travelagent.admin.dto.AdminScenicSpotResponse;
 import com.travelagent.travelagent.config.AgentProperties;
-import com.travelagent.travelagent.rag.service.ScenicKnowledgeIngestionService;
 import co.elastic.clients.transport.rest5_client.low_level.Request;
 import co.elastic.clients.transport.rest5_client.low_level.Response;
 import co.elastic.clients.transport.rest5_client.low_level.Rest5Client;
@@ -31,7 +29,6 @@ public class ScenicSpotGeoService {
 
     private final ObjectProvider<Rest5Client> restClientProvider;
     private final AgentProperties agentProperties;
-    private final ScenicKnowledgeIngestionService scenicKnowledgeIngestionService;
 
     public List<AdminScenicSpotResponse> list() {
         long startedAt = System.nanoTime();
@@ -51,17 +48,10 @@ public class ScenicSpotGeoService {
         Instant now = Instant.now();
         Map<String, Object> source = Map.of("id", spotId, "name", input.name().trim(),
                 "category", SCENIC_CATEGORY, "categoryGroup", SCENIC_CATEGORY,
+                "description", input.description().trim(),
                 "location", Map.of("lat", input.latitude(), "lon", input.longitude()),
                 "updatedAt", now.toString());
-        AdminScenicSpotResponse previous = findById(spotId);
-        try {
-            scenicKnowledgeIngestionService.ingestScenicSpot(spotId, input.name(), input.description());
-            request("PUT", "/" + indexName() + "/_doc/" + spotId, source);
-        } catch (RuntimeException exception) {
-            if (previous == null) scenicKnowledgeIngestionService.deleteDocument(spotId);
-            else scenicKnowledgeIngestionService.ingestScenicSpot(spotId, previous.name(), previous.description());
-            throw exception;
-        }
+        request("PUT", "/" + indexName() + "/_doc/" + spotId, source);
         return new AdminScenicSpotResponse(spotId, input.name().trim(), SCENIC_CATEGORY, input.description().trim(),
                 input.longitude(), input.latitude(), now);
     }
@@ -74,16 +64,7 @@ public class ScenicSpotGeoService {
 
     public void delete(String id) {
         log.info("Deleting scenic spot: id={}", id);
-        AdminScenicSpotResponse previous = findById(id);
-        try {
-            scenicKnowledgeIngestionService.deleteDocument(id);
-            request("DELETE", "/" + indexName() + "/_doc/" + id, null);
-        } catch (RuntimeException exception) {
-            if (previous != null) {
-                scenicKnowledgeIngestionService.ingestScenicSpot(id, previous.name(), previous.description());
-            }
-            throw exception;
-        }
+        request("DELETE", "/" + indexName() + "/_doc/" + id, null);
     }
 
     public List<AdminScenicSpotResponse> nearby(double longitude, double latitude, String distance) {
@@ -162,34 +143,11 @@ public class ScenicSpotGeoService {
         String id = source.getString("id");
         String name = source.getString("name");
         String category = source.getString("category", SCENIC_CATEGORY);
-        String description = includeDescription ? loadKnowledgeDescription(id, name) : "";
+        String description = includeDescription ? source.getString("description", "") : "";
         JSONObject location = source.getJSONObject("location");
         return new AdminScenicSpotResponse(id, name, category, description,
                 location.getDoubleValue("lon"), location.getDoubleValue("lat"),
                 Instant.parse(source.getString("updatedAt")));
-    }
-
-    private String loadKnowledgeDescription(String id, String name) {
-        JSONObject byId = request("GET", "/" + knowledgeIndexName() + "/_doc/" + id, null).getJSONObject("_source");
-        String content = byId == null ? "" : byId.getString("content", "");
-        if (!content.isBlank()) return removeTitleLine(content);
-
-        JSONArray byTitle = request("POST", "/" + knowledgeIndexName() + "/_search", Map.of(
-                "size", 1,
-                "query", Map.of("match_phrase", Map.of("content", "# " + name)))).getJSONObject("hits").getJSONArray("hits");
-        if (byTitle != null && !byTitle.isEmpty()) {
-            return removeTitleLine(byTitle.getJSONObject(0).getJSONObject("_source").getString("content", ""));
-        }
-        return "";
-    }
-
-    private String removeTitleLine(String content) {
-        String normalized = content.strip();
-        if (normalized.startsWith("# ")) {
-            int lineBreak = normalized.indexOf('\n');
-            return lineBreak < 0 ? "" : normalized.substring(lineBreak + 1).strip();
-        }
-        return normalized;
     }
 
     private AdminScenicSpotResponse findById(String id) {
@@ -198,7 +156,5 @@ public class ScenicSpotGeoService {
         return source == null || source.isEmpty() ? null : toResponse(source);
     }
 
-    private String indexName() { return agentProperties.getRag().getElasticsearch().getGeoIndexName(); }
-
-    private String knowledgeIndexName() { return agentProperties.getRag().getElasticsearch().getIndexName(); }
+    private String indexName() { return agentProperties.getElasticsearch().getGeoIndexName(); }
 }
