@@ -122,6 +122,10 @@ Page({
     sessionId: "",
     activeHistoryId: "",
     sidebarCollapsed: true,
+    isHarmony: false,
+    keyboardInset: 0,
+    editorHeight: 36,
+    editorMeasureText: " ",
     loading: false,
     errorMessage: "",
     history: [],
@@ -133,6 +137,21 @@ Page({
   async onLoad(options) {
     if (!requireSession()) {
       return;
+    }
+
+    const systemInfo = wx.getSystemInfoSync();
+    this.isHarmony = /harmony/i.test(systemInfo.system || "");
+    this.initialWindowHeight = systemInfo.windowHeight;
+    this.currentWindowHeight = systemInfo.windowHeight;
+    this.setData({ isHarmony: this.isHarmony });
+    if (this.isHarmony) {
+      this.handleWindowResize = result => {
+        this.currentWindowHeight = result.size.windowHeight;
+        this.updateKeyboardInset();
+      };
+      wx.onWindowResize(this.handleWindowResize);
+      this.handleGlobalKeyboardHeightChange = event => this.handleKeyboardHeightChange(event);
+      wx.onKeyboardHeightChange(this.handleGlobalKeyboardHeightChange);
     }
 
     this.resetConversation();
@@ -170,6 +189,11 @@ Page({
     void this.loadHistory();
   },
 
+  onUnload() {
+    if (this.handleWindowResize) wx.offWindowResize(this.handleWindowResize);
+    if (this.handleGlobalKeyboardHeightChange) wx.offKeyboardHeightChange(this.handleGlobalKeyboardHeightChange);
+  },
+
   loadLocation() {
     wx.getLocation({
       type: "gcj02",
@@ -187,10 +211,38 @@ Page({
     });
   },
 
-  handleInput(event) {
+  handleEditorReady() {
+    wx.createSelectorQuery()
+      .select(".composer-editor").context(result => {
+        this.editorContext = result.context;
+        this.editorContext.clear();
+        this.setData({ editorHeight: 36, editorMeasureText: " " });
+      })
+      .exec();
+  },
+
+  handleEditorInput(event) {
+    const text = event.detail.text || "";
     this.setData({
-      messageInput: event.detail.value
+      messageInput: text,
+      editorMeasureText: text.replace(/\n+$/, "") || " "
+    }, () => {
+      wx.createSelectorQuery().select(".composer-measure").boundingClientRect(result => {
+        if (result) this.setData({ editorHeight: Math.max(36, Math.min(180, Math.ceil(result.height))) });
+      }).exec();
     });
+  },
+
+  handleKeyboardHeightChange(event) {
+    if (!this.isHarmony) return;
+    this.keyboardHeight = Number(event.detail.height) || 0;
+    this.updateKeyboardInset();
+    wx.nextTick(() => this.updateKeyboardInset());
+  },
+
+  updateKeyboardInset() {
+    const resizedHeight = Math.max(0, this.initialWindowHeight - this.currentWindowHeight);
+    this.setData({ keyboardInset: Math.max(0, this.keyboardHeight - resizedHeight) });
   },
 
   toggleSidebar() {
@@ -230,6 +282,8 @@ Page({
       activeHistoryId: "",
       bottomMessageId: greetingMessage.id,
       messageInput: "",
+      editorHeight: 36,
+      editorMeasureText: " ",
       errorMessage: "",
       messages: [greetingMessage]
     });
@@ -428,10 +482,13 @@ Page({
       activeHistoryId: nextSessionId,
       bottomMessageId: nextMessages[nextMessages.length - 1].id,
       messageInput: "",
+      editorHeight: 36,
+      editorMeasureText: " ",
       errorMessage: "",
       loading: true,
       messages: nextMessages
     });
+    if (this.editorContext) this.editorContext.clear();
 
     try {
       const latestLocation = await refreshCurrentLocation();

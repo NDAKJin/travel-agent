@@ -44,7 +44,7 @@
           </view>
         </view>
 
-        <view class="sidebar-logout">
+        <view class="sidebar-logout" style="margin-bottom: {{keyboardInset}}px;">
           <button class="logout-button" bindtap="logoutTap" aria-label="退出登录">
             <view class="logout-icon">
               <view class="logout-door"></view>
@@ -109,15 +109,15 @@
         </view>
       </view>
 
-      <view class="composer">
-        <view class="composer-input-wrap">
-        <textarea
-          class="textarea composer-textarea"
+      <view class="composer" style="margin-bottom: {{keyboardInset}}px;">
+        <view class="composer-input-wrap" style="height: {{editorHeight}}px;">
+          <view class="composer-measure">{{editorMeasureText}}</view>
+        <editor
+          class="composer-editor"
+          style="height: {{editorHeight}}px;"
           placeholder="输入你的旅行需求"
-          value="{{messageInput}}"
-          bindinput="handleInput"
-          maxlength="-1"
-          auto-height
+          bindready="handleEditorReady"
+          bindinput="handleEditorInput"
         />
           <button class="composer-button" loading="{{loading}}" bindtap="sendTap" aria-label="发送"><text wx:if="{{!loading}}" class="send-icon">➤</text></button>
         </view>
