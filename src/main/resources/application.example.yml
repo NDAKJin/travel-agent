@@ -9,7 +9,7 @@ spring:
       api-key: ${SPRING_AI_DASHSCOPE_API_KEY:}
       chat:
         options:
-          model: ${SPRING_AI_DASHSCOPE_CHAT_OPTIONS_MODEL:qwen-plus}
+          model: ${SPRING_AI_DASHSCOPE_CHAT_OPTIONS_MODEL:qwen3.7-flash}
       embedding:
         options:
           model: ${SPRING_AI_DASHSCOPE_EMBEDDING_OPTIONS_MODEL:text-embedding-v4}

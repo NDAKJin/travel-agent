@@ -113,8 +113,6 @@ Page({
     sidebarCollapsed: true,
     isHarmony: false,
     keyboardInset: 0,
-    editorHeight: 36,
-    editorMeasureText: " ",
     loading: false,
     errorMessage: "",
     history: [],
@@ -210,26 +208,8 @@ Page({
     });
   },
 
-  handleEditorReady() {
-    wx.createSelectorQuery()
-      .select(".composer-editor").context(result => {
-        this.editorContext = result.context;
-        this.editorContext.clear();
-        this.setData({ editorHeight: 36, editorMeasureText: " " });
-      })
-      .exec();
-  },
-
-  handleEditorInput(event) {
-    const text = event.detail.text || "";
-    this.setData({
-      messageInput: text,
-      editorMeasureText: text.replace(/\n+$/, "") || " "
-    }, () => {
-      wx.createSelectorQuery().select(".composer-measure").boundingClientRect(result => {
-        if (result) this.setData({ editorHeight: Math.max(36, Math.min(180, Math.ceil(result.height))) });
-      }).exec();
-    });
+  handleTextareaInput(event) {
+    this.setData({ messageInput: event.detail.value || "" });
   },
 
   handleKeyboardHeightChange(event) {
@@ -280,8 +260,6 @@ Page({
       activeHistoryId: "",
       bottomMessageId: "",
       messageInput: "",
-      editorHeight: 36,
-      editorMeasureText: " ",
       errorMessage: "",
       messages: []
     });
@@ -482,14 +460,10 @@ Page({
       activeHistoryId: nextSessionId,
       bottomMessageId: nextMessages[nextMessages.length - 1].id,
       messageInput: "",
-      editorHeight: 36,
-      editorMeasureText: " ",
       errorMessage: "",
       loading: true,
       messages: nextMessages
     });
-    if (this.editorContext) this.editorContext.clear();
-
     try {
       const latestLocation = await refreshCurrentLocation();
       this.setData({ location: latestLocation });

@@ -593,27 +593,8 @@
   flex-shrink: 0;
 }
 
-.composer-editor {
-  background: #ffffff;
-  padding: 0 82rpx 0 20rpx;
-  box-sizing: border-box;
-  line-height: 36px;
-}
-
 .composer-input-wrap {
   position: relative;
-}
-
-.composer-measure {
-  display: block;
-  position: absolute;
-  visibility: hidden;
-  width: calc(100% - 102rpx);
-  font-size: 26rpx;
-  line-height: 36px;
-  white-space: pre-wrap;
-  word-break: break-word;
-  box-sizing: border-box;
 }
 
 .composer-button {
@@ -927,32 +908,17 @@ page {
 
 .quick-action-panel {
   width: 100%;
-  max-width: 540rpx;
-  margin: 44rpx auto 0;
-  padding: 26rpx 22rpx;
+  flex-shrink: 0;
+  padding: 14rpx 18rpx;
   box-sizing: border-box;
   border: 1rpx solid rgba(73, 137, 83, 0.1);
-  border-radius: 28rpx;
+  border-radius: 22rpx;
   background: rgba(255, 255, 255, 0.8);
-  box-shadow: 0 14rpx 30rpx rgba(38, 92, 51, 0.06);
-}
-
-.quick-action-title {
-  color: #244435;
-  font-size: 28rpx;
-  font-weight: 700;
-  text-align: center;
-}
-
-.quick-action-subtitle {
-  margin-top: 6rpx;
-  color: #8ba091;
-  font-size: 22rpx;
-  text-align: center;
+  box-shadow: 0 8rpx 18rpx rgba(38, 92, 51, 0.04);
 }
 
 .quick-action-grid {
-  margin-top: 20rpx;
+  margin-top: 0;
 }
 
 .quick-action-row {
@@ -1036,11 +1002,20 @@ page {
   box-shadow: inset 0 0 0 1rpx rgba(73, 137, 83, 0.08);
 }
 
-.composer-editor {
+.composer-textarea {
+  display: block;
+  width: 100%;
+  min-height: 72rpx;
+  max-height: 180px;
+  padding: 16rpx 82rpx 16rpx 20rpx;
+  box-sizing: border-box;
   border: 1rpx solid rgba(255, 255, 255, 0.92);
   border-radius: 20rpx;
   background: #ffffff;
   font-size: 26rpx;
+  line-height: 1.5;
+  overflow-y: auto;
+  resize: none;
   box-shadow: 0 6rpx 16rpx rgba(39, 93, 51, 0.04);
 }
 
