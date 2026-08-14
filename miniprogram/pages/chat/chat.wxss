@@ -925,6 +925,69 @@ page {
   padding: 14rpx 12rpx 30rpx 8rpx;
 }
 
+.quick-action-panel {
+  width: 100%;
+  max-width: 540rpx;
+  margin: 44rpx auto 0;
+  padding: 26rpx 22rpx;
+  box-sizing: border-box;
+  border: 1rpx solid rgba(73, 137, 83, 0.1);
+  border-radius: 28rpx;
+  background: rgba(255, 255, 255, 0.8);
+  box-shadow: 0 14rpx 30rpx rgba(38, 92, 51, 0.06);
+}
+
+.quick-action-title {
+  color: #244435;
+  font-size: 28rpx;
+  font-weight: 700;
+  text-align: center;
+}
+
+.quick-action-subtitle {
+  margin-top: 6rpx;
+  color: #8ba091;
+  font-size: 22rpx;
+  text-align: center;
+}
+
+.quick-action-grid {
+  margin-top: 20rpx;
+}
+
+.quick-action-row {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 12rpx;
+}
+
+.quick-action-row:first-child {
+  margin-top: 0;
+}
+
+.quick-action-button {
+  width: 48%;
+  height: 60rpx;
+  margin: 0;
+  padding: 0 12rpx;
+  box-sizing: border-box;
+  color: #315d43;
+  font-size: 21rpx;
+  font-weight: 600;
+  line-height: 60rpx;
+  border: 1rpx solid rgba(73, 137, 83, 0.16);
+  border-radius: 18rpx;
+  background: #f4faf3;
+}
+
+.quick-action-button::after {
+  border: none;
+}
+
+.quick-action-button:active {
+  background: #e7f3e7;
+}
+
 .message-row {
   margin-bottom: 20rpx;
 }

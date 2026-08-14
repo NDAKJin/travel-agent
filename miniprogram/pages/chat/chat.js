@@ -2,17 +2,6 @@ const { chat, createSession, getSession, listSessions, deleteSession, nextNearby
 const { requireSession, clearSession } = require("../../utils/auth");
 const { markdownToHtml } = require("../../utils/markdown");
 
-function createGreetingMessage() {
-  const text = "你好，我是行迹 AI 旅行助手。告诉我出发地、目的地、天数、预算和偏好，我会帮你生成可执行行程。";
-  return {
-    id: `assistant-${Date.now()}`,
-    role: "assistant",
-    text,
-    html: markdownToHtml(text),
-    meta: ""
-  };
-}
-
 function createMessage(role, text, id, extra) {
   const content = text || "";
   return {
@@ -131,7 +120,17 @@ Page({
     history: [],
     historyLoading: false,
     historyError: "",
-    location: null
+    location: null,
+    quickActionRows: [
+      [
+        { label: "规划行程", prompt: "请帮我规划一次旅行行程。" },
+        { label: "查询附近景点", prompt: "查询我附近的景点。" }
+      ],
+      [
+        { label: "查询附近饭店", prompt: "查询我附近的饭店。" },
+        { label: "查询附近酒店", prompt: "查询我附近的酒店。" }
+      ]
+    ]
   },
 
   async onLoad(options) {
@@ -276,16 +275,15 @@ Page({
   },
 
   resetConversation() {
-    const greetingMessage = createGreetingMessage();
     this.setData({
       sessionId: "",
       activeHistoryId: "",
-      bottomMessageId: greetingMessage.id,
+      bottomMessageId: "",
       messageInput: "",
       editorHeight: 36,
       editorMeasureText: " ",
       errorMessage: "",
-      messages: [greetingMessage]
+      messages: []
     });
   },
 
@@ -353,13 +351,11 @@ Page({
         message.content,
         `${detail.sessionId}-${index}`
       ));
-      const fallbackGreetingMessage = createGreetingMessage();
-
       this.setData({
         sessionId: detail.sessionId,
         activeHistoryId: detail.sessionId,
-        messages: messages.length > 0 ? messages : [fallbackGreetingMessage],
-        bottomMessageId: messages.length > 0 ? messages[messages.length - 1].id : fallbackGreetingMessage.id
+        messages,
+        bottomMessageId: messages.length > 0 ? messages[messages.length - 1].id : ""
       });
     } catch (error) {
       if (isSilentError(error)) {
@@ -433,6 +429,10 @@ Page({
 
   async sendTap() {
     await this.submitMessage(this.data.messageInput);
+  },
+
+  async sendQuickAction(event) {
+    await this.submitMessage(event.currentTarget.dataset.prompt);
   },
 
   async loadNextPage(event) {

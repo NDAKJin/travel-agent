@@ -78,6 +78,15 @@
         <view class="scroll-shell message-scroll-shell">
           <scroll-view class="message-list" scroll-y="true" enhanced="true" show-scrollbar="false" scroll-into-view="{{bottomMessageId}}">
             <view class="scroll-gutter message-scroll-gutter">
+              <view wx:if="{{messages.length === 0}}" class="quick-action-panel">
+                <view class="quick-action-title">开始你的旅行</view>
+                <view class="quick-action-subtitle">选择一个功能，马上开始提问</view>
+                <view class="quick-action-grid">
+                  <view wx:for="{{quickActionRows}}" wx:key="index" wx:for-item="row" class="quick-action-row">
+                    <button wx:for="{{row}}" wx:key="label" wx:for-item="action" class="quick-action-button" data-prompt="{{action.prompt}}" bindtap="sendQuickAction" disabled="{{loading}}">{{action.label}}</button>
+                  </view>
+                </view>
+              </view>
               <block wx:for="{{messages}}" wx:key="id">
                 <view id="{{item.id}}" class="message-row {{item.role === 'user' ? 'message-row-user' : ''}}">
                   <view class="message-bubble {{item.role === 'user' ? 'user-bubble' : 'assistant-bubble'}}">
