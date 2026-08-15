@@ -1,8 +1,5 @@
 package com.travelagent.travelagent.config;
 
-import com.travelagent.travelagent.agent.prompt.PromptProvider;
-import com.travelagent.travelagent.agent.prompt.PromptResourceLoader;
-import com.travelagent.travelagent.agent.prompt.TravelAssistantPromptProvider;
 import com.travelagent.travelagent.agent.subagent.BudgetAgent;
 import com.travelagent.travelagent.agent.subagent.KnowledgePlanningAgent;
 import com.travelagent.travelagent.agent.subagent.PoiSearchAgent;
@@ -22,11 +19,6 @@ import org.springframework.context.annotation.Primary;
 
 @Configuration
 public class AgentBootstrapConfiguration {
-
-    @Bean
-    PromptProvider promptProvider(AgentProperties agentProperties, PromptResourceLoader promptResourceLoader) {
-        return new TravelAssistantPromptProvider(agentProperties, promptResourceLoader);
-    }
 
     @Bean
     @Primary

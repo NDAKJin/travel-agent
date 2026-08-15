@@ -9,7 +9,7 @@ import static org.mockito.Mockito.when;
 import com.travelagent.travelagent.agent.dto.AgentChatRequest;
 import com.travelagent.travelagent.agent.dto.AgentChatResponse;
 import com.travelagent.travelagent.agent.dto.AgentSessionSummaryResponse;
-import com.travelagent.travelagent.agent.prompt.PromptProvider;
+import com.travelagent.travelagent.agent.prompt.TravelAssistantPromptProvider;
 import com.travelagent.travelagent.auth.security.AuthenticatedUser;
 import com.travelagent.travelagent.config.AgentProperties;
 import java.util.List;
@@ -32,7 +32,7 @@ class DefaultReactAgentServiceTest {
             new AuthenticatedUser(1L, "admin", "admin", "ops-admin");
 
     @Mock
-    private PromptProvider promptProvider;
+    private TravelAssistantPromptProvider promptProvider;
 
     @Mock
     private ChatClient chatClient;

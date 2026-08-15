@@ -7,7 +7,7 @@ import com.travelagent.travelagent.agent.dto.AgentSessionDetailResponse;
 import com.travelagent.travelagent.agent.dto.AgentSessionSummaryResponse;
 import com.travelagent.travelagent.agent.model.AgentMessage;
 import com.travelagent.travelagent.agent.model.AgentSessionContext;
-import com.travelagent.travelagent.agent.prompt.PromptProvider;
+import com.travelagent.travelagent.agent.prompt.TravelAssistantPromptProvider;
 import com.travelagent.travelagent.auth.exception.AuthException;
 import com.travelagent.travelagent.auth.security.AuthenticatedUser;
 import com.travelagent.travelagent.config.AgentProperties;
@@ -31,13 +31,13 @@ import org.springframework.util.StringUtils;
 public class DefaultReactAgentService {
 
     private final AgentProperties agentProperties;
-    private final PromptProvider promptProvider;
+    private final TravelAssistantPromptProvider promptProvider;
     private final ChatClient chatClient;
     private final AgentConversationStore conversationStore;
     private final String model;
 
     public DefaultReactAgentService(AgentProperties agentProperties,
-                                    PromptProvider promptProvider,
+                                    TravelAssistantPromptProvider promptProvider,
                                     ChatClient chatClient,
                                     AgentConversationStore conversationStore,
                                     @Value("${SPRING_AI_DASHSCOPE_CHAT_OPTIONS_MODEL:qwen3.7-flash}") String model) {
@@ -94,10 +94,6 @@ public class DefaultReactAgentService {
                     NearbySearchContext.get(),
                     locationPermissionRequired);
         }
-        catch (RuntimeException exception) {
-            log.error("React-agent chat failed: sessionId={}", sessionId, exception);
-            throw exception;
-        }
         finally {
             NearbySearchContext.clear();
             LocationPermissionContext.clear();
@@ -142,25 +138,19 @@ public class DefaultReactAgentService {
 
     private String callModel(List<AgentMessage> history) {
         List<Message> messages = toChatMessages(promptProvider.systemPrompt(), history);
-        try {
-            log.debug("Calling chat model: model={}, sessionMessageCount={}, toolEnabled={}",
-                    model,
-                    messages.size(),
-                    agentProperties.getTool().isEnabled());
-            ChatResponse response = chatClient.prompt()
-                    .messages(messages)
-                    .call()
-                    .chatResponse();
-            log.info("Chat model completed: model={}, hasToolCalls={}, generationCount={}",
-                    model,
-                    response.hasToolCalls(),
-                    response.getResults().size());
-            return response.getResult().getOutput().getText();
-        }
-        catch (RuntimeException exception) {
-            log.error("Chat model call failed: model={}", model, exception);
-            throw exception;
-        }
+        log.debug("Calling chat model: model={}, sessionMessageCount={}, toolEnabled={}",
+                model,
+                messages.size(),
+                agentProperties.getTool().isEnabled());
+        ChatResponse response = chatClient.prompt()
+                .messages(messages)
+                .call()
+                .chatResponse();
+        log.info("Chat model completed: model={}, hasToolCalls={}, generationCount={}",
+                model,
+                response.hasToolCalls(),
+                response.getResults().size());
+        return response.getResult().getOutput().getText();
     }
 
     private String normalizeSessionId(String sessionId) {
