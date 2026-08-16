@@ -13,15 +13,18 @@ public class SpecialistAgentRunner {
     public String run(String agent, ChatClient chatClient, String prompt, String task) {
         AgentObservationContext observation = AgentObservationContextHolder.current();
         Instant startedAt = Instant.now();
+        String input = "系统提示：\n" + prompt + "\n\n任务：\n" + task;
         try {
             ChatResponse response = chatClient.prompt().system(prompt).user(task).call().chatResponse();
             String output = normalize(response.getResult().getOutput().getText());
-            if (observation != null) observation.publish(agent, "llm", "success", startedAt,
-                    "系统提示：\n" + prompt + "\n\n任务：\n" + task, output, response, null);
+            if (observation != null) {
+                observation.publish(agent, "llm", "success", startedAt, input, output, response, "return", null);
+            }
             return output;
         } catch (RuntimeException exception) {
-            if (observation != null) observation.publish(agent, "llm", "error", startedAt,
-                    "系统提示：\n" + prompt + "\n\n任务：\n" + task, null, null, exception);
+            if (observation != null) {
+                observation.publish(agent, "llm", "error", startedAt, input, null, null, null, exception);
+            }
             throw exception;
         }
     }

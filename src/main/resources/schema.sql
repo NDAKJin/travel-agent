@@ -68,9 +68,6 @@ CREATE TABLE IF NOT EXISTS agent_observation_log (
     INDEX idx_agent_observation_message_sequence (message_id, sequence_no)
 );
 
-ALTER TABLE agent_observation_log
-    ADD COLUMN IF NOT EXISTS next_decision VARCHAR(64);
-
 CREATE TABLE IF NOT EXISTS service_point_category (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     name VARCHAR(64) NOT NULL UNIQUE,

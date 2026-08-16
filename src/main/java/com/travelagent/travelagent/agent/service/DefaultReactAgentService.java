@@ -71,6 +71,7 @@ public class DefaultReactAgentService {
                     List.of(new AgentMessage("user", request.message()))).getLast();
 
             String reply = callModel(history, new AgentObservationContext(messageId, observationPublisher));
+            String userReply = userFacingReply(reply);
             boolean locationPermissionRequired = LocationPermissionContext.isRequested();
 
             if (!locationPermissionRequired) {
@@ -84,10 +85,10 @@ public class DefaultReactAgentService {
             log.info("Completed react-agent chat: sessionId={}, totalMessageCount={}, replyLength={}",
                     sessionId,
                     history.size(),
-                    reply.length());
+                    userReply.length());
             return new AgentChatResponse(
                     sessionId,
-                    reply,
+                    userReply,
                     agentProperties.getProfile().getName(),
                     model,
                     agentProperties.getTool().isEnabled(),
@@ -149,6 +150,13 @@ public class DefaultReactAgentService {
             return UUID.randomUUID().toString();
         }
         return sessionId;
+    }
+
+    private String userFacingReply(String reply) {
+        if (reply == null) return null;
+        String trimmed = reply.trim();
+        return trimmed.regionMatches(true, 0, "questions:", 0, "questions:".length())
+                ? trimmed.substring("questions:".length()).trim() : reply;
     }
 
     private List<AgentMessage> boundedHistory(List<AgentMessage> messages) {

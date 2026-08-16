@@ -58,16 +58,12 @@ export type AgentSessionDetail = {
 
 export type AdminAgentObservation = {
   agentName: string;
-  phase: string;
-  status: string;
-  model: string | null;
-  llmInput: string | null;
-  llmOutput: string | null;
+  input: string | null;
+  output: string | null;
   promptTokens: number | null;
   completionTokens: number | null;
   totalTokens: number | null;
-  durationMs: number | null;
-  errorMessage: string | null;
+  nextDecision: string | null;
   createdAt: string;
 };
 

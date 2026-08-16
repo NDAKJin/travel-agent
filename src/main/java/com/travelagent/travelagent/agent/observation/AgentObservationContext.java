@@ -57,4 +57,10 @@ public final class AgentObservationContext implements Serializable {
                 startedAt == null ? null : java.time.Duration.between(startedAt, Instant.now()).toMillis(),
                 error == null ? null : error.getMessage(), Instant.now()));
     }
+
+    /** Backward-compatible overload for callers that do not provide routing data. */
+    public void publish(String agentName, String phase, String status, Instant startedAt,
+                        String llmInput, String llmOutput, ChatResponse response, Throwable error) {
+        publish(agentName, phase, status, startedAt, llmInput, llmOutput, response, null, error);
+    }
 }
