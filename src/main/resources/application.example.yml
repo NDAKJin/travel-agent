@@ -29,7 +29,7 @@ spring:
       connection-timeout: ${SPRING_DATASOURCE_HIKARI_CONNECTION_TIMEOUT:30000}
   sql:
     init:
-      mode: never
+      mode: always
   data:
     redis:
       host: ${SPRING_DATA_REDIS_HOST:localhost}
