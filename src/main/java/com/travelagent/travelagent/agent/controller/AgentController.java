@@ -10,6 +10,7 @@ import com.travelagent.travelagent.agent.service.DefaultReactAgentService;
 import com.travelagent.travelagent.agent.service.NearbyPoiSearchService;
 import com.travelagent.travelagent.auth.security.AuthenticatedUser;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -37,10 +38,10 @@ public class AgentController {
     private final NearbyPoiSearchService nearbyPoiSearchService;
 
     @PostMapping("/chat")
-    @Operation(summary = "与旅行助手对话", description = "通过会话标识保留多轮上下文")
+    @Operation(summary = "与旅行助手对话", description = "通过会话标识保留多轮上下文，可附带当前位置")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Success", content = @io.swagger.v3.oas.annotations.media.Content),
-            @ApiResponse(responseCode = "400", description = "Invalid request", content = @io.swagger.v3.oas.annotations.media.Content)
+            @ApiResponse(responseCode = "200", description = "对话成功", content = @io.swagger.v3.oas.annotations.media.Content),
+            @ApiResponse(responseCode = "400", description = "请求参数无效", content = @io.swagger.v3.oas.annotations.media.Content)
     })
     public AgentChatResponse chat(@Valid @RequestBody AgentChatRequest request, Authentication authentication) {
         log.info("Agent chat request received: sessionId={}, messageLength={}",
@@ -63,12 +64,12 @@ public class AgentController {
 
     @GetMapping("/sessions/{sessionId}")
     @Operation(summary = "查询会话详情", description = "查询当前用户的一段历史会话")
-    public AgentSessionDetailResponse getSession(@PathVariable String sessionId, Authentication authentication) {
+    public AgentSessionDetailResponse getSession(@Parameter(description = "会话标识") @PathVariable String sessionId, Authentication authentication) {
         return reactAgentService.getSession(currentUser(authentication), sessionId);
     }
 
     @PostMapping("/nearby/next")
-    @Operation(summary = "加载附近地点下一页")
+    @Operation(summary = "加载附近地点下一页", description = "使用上一页返回的游标继续查询")
     public NearbySearchResult nearbyNext(@Valid @RequestBody NearbyNextPageRequest request) {
         return nearbyPoiSearchService.search(request.latitude(), request.longitude(), request.keyword(),
                 request.radiusMeters() == null ? 20_000 : request.radiusMeters(), request.searchAfter());
@@ -76,7 +77,7 @@ public class AgentController {
 
     @DeleteMapping("/sessions/{sessionId}")
     @Operation(summary = "删除会话", description = "删除当前用户的一段会话")
-    public void deleteSession(@PathVariable String sessionId, Authentication authentication) {
+    public void deleteSession(@Parameter(description = "会话标识") @PathVariable String sessionId, Authentication authentication) {
         reactAgentService.deleteSession(currentUser(authentication), sessionId);
     }
 

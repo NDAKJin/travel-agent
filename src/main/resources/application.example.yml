@@ -48,6 +48,9 @@ springdoc:
 
 nextdoc4j:
   enabled: ${NEXTDOC4J_ENABLED:true}
+  auth:
+    enabled: true
+    password: 123456
 
 travel-agent:
   neo4j:

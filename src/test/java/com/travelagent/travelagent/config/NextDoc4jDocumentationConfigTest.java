@@ -14,6 +14,8 @@ class NextDoc4jDocumentationConfigTest {
         Properties properties = loadYaml("application.yml");
         assertThat(properties.getProperty("springdoc.api-docs.enabled")).isEqualTo("true");
         assertThat(properties.getProperty("nextdoc4j.enabled")).isEqualTo("true");
+        assertThat(properties.getProperty("nextdoc4j.auth.enabled")).isEqualTo("true");
+        assertThat(properties.getProperty("nextdoc4j.auth.password")).isEqualTo("123456");
     }
 
     private Properties loadYaml(String location) {

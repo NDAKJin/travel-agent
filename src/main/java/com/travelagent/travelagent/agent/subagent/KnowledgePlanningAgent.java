@@ -25,6 +25,6 @@ public class KnowledgePlanningAgent {
 
     @Tool(name = "delegate_travel_knowledge", description = "委派给旅行知识规划专员，根据城市、兴趣、天数和偏好从知识图谱筛选景点。")
     public String planKnowledge(String task) {
-        return runner.run("knowledge", chatClient, promptResourceLoader.load("knowledge-agent"), task);
+        return runner.run(chatClient, promptResourceLoader.load("knowledge-agent"), task);
     }
 }

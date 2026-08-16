@@ -8,6 +8,7 @@ import com.travelagent.travelagent.agent.service.LocationPermissionContext;
 import com.travelagent.travelagent.agent.service.NearbyPoiSearchService;
 import com.travelagent.travelagent.agent.service.NearbySearchContext;
 import java.util.List;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.tool.annotation.Tool;
@@ -28,6 +29,13 @@ public class NearbySearchTool {
         }
         NearbySearchResult result = nearbyPoiSearchService.search(location.latitude(), location.longitude(), keyword, 20_000, List.of());
         NearbySearchContext.set(result);
+        if (result.pois().isEmpty()) {
+            return JSON.toJSONString(Map.of(
+                    "status", "no_data",
+                    "summary", "当前位置附近暂未找到合适的推荐地点",
+                    "data", Map.of("places", List.of()),
+                    "warnings", List.of()));
+        }
         try {
             return JSON.toJSONString(result);
         } catch (RuntimeException exception) {

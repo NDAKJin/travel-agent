@@ -32,6 +32,7 @@
         <springdoc.version>3.0.3</springdoc.version>
         <nextdoc4j.version>1.4.0</nextdoc4j.version>
         <swagger-core.version>2.2.47</swagger-core.version>
+        <langgraph4j.version>1.8.24</langgraph4j.version>
     </properties>
     <dependencyManagement>
         <dependencies>
@@ -131,6 +132,11 @@
             <groupId>com.alibaba.cloud.ai</groupId>
             <artifactId>spring-ai-alibaba-starter-dashscope</artifactId>
             <version>2.0.0-M1.1</version>
+        </dependency>
+        <dependency>
+            <groupId>org.bsc.langgraph4j</groupId>
+            <artifactId>langgraph4j-core</artifactId>
+            <version>${langgraph4j.version}</version>
         </dependency>
         <dependency>
             <groupId>io.swagger.core.v3</groupId>

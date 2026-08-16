@@ -1,8 +1,5 @@
 package com.travelagent.travelagent.config;
 
-import com.travelagent.travelagent.agent.prompt.PromptProvider;
-import com.travelagent.travelagent.agent.prompt.PromptResourceLoader;
-import com.travelagent.travelagent.agent.prompt.TravelAssistantPromptProvider;
 import com.travelagent.travelagent.agent.subagent.BudgetAgent;
 import com.travelagent.travelagent.agent.subagent.KnowledgePlanningAgent;
 import com.travelagent.travelagent.agent.subagent.PoiSearchAgent;
@@ -24,31 +21,37 @@ import org.springframework.context.annotation.Primary;
 public class AgentBootstrapConfiguration {
 
     @Bean
-    PromptProvider promptProvider(AgentProperties agentProperties, PromptResourceLoader promptResourceLoader) {
-        return new TravelAssistantPromptProvider(agentProperties, promptResourceLoader);
+    @Primary
+    ChatClient finalizerChatClient(ChatModel chatModel,
+                                   CurrentTimeTool currentTimeTool,
+                                   CurrentUserLocationTool currentUserLocationTool,
+                                   LocationPermissionTool locationPermissionTool) {
+        return ChatClient.builder(chatModel)
+                .defaultTools(currentTimeTool, currentUserLocationTool, locationPermissionTool)
+                .build();
     }
 
-    @Bean
-    @Primary
-    ChatClient supervisorChatClient(ChatModel chatModel,
-                                    CurrentTimeTool currentTimeTool,
-                                    CurrentUserLocationTool currentUserLocationTool,
-                                    LocationPermissionTool locationPermissionTool,
-                                    ObjectProvider<KnowledgePlanningAgent> knowledgePlanningAgentProvider,
-                                    ObjectProvider<RoutePlanningAgent> routePlanningAgentProvider,
-                                    PoiSearchAgent poiSearchAgent,
-                                    BudgetAgent budgetAgent) {
-        var tools = new java.util.ArrayList<Object>();
-        tools.add(currentTimeTool);
-        tools.add(currentUserLocationTool);
-        tools.add(locationPermissionTool);
-        knowledgePlanningAgentProvider.ifAvailable(tools::add);
-        routePlanningAgentProvider.ifAvailable(tools::add);
-        tools.add(poiSearchAgent);
-        tools.add(budgetAgent);
-        return ChatClient.builder(chatModel)
-                .defaultTools(tools.toArray())
-                .build();
+    @Bean("orchestrationChatClient")
+    ChatClient orchestrationChatClient(ChatModel chatModel) {
+        return ChatClient.builder(chatModel).build();
+    }
+
+    @Bean("routePlannerChatClient")
+    ChatClient routePlannerChatClient(ChatModel chatModel,
+                                      ObjectProvider<KnowledgePlanningAgent> knowledgeAgent,
+                                      ObjectProvider<RoutePlanningAgent> routeAgent,
+                                      PoiSearchAgent poiAgent,
+                                      BudgetAgent budgetAgent) {
+        return specialistChatClient(chatModel, knowledgeAgent, routeAgent, poiAgent, budgetAgent);
+    }
+
+    @Bean("normalServiceChatClient")
+    ChatClient normalServiceChatClient(ChatModel chatModel,
+                                       ObjectProvider<KnowledgePlanningAgent> knowledgeAgent,
+                                       ObjectProvider<RoutePlanningAgent> routeAgent,
+                                       PoiSearchAgent poiAgent,
+                                       BudgetAgent budgetAgent) {
+        return specialistChatClient(chatModel, knowledgeAgent, routeAgent, poiAgent, budgetAgent);
     }
 
     @Bean("knowledgePlanningChatClient")
@@ -74,5 +77,18 @@ public class AgentBootstrapConfiguration {
     @Bean("budgetChatClient")
     ChatClient budgetChatClient(ChatModel chatModel) {
         return ChatClient.builder(chatModel).build();
+    }
+
+    private ChatClient specialistChatClient(ChatModel chatModel,
+                                            ObjectProvider<KnowledgePlanningAgent> knowledgeAgent,
+                                            ObjectProvider<RoutePlanningAgent> routeAgent,
+                                            PoiSearchAgent poiAgent,
+                                            BudgetAgent budgetAgent) {
+        var tools = new java.util.ArrayList<Object>();
+        knowledgeAgent.ifAvailable(tools::add);
+        routeAgent.ifAvailable(tools::add);
+        tools.add(poiAgent);
+        tools.add(budgetAgent);
+        return ChatClient.builder(chatModel).defaultTools(tools.toArray()).build();
     }
 }

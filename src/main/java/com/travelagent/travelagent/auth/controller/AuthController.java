@@ -26,7 +26,7 @@ public class AuthController {
     private final AuthService authService;
 
     @PostMapping("/wx/login")
-    @Operation(summary = "微信小程序登录")
+    @Operation(summary = "微信小程序登录", description = "使用微信临时凭证换取系统访问令牌")
     public AuthResponse wxLogin(@Valid @RequestBody WxLoginRequest request) {
         log.info("WX login request received: codePresent={}, nicknamePresent={}",
                 request.code() != null && !request.code().isBlank(),
@@ -35,21 +35,21 @@ public class AuthController {
     }
 
     @PostMapping("/admin/login")
-    @Operation(summary = "管理端登录")
+    @Operation(summary = "管理端登录", description = "使用管理员用户名和密码换取系统访问令牌")
     public AuthResponse adminLogin(@Valid @RequestBody AdminLoginRequest request) {
         log.info("Admin login request received: username={}", request.username());
         return authService.loginAdmin(request);
     }
 
     @PostMapping("/refresh")
-    @Operation(summary = "刷新访问令牌")
+    @Operation(summary = "刷新访问令牌", description = "使用刷新令牌获取新的访问令牌")
     public AuthResponse refresh(@Valid @RequestBody RefreshTokenRequest request) {
         log.info("Token refresh request received");
         return authService.refresh(request);
     }
 
     @PostMapping("/logout")
-    @Operation(summary = "退出登录")
+    @Operation(summary = "退出登录", description = "使指定刷新令牌立即失效")
     public void logout(@Valid @RequestBody LogoutRequest request) {
         log.info("Logout request received");
         authService.logout(request);

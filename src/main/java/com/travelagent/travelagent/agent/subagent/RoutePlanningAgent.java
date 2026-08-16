@@ -25,6 +25,6 @@ public class RoutePlanningAgent {
 
     @Tool(name = "delegate_route_planning", description = "委派给路线规划专员，根据景点 ID 查询图谱连通关系和最短路径。")
     public String planRoute(String task) {
-        return runner.run("route", chatClient, promptResourceLoader.load("route-agent"), task);
+        return runner.run(chatClient, promptResourceLoader.load("route-agent"), task);
     }
 }

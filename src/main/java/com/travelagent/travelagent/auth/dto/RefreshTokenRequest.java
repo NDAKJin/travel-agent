@@ -1,6 +1,8 @@
 package com.travelagent.travelagent.auth.dto;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 
-public record RefreshTokenRequest(@NotBlank String refreshToken) {
+@Schema(description = "刷新访问令牌请求")
+public record RefreshTokenRequest(@Schema(description = "刷新令牌") @NotBlank String refreshToken) {
 }
