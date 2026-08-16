@@ -39,7 +39,13 @@ class AgentObservationConfiguration {
         public void publish(AgentObservationEvent event) {
             kafkaTemplate.send(properties.getKafkaTopic(), Long.toString(event.messageId()), JSON.toJSONString(event))
                     .whenComplete((result, error) -> {
-                        if (error != null) log.error("Failed to publish agent observation: eventId={}", event.eventId(), error);
+                        if (error != null) {
+                            log.error("Failed to publish agent observation: eventId={}", event.eventId(), error);
+                            return;
+                        }
+                        log.info("Published agent observation: eventId={}, messageId={}, topic={}, partition={}, offset={}",
+                                event.eventId(), event.messageId(), result.getRecordMetadata().topic(),
+                                result.getRecordMetadata().partition(), result.getRecordMetadata().offset());
                     });
         }
     }
