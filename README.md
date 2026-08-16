@@ -244,8 +244,7 @@ docker compose up -d --build
 TRAVEL_AGENT_AGENT_ELASTICSEARCH_HOST=<ES 公网地址>
 TRAVEL_AGENT_NEO4J_ENABLED=false
 # 启用 Agent 可观测时需要：
-SPRING_KAFKA_HOST=<Kafka 地址>
-SPRING_KAFKA_PORT=9092
+SPRING_KAFKA_BOOTSTRAP_SERVERS=<Kafka 地址>:9092
 TRAVEL_AGENT_OBSERVABILITY_ENABLED=false
 # 仅启用图谱时需要：
 SPRING_NEO4J_URI=bolt://<Neo4j 公网地址>:7687
@@ -290,8 +289,7 @@ npm run build
 启用 `TRAVEL_AGENT_OBSERVABILITY_ENABLED=true` 后，LangGraph4j 节点与四个专家的调用日志会由 Hook 直接发送至 Kafka `agent-observation`，消费者异步写入 `agent_observation_log`。记录通过 `message_id` 关联用户消息，包含 LLM 输入输出、模型、Token、耗时和错误信息；仅在管理端会话详情中展示，不会返回给用户端。Kafka 未部署或开关关闭时，不会记录观测日志。
 
 ```env
-SPRING_KAFKA_HOST=localhost
-SPRING_KAFKA_PORT=9092
+SPRING_KAFKA_BOOTSTRAP_SERVERS=localhost:9092
 TRAVEL_AGENT_OBSERVABILITY_ENABLED=true
 ```
 
