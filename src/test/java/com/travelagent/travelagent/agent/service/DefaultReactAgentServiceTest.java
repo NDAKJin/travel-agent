@@ -50,6 +50,16 @@ class DefaultReactAgentServiceTest {
     }
 
     @Test
+    void hidesInternalQuestionsPrefixFromUser() {
+        when(agentGraph.run(any(), any())).thenReturn("questions: 请补充出发日期");
+
+        AgentChatResponse response = reactAgentService.chat(AUTHENTICATED_USER,
+                new AgentChatRequest("我想去杭州", "session-questions"));
+
+        assertThat(response.reply()).isEqualTo("请补充出发日期");
+    }
+
+    @Test
     void createSessionPersistsEmptyConversation() {
         AgentSessionSummaryResponse response = reactAgentService.createSession(AUTHENTICATED_USER);
 

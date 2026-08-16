@@ -129,9 +129,9 @@ public class AdminManagementService {
     }
 
     private AdminAgentObservationResponse toObservation(AgentObservationLog log) {
-        return new AdminAgentObservationResponse(log.getAgentName(), log.getPhase(), log.getStatus(), log.getModel(),
-                log.getLlmInput(), log.getLlmOutput(), log.getPromptTokens(), log.getCompletionTokens(),
-                log.getTotalTokens(), log.getDurationMs(), log.getErrorMessage(), log.getCreatedAt());
+        return new AdminAgentObservationResponse(log.getAgentName(), log.getLlmInput(), log.getLlmOutput(),
+                log.getPromptTokens(), log.getCompletionTokens(), log.getTotalTokens(), log.getNextDecision(),
+                log.getCreatedAt());
     }
 
     private String buildTitle(List<AgentConversationMessage> messages) {

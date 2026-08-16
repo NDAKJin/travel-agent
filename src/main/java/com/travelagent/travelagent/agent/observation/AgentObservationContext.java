@@ -40,7 +40,8 @@ public final class AgentObservationContext implements Serializable {
     }
 
     public void publish(String agentName, String phase, String status, Instant startedAt,
-                        String llmInput, String llmOutput, ChatResponse response, Throwable error) {
+                        String llmInput, String llmOutput, ChatResponse response,
+                        String nextDecision, Throwable error) {
         Usage usage = response == null || response.getMetadata() == null ? null : response.getMetadata().getUsage();
         String model = response == null || response.getMetadata() == null ? null : response.getMetadata().getModel();
         AgentObservationPublisher publisher = PUBLISHERS.get(traceId);
@@ -52,7 +53,14 @@ public final class AgentObservationContext implements Serializable {
                 usage == null ? null : usage.getPromptTokens(),
                 usage == null ? null : usage.getCompletionTokens(),
                 usage == null ? null : usage.getTotalTokens(),
+                nextDecision,
                 startedAt == null ? null : java.time.Duration.between(startedAt, Instant.now()).toMillis(),
                 error == null ? null : error.getMessage(), Instant.now()));
+    }
+
+    /** Backward-compatible overload for callers that do not provide routing data. */
+    public void publish(String agentName, String phase, String status, Instant startedAt,
+                        String llmInput, String llmOutput, ChatResponse response, Throwable error) {
+        publish(agentName, phase, status, startedAt, llmInput, llmOutput, response, null, error);
     }
 }

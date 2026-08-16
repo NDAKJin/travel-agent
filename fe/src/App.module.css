@@ -894,13 +894,36 @@
   font: inherit;
 }
 
-.observationDetails {
-  margin-top: 12px;
-  color: #173b27;
-  background: rgba(255, 255, 255, 0.9);
-  border-radius: 10px;
-  padding: 8px;
-  font-size: 12px;
+.observationModal {
+  width: min(860px, 100%);
+}
+
+.observationModalMessage {
+  margin-top: 20px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: #f5faf5;
+}
+
+.observationLogList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.observationLogList .observationItem {
+  margin-top: 0;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: #fbfefb;
+  box-shadow: inset 0 0 0 1px rgba(39, 101, 71, 0.08);
+}
+
+.observationItem h3 {
+  margin: 0 0 8px;
+  color: #173628;
+  font-size: 15px;
 }
 
 .observationItem {

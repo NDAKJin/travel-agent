@@ -24,10 +24,11 @@ class LangGraphTravelAgentTest {
     void asksForMissingRouteRequirementsWithoutPlanning() {
         ChatClient orchestration = client("route", "questions: Which city and how many days?");
         ChatClient planner = client();
-        LangGraphTravelAgent graph = new LangGraphTravelAgent(orchestration, planner, client(), client(), new PromptResourceLoader());
+        LangGraphTravelAgent graph = new LangGraphTravelAgent(orchestration, planner, client(),
+                client("请告诉我出发城市和旅行天数。"), new PromptResourceLoader());
 
         assertThat(graph.run(List.of(new AgentMessage("user", "Plan a trip"))))
-                .isEqualTo("questions: Which city and how many days?");
+                .isEqualTo("questions: 请告诉我出发城市和旅行天数。");
         verify(planner, org.mockito.Mockito.never()).prompt();
     }
 
@@ -38,6 +39,18 @@ class LangGraphTravelAgentTest {
                 client("draft itinerary"), client(), client("final itinerary"), new PromptResourceLoader());
 
         assertThat(graph.run(List.of(new AgentMessage("user", "Plan two days in Hangzhou"))))
+                .isEqualTo("final itinerary");
+    }
+
+    @Test
+    void acceptsStructuredControlAgentResponses() {
+        LangGraphTravelAgent graph = new LangGraphTravelAgent(
+                client("{\"intent\":\"route\"}",
+                        "{\"status\":\"CONFIRMED\",\"question\":null,\"requirements\":{\"origin\":\"南京站\",\"destination\":\"南京南站\",\"days\":1}}",
+                        "{\"status\":\"APPROVED\",\"issues\":[]}"),
+                client("- 行程：总统府"), client(), client("final itinerary"), new PromptResourceLoader());
+
+        assertThat(graph.run(List.of(new AgentMessage("user", "南京一日游"))))
                 .isEqualTo("final itinerary");
     }
 

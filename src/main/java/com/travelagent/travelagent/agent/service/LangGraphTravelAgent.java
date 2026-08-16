@@ -1,5 +1,7 @@
 package com.travelagent.travelagent.agent.service;
 
+import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONObject;
 import com.travelagent.travelagent.agent.model.AgentMessage;
 import com.travelagent.travelagent.agent.observation.AgentObservationContext;
 import com.travelagent.travelagent.agent.observation.AgentObservationContextHolder;
@@ -39,6 +41,7 @@ public class LangGraphTravelAgent {
             Map.entry("intent", Channels.base(() -> "")),
             Map.entry("requirementsConfirmed", Channels.base(() -> false)),
             Map.entry("requirementsReply", Channels.base(() -> "")),
+            Map.entry("requirementsData", Channels.base(() -> "{}")),
             Map.entry("routePlan", Channels.base(() -> "")),
             Map.entry("review", Channels.base(() -> "")),
             Map.entry("reviewApproved", Channels.base(() -> false)),
@@ -87,14 +90,6 @@ public class LangGraphTravelAgent {
     private CompiledGraph<WorkflowState> buildGraph() {
         try {
             return new StateGraph<WorkflowState>(STATE_SCHEMA, WorkflowState::new)
-                    .addBeforeCallNodeHook((node, state, config) -> {
-                        observation(config).publish(node, "before", "running", Instant.now(), null, null, null, null);
-                        return CompletableFuture.completedFuture(Map.of());
-                    })
-                    .addAfterCallNodeHook((node, state, config, output) -> {
-                        observation(config).publish(node, "after", "success", null, null, null, null, null);
-                        return CompletableFuture.completedFuture(output);
-                    })
                     .addNode("supervisor", AsyncNodeAction.node_async(this::supervise))
                     .addNode("requirements", AsyncNodeAction.node_async(this::collectRequirements))
                     .addNode("routePlanner", AsyncNodeAction.node_async(this::planRoute))
@@ -120,34 +115,45 @@ public class LangGraphTravelAgent {
         }
         String input = conversation(state.history());
         String decision = call("supervisor", input,
-                orchestrationChatClient.prompt().system(prompt("intent-supervisor")).user(input).call(), state.observation());
-        return Map.of("intent", "route".equalsIgnoreCase(decision == null ? "" : decision.trim()) ? "route" : "normal");
+                orchestrationChatClient.prompt().system(prompt("intent-supervisor")).user(input).call(),
+                state.observation(), output -> "route".equals(parseIntent(output))
+                        ? "requirements" : "normalService");
+        return Map.of("intent", "route".equals(parseIntent(decision)) ? "route" : "normal");
     }
 
     private Map<String, Object> collectRequirements(WorkflowState state) {
         String input = conversation(state.history());
-        String reply = call("requirements", input,
-                orchestrationChatClient.prompt().system(prompt("route-requirements")).user(input).call(), state.observation());
-        return Map.of("requirementsConfirmed", startsWith(reply, "confirmed:"), "requirementsReply", reply);
+        String raw = call("requirements", input,
+                orchestrationChatClient.prompt().system(prompt("route-requirements")).user(input).call(),
+                state.observation(), output -> parseRequirements(output).confirmed() ? "routePlanner" : "finalize");
+        RequirementDecision decision = parseRequirements(raw);
+        return Map.of(
+                "requirementsConfirmed", decision.confirmed(),
+                "requirementsReply", decision.protocolReply(),
+                "requirementsData", decision.requirements());
     }
 
     private Map<String, Object> planRoute(WorkflowState state) {
         try (AgentObservationContextHolder.Scope ignored = AgentObservationContextHolder.open(state.observation())) {
-            String systemPrompt = prompt("route-planner") + "\n" + state.requirementsReply()
+            String systemPrompt = prompt("route-planner") + "\n已确认需求（结构化）：\n" + state.requirementsData()
                     + (state.review().isBlank() ? "" : "\n审核修改要求：\n" + state.review());
             String plan = call("routePlanner", systemPrompt + "\n\n" + conversation(state.history()),
-                    routePlannerChatClient.prompt().messages(toMessages(systemPrompt, state.history())).call(), state.observation());
+                    routePlannerChatClient.prompt().messages(toMessages(systemPrompt, state.history())).call(),
+                    state.observation(), output -> "routeReviewer");
             return Map.of("routePlan", plan);
         }
     }
 
     private Map<String, Object> reviewRoute(WorkflowState state) {
-        String input = "已确认需求：\n" + state.requirementsReply() + "\n\n行程方案：\n" + state.routePlan();
-        String review = call("routeReviewer", input,
-                orchestrationChatClient.prompt().system(prompt("route-reviewer")).user(input).call(), state.observation());
+        String input = "已确认需求（结构化）：\n" + state.requirementsData() + "\n\n行程方案：\n" + state.routePlan();
+        String raw = call("routeReviewer", input,
+                orchestrationChatClient.prompt().system(prompt("route-reviewer")).user(input).call(),
+                state.observation(), output -> parseReview(output).approved() || state.reviewAttempts() + 1 > MAX_ROUTE_REVISIONS
+                        ? "finalize" : "routePlanner");
+        ReviewDecision decision = parseReview(raw);
         return Map.of(
-                "review", review,
-                "reviewApproved", startsWith(review, "approve:"),
+                "review", decision.issues(),
+                "reviewApproved", decision.approved(),
                 "reviewAttempts", state.reviewAttempts() + 1);
     }
 
@@ -155,14 +161,22 @@ public class LangGraphTravelAgent {
         try (AgentObservationContextHolder.Scope ignored = AgentObservationContextHolder.open(state.observation())) {
             String systemPrompt = prompt("normal-service");
             String reply = call("normalService", systemPrompt + "\n\n" + conversation(state.history()),
-                    normalServiceChatClient.prompt().messages(toMessages(systemPrompt, state.history())).call(), state.observation());
+                    normalServiceChatClient.prompt().messages(toMessages(systemPrompt, state.history())).call(),
+                    state.observation(), output -> "finalize");
             return Map.of("normalReply", reply);
         }
     }
 
     private Map<String, Object> finalizeReply(WorkflowState state) {
         if ("route".equals(state.intent()) && !state.requirementsConfirmed()) {
-            return Map.of("reply", state.requirementsReply());
+            String question = stripPrefix(state.requirementsReply(), "questions:");
+            String systemPrompt = prompt("finalize")
+                    + "\n\n当前路线需求尚未确认，只能润色并返回待确认问题。"
+                    + "不得生成路线、行程、景点推荐或任何最终方案。";
+            List<Message> messages = List.of(new SystemMessage(systemPrompt), new UserMessage(question));
+            String reply = call("finalize", systemPrompt + "\n\n待确认问题：\n" + question,
+                    finalizerChatClient.prompt().messages(messages).call(), state.observation(), output -> "end");
+            return Map.of("reply", "questions: " + (StringUtils.hasText(reply) ? reply.trim() : question));
         }
         String result = "route".equals(state.intent())
                 ? "路线规划方案：\n" + state.routePlan() + "\n\n审核意见：\n" + state.review()
@@ -170,7 +184,7 @@ public class LangGraphTravelAgent {
         List<Message> messages = toMessages(prompt("finalize"), state.history());
         messages.add(new UserMessage(result));
         return Map.of("reply", call("finalize", prompt("finalize") + "\n\n" + result,
-                finalizerChatClient.prompt().messages(messages).call(), state.observation()));
+                finalizerChatClient.prompt().messages(messages).call(), state.observation(), output -> "end"));
     }
 
     private String afterSupervisor(WorkflowState state) {
@@ -193,6 +207,62 @@ public class LangGraphTravelAgent {
         return value != null && value.trim().toLowerCase().startsWith(prefix);
     }
 
+    private String parseIntent(String output) {
+        JSONObject json = parseJson(output);
+        if (json != null && StringUtils.hasText(json.getString("intent"))) {
+            return json.getString("intent").trim().toLowerCase();
+        }
+        return output == null ? "" : output.trim().toLowerCase();
+    }
+
+    private RequirementDecision parseRequirements(String output) {
+        JSONObject json = parseJson(output);
+        if (json != null) {
+            boolean confirmed = "confirmed".equalsIgnoreCase(json.getString("status"));
+            JSONObject requirements = json.getJSONObject("requirements");
+            String data = requirements == null ? "{}" : requirements.toJSONString();
+            String question = json.getString("question");
+            if (confirmed) return new RequirementDecision(true, "confirmed: " + data, data);
+            if (StringUtils.hasText(question)) return new RequirementDecision(false, "questions: " + question.trim(), data);
+        }
+        boolean confirmed = startsWith(output, "confirmed:");
+        return new RequirementDecision(confirmed, output == null ? "" : output.trim(), "{}" );
+    }
+
+    private ReviewDecision parseReview(String output) {
+        JSONObject json = parseJson(output);
+        if (json != null) {
+            boolean approved = "approved".equalsIgnoreCase(json.getString("status"));
+            String issues = json.getString("issues");
+            if (issues == null && json.getJSONArray("issues") != null) {
+                issues = json.getJSONArray("issues").toJSONString();
+            }
+            return new ReviewDecision(approved, issues == null ? "" : issues);
+        }
+        return new ReviewDecision(startsWith(output, "approve:"), output == null ? "" : output.trim());
+    }
+
+    private JSONObject parseJson(String output) {
+        if (!StringUtils.hasText(output)) return null;
+        String value = output.trim();
+        if (value.startsWith("```")) {
+            value = value.replaceFirst("^```(?:json)?\\s*", "").replaceFirst("\\s*```$", "").trim();
+        }
+        int start = value.indexOf('{');
+        int end = value.lastIndexOf('}');
+        if (start < 0 || end <= start) return null;
+        try {
+            return JSON.parseObject(value.substring(start, end + 1));
+        } catch (RuntimeException ignored) {
+            return null;
+        }
+    }
+
+    private String stripPrefix(String value, String prefix) {
+        if (!startsWith(value, prefix)) return value == null ? "" : value.trim();
+        return value.trim().substring(prefix.length()).trim();
+    }
+
     private boolean awaitingRequirements(List<AgentMessage> history) {
         return history.size() > 1
                 && "assistant".equalsIgnoreCase(history.get(history.size() - 2).role())
@@ -209,15 +279,17 @@ public class LangGraphTravelAgent {
     }
 
     private String call(String agent, String input, ChatClient.CallResponseSpec request,
-                        AgentObservationContext observation) {
+                        AgentObservationContext observation,
+                        java.util.function.Function<String, String> nextDecision) {
         Instant startedAt = Instant.now();
         try {
             ChatResponse response = request.chatResponse();
             String output = response.getResult().getOutput().getText();
-            observation.publish(agent, "llm", "success", startedAt, input, output, response, null);
+            observation.publish(agent, "llm", "success", startedAt, input, output, response,
+                    nextDecision.apply(output), null);
             return output;
         } catch (RuntimeException exception) {
-            observation.publish(agent, "llm", "error", startedAt, input, null, null, exception);
+            observation.publish(agent, "llm", "error", startedAt, input, null, null, null, exception);
             throw exception;
         }
     }
@@ -254,6 +326,7 @@ public class LangGraphTravelAgent {
         String intent() { return this.<String>value("intent").orElse(""); }
         boolean requirementsConfirmed() { return this.<Boolean>value("requirementsConfirmed").orElse(false); }
         String requirementsReply() { return this.<String>value("requirementsReply").orElse(""); }
+        String requirementsData() { return this.<String>value("requirementsData").orElse("{}"); }
         String routePlan() { return this.<String>value("routePlan").orElse(""); }
         String review() { return this.<String>value("review").orElse(""); }
         boolean reviewApproved() { return this.<Boolean>value("reviewApproved").orElse(false); }
@@ -261,4 +334,8 @@ public class LangGraphTravelAgent {
         String normalReply() { return this.<String>value("normalReply").orElse(""); }
         String reply() { return this.<String>value("reply").orElse(""); }
     }
+
+    private record RequirementDecision(boolean confirmed, String protocolReply, String requirements) { }
+
+    private record ReviewDecision(boolean approved, String issues) { }
 }

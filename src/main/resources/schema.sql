@@ -58,6 +58,7 @@ CREATE TABLE IF NOT EXISTS agent_observation_log (
     prompt_tokens INT,
     completion_tokens INT,
     total_tokens INT,
+    next_decision VARCHAR(64),
     duration_ms BIGINT,
     error_message MEDIUMTEXT,
     created_at TIMESTAMP NOT NULL,
