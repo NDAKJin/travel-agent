@@ -49,51 +49,26 @@
 
 ```mermaid
 flowchart LR
-    mini[微信小程序]
-    admin[React 管理台]
-    api[行迹 API<br/>Spring Boot]
-    graph[LangGraph4j 编排]
-    supervisor[总控]
-    requirements[需求询问师]
-    planner[路线规划师]
-    reviewer[路线审核师]
-    normal[普通服务者]
-    finalize[最终答复编辑]
-    knowledge[旅行知识专员]
-    route[路线规划专员]
-    poi[POI 搜索专员]
-    budget[预算专员]
-    mysql[(MySQL)]
-    redis[(Redis)]
-    es[(Elasticsearch<br/>地理索引)]
-    neo4j[(Neo4j<br/>图关系)]
-    amap[高德地图 API]
-    model[OpenAI 兼容模型]
+    mini["微信小程序"];
+    admin["React 管理台"];
+    api["行迹 API（Spring Boot）"];
+    workflow["LangGraph4j 多智能体编排"];
+    mysql[("MySQL")];
+    redis[("Redis")];
+    es[("Elasticsearch 地理索引")];
+    neo4j[("Neo4j 图关系")];
+    amap["高德地图 API"];
+    model["OpenAI 兼容模型"];
 
-    mini --> api
-    admin --> api
-    api --> graph
-    graph --> supervisor
-    supervisor --> requirements
-    requirements --> planner
-    planner --> reviewer
-    supervisor --> normal
-    reviewer --> finalize
-    normal --> finalize
-    planner -.按需调用.-> knowledge
-    planner -.按需调用.-> route
-    planner -.按需调用.-> poi
-    planner -.按需调用.-> budget
-    normal -.按需调用.-> knowledge
-    normal -.按需调用.-> route
-    normal -.按需调用.-> poi
-    normal -.按需调用.-> budget
-    api --> mysql
-    api --> redis
-    api --> es
-    api --> neo4j
-    api --> amap
-    api --> model
+    mini --> api;
+    admin --> api;
+    api --> workflow;
+    workflow --> model;
+    api --> mysql;
+    api --> redis;
+    api --> es;
+    api --> neo4j;
+    api --> amap;
 ```
 
 ## 多智能体协作
@@ -102,17 +77,27 @@ flowchart LR
 
 ```mermaid
 flowchart TD
-    Start([用户消息]) --> Supervisor[总控：识别意图]
-    Supervisor -->|路线规划| Requirements[需求询问师]
-    Supervisor -->|普通服务| Normal[普通服务者]
-    Requirements -->|已确认| Planner[路线规划师]
-    Requirements -->|需补充| Reply[返回追问]
-    Planner --> Reviewer[路线审核师]
-    Reviewer -->|通过| Finalize[最终答复编辑]
-    Reviewer -->|需修改，审核次数不超过 2| Planner
-    Reviewer -->|已达上限| Finalize
-    Normal --> Finalize
-    Finalize --> End([最终回复])
+    message(["用户消息"]);
+    control["总控：识别意图"];
+    requirements["需求询问师"];
+    planner["路线规划师"];
+    reviewer["路线审核师"];
+    normal["普通服务者"];
+    finalize["最终答复编辑"];
+    question["返回追问"];
+    response(["最终回复"]);
+
+    message --> control;
+    control -->|路线规划| requirements;
+    control -->|普通服务| normal;
+    requirements -->|已确认| planner;
+    requirements -->|需补充| question;
+    planner --> reviewer;
+    reviewer -->|通过| finalize;
+    reviewer -->|需修改且审核次数不超过 2| planner;
+    reviewer -->|已达上限| finalize;
+    normal --> finalize;
+    finalize --> response;
 ```
 
 路线需求的必填项为起点、终点、出行日期或天数、人数与预算；兴趣和约束为选填项，用户未提供时不阻塞规划。
