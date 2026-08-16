@@ -1,6 +1,7 @@
 package com.travelagent.travelagent.admin.controller;
 
 import com.travelagent.travelagent.admin.dto.AdminConversationSummaryResponse;
+import com.travelagent.travelagent.admin.dto.AdminConversationDetailResponse;
 import com.travelagent.travelagent.admin.dto.AdminMapPlaceResponse;
 import com.travelagent.travelagent.admin.dto.AdminScenicSpotRequest;
 import com.travelagent.travelagent.admin.dto.AdminScenicSpotResponse;
@@ -13,7 +14,6 @@ import com.travelagent.travelagent.admin.service.ScenicSpotGeoService;
 import com.travelagent.travelagent.admin.service.ServicePointCategoryService;
 import com.travelagent.travelagent.admin.service.ServicePointGeoService;
 import com.travelagent.travelagent.agent.service.ScenicSpotKnowledgeGraphService;
-import com.travelagent.travelagent.agent.dto.AgentSessionDetailResponse;
 import com.travelagent.travelagent.common.dto.PageResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -106,7 +106,7 @@ public class AdminController {
 
     @GetMapping("/sessions/{conversationId}")
     @Operation(summary = "查询管理端会话详情")
-    public AgentSessionDetailResponse getSessionDetail(@Parameter(description = "会话数据库标识") @PathVariable long conversationId) {
+    public AdminConversationDetailResponse getSessionDetail(@Parameter(description = "会话数据库标识") @PathVariable long conversationId) {
         return adminManagementService.getSessionDetail(conversationId);
     }
 

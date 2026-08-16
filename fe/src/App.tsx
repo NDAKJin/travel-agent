@@ -7,9 +7,9 @@ import ServicePointsPage from "./components/ServicePointsPage";
 import { api, ApiError } from "./services/api";
 import type {
   AdminConversationSummary,
+  AdminConversationDetail,
   AdminScenicSpot,
   AdminWxUser,
-  AgentSessionDetail,
   AuthSession,
   PageResponse
 } from "./types";
@@ -201,7 +201,7 @@ export default function App() {
   const [sessionPage, setSessionPage] = useState(1);
   const [sessionPageResult, setSessionPageResult] = useState<PageResponse<AdminConversationSummary> | null>(null);
   const [selectedConversationId, setSelectedConversationId] = useState<number | null>(null);
-  const [selectedConversationDetail, setSelectedConversationDetail] = useState<AgentSessionDetail | null>(null);
+  const [selectedConversationDetail, setSelectedConversationDetail] = useState<AdminConversationDetail | null>(null);
   const [sessionLoading, setSessionLoading] = useState(false);
   const [sessionError, setSessionError] = useState("");
   const [detailLoading, setDetailLoading] = useState(false);

@@ -24,10 +24,11 @@ class InMemoryAgentConversationStore implements AgentConversationStore {
     }
 
     @Override
-    public void append(long userId, AgentSessionContext sessionContext, List<AgentMessage> messages) {
+    public List<Long> append(long userId, AgentSessionContext sessionContext, List<AgentMessage> messages) {
         sessions.compute(key(userId, sessionContext.sessionId()), (ignored, existing) -> new AgentSessionContext(
                 sessionContext.sessionId(), sessionContext.messages(),
                 existing == null ? sessionContext.createdAt() : existing.createdAt(), sessionContext.updatedAt()));
+        return java.util.stream.LongStream.range(1, messages.size() + 1).boxed().toList();
     }
 
     @Override

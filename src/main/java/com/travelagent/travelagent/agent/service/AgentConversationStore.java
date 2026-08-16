@@ -12,7 +12,7 @@ public interface AgentConversationStore {
 
     void save(long userId, AgentSessionContext sessionContext);
 
-    void append(long userId, AgentSessionContext sessionContext, List<AgentMessage> messages);
+    List<Long> append(long userId, AgentSessionContext sessionContext, List<AgentMessage> messages);
 
     List<AgentSessionSummary> list(long userId);
 

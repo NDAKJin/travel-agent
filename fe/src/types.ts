@@ -56,6 +56,36 @@ export type AgentSessionDetail = {
   updatedAt: string;
 };
 
+export type AdminAgentObservation = {
+  agentName: string;
+  phase: string;
+  status: string;
+  model: string | null;
+  llmInput: string | null;
+  llmOutput: string | null;
+  promptTokens: number | null;
+  completionTokens: number | null;
+  totalTokens: number | null;
+  durationMs: number | null;
+  errorMessage: string | null;
+  createdAt: string;
+};
+
+export type AdminConversationMessage = {
+  id: number;
+  role: "user" | "assistant";
+  content: string;
+  observations: AdminAgentObservation[];
+};
+
+export type AdminConversationDetail = {
+  sessionId: string;
+  title: string;
+  messages: AdminConversationMessage[];
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type AdminWxUser = {
   id: number;
   openId: string;

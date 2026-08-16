@@ -117,6 +117,17 @@
         </foreach>
     </insert>
 
+    <select id="nextMessageSequenceNo" resultType="int">
+        SELECT COALESCE(MAX(sequence_no) + 1, 0)
+        FROM agent_conversation_message
+        WHERE session_id = #{sessionId}
+    </select>
+
+    <insert id="insertMessage" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO agent_conversation_message (session_id, sequence_no, role, content, created_at)
+        VALUES (#{sessionId}, #{sequenceNo}, #{role}, #{content}, #{createdAt})
+    </insert>
+
     <insert id="insert" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO agent_conversation_session (
             user_id, session_id, title, preview, message_count, created_at, updated_at

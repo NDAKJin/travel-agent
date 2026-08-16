@@ -36,6 +36,10 @@ public interface AgentConversationSessionMapper {
 
     int insertMessages(@Param("messages") List<AgentConversationMessage> messages);
 
+    int nextMessageSequenceNo(long sessionId);
+
+    int insertMessage(AgentConversationMessage message);
+
     int insert(AgentConversationSession session);
 
     int update(AgentConversationSession session);

@@ -2,6 +2,8 @@ package com.travelagent.travelagent.agent.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 
 import com.travelagent.travelagent.agent.dto.AgentChatRequest;
 import com.travelagent.travelagent.agent.dto.AgentChatResponse;
@@ -32,12 +34,12 @@ class DefaultReactAgentServiceTest {
         properties.getProfile().setName("Travel Buddy");
         properties.getTool().setEnabled(true);
         reactAgentService = new DefaultReactAgentService(
-                properties, agentGraph, new InMemoryAgentConversationStore(), "qwen-plus");
+                properties, agentGraph, new InMemoryAgentConversationStore(), event -> { }, "qwen-plus");
     }
 
     @Test
     void chatCreatesSessionWhenRequestDoesNotProvideOne() {
-        when(agentGraph.run(List.of(new com.travelagent.travelagent.agent.model.AgentMessage("user", "Plan a three-day Hangzhou trip"))))
+        when(agentGraph.run(eq(List.of(new com.travelagent.travelagent.agent.model.AgentMessage("user", "Plan a three-day Hangzhou trip"))), any()))
                 .thenReturn("Welcome to Hangzhou");
 
         AgentChatResponse response = reactAgentService.chat(AUTHENTICATED_USER, new AgentChatRequest("Plan a three-day Hangzhou trip", null));
@@ -61,12 +63,12 @@ class DefaultReactAgentServiceTest {
 
     @Test
     void chatReusesConversationHistoryForSameSession() {
-        when(agentGraph.run(List.of(new com.travelagent.travelagent.agent.model.AgentMessage("user", "What should I do on day one?"))))
+        when(agentGraph.run(eq(List.of(new com.travelagent.travelagent.agent.model.AgentMessage("user", "What should I do on day one?"))), any()))
                 .thenReturn("Start with West Lake");
-        when(agentGraph.run(List.of(
+        when(agentGraph.run(eq(List.of(
                 new com.travelagent.travelagent.agent.model.AgentMessage("user", "What should I do on day one?"),
                 new com.travelagent.travelagent.agent.model.AgentMessage("assistant", "Start with West Lake"),
-                new com.travelagent.travelagent.agent.model.AgentMessage("user", "What about day two?"))))
+                new com.travelagent.travelagent.agent.model.AgentMessage("user", "What about day two?"))), any()))
                 .thenReturn("Then visit Lingyin Temple");
 
         AgentChatResponse first = reactAgentService.chat(AUTHENTICATED_USER, new AgentChatRequest("What should I do on day one?", "session-1"));
@@ -80,9 +82,9 @@ class DefaultReactAgentServiceTest {
 
     @Test
     void listSessionsReturnsOnlyCurrentUsersSessions() {
-        when(agentGraph.run(List.of(new com.travelagent.travelagent.agent.model.AgentMessage("user", "Plan Hangzhou day one"))))
+        when(agentGraph.run(eq(List.of(new com.travelagent.travelagent.agent.model.AgentMessage("user", "Plan Hangzhou day one"))), any()))
                 .thenReturn("Start with West Lake");
-        when(agentGraph.run(List.of(new com.travelagent.travelagent.agent.model.AgentMessage("user", "Plan Suzhou"))))
+        when(agentGraph.run(eq(List.of(new com.travelagent.travelagent.agent.model.AgentMessage("user", "Plan Suzhou"))), any()))
                 .thenReturn("Visit the tea fields");
 
         reactAgentService.chat(AUTHENTICATED_USER, new AgentChatRequest("Plan Hangzhou day one", "session-1"));

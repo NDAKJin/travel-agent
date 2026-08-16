@@ -39,11 +39,33 @@ CREATE TABLE IF NOT EXISTS agent_conversation_message (
     created_at TIMESTAMP NOT NULL,
     CONSTRAINT uk_agent_message_session_sequence UNIQUE (session_id, sequence_no),
     CONSTRAINT fk_agent_message_session FOREIGN KEY (session_id)
-        REFERENCES agent_conversation_session (id) ON DELETE CASCADE
+        REFERENCES agent_conversation_session (id) ON DELETE CASCADE,
+    INDEX idx_agent_message_session_created (session_id, created_at)
 );
 
-CREATE INDEX idx_agent_message_session_created
-    ON agent_conversation_message (session_id, created_at);
+CREATE TABLE IF NOT EXISTS agent_observation_log (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    event_id VARCHAR(36) NOT NULL,
+    message_id BIGINT NOT NULL,
+    trace_id VARCHAR(36) NOT NULL,
+    sequence_no INT NOT NULL,
+    agent_name VARCHAR(64) NOT NULL,
+    phase VARCHAR(16) NOT NULL,
+    status VARCHAR(16) NOT NULL,
+    model VARCHAR(128),
+    llm_input MEDIUMTEXT,
+    llm_output MEDIUMTEXT,
+    prompt_tokens INT,
+    completion_tokens INT,
+    total_tokens INT,
+    duration_ms BIGINT,
+    error_message MEDIUMTEXT,
+    created_at TIMESTAMP NOT NULL,
+    CONSTRAINT uk_agent_observation_event UNIQUE (event_id),
+    CONSTRAINT fk_agent_observation_message FOREIGN KEY (message_id)
+        REFERENCES agent_conversation_message (id) ON DELETE CASCADE,
+    INDEX idx_agent_observation_message_sequence (message_id, sequence_no)
+);
 
 CREATE TABLE IF NOT EXISTS service_point_category (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,

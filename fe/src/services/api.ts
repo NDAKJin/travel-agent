@@ -2,6 +2,7 @@ import type {
   AgentChatResponse,
   AgentSession,
   AgentSessionDetail,
+  AdminConversationDetail,
   AdminConversationSummary,
   AdminScenicSpot,
   AdminServicePoint,
@@ -174,7 +175,7 @@ export const api = {
     });
   },
   getSessionDetail(accessToken: string, conversationId: number) {
-    return request<AgentSessionDetail>(`/api/admin/sessions/${conversationId}`, {
+    return request<AdminConversationDetail>(`/api/admin/sessions/${conversationId}`, {
       accessToken
     });
   },

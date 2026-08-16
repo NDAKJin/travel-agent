@@ -13,6 +13,7 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![MySQL](https://img.shields.io/badge/MySQL-4479A1?logo=mysql&logoColor=white)](https://www.mysql.com/)
 [![Redis](https://img.shields.io/badge/Redis-DC382D?logo=redis&logoColor=white)](https://redis.io/)
+[![Kafka](https://img.shields.io/badge/Apache%20Kafka-231F20?logo=apachekafka&logoColor=white)](https://kafka.apache.org/)
 [![Elasticsearch](https://img.shields.io/badge/Elasticsearch-005571?logo=elasticsearch&logoColor=white)](https://www.elastic.co/elasticsearch)
 [![Neo4j](https://img.shields.io/badge/Neo4j-008CC1?logo=neo4j&logoColor=white)](https://neo4j.com/)
 [![Vite](https://img.shields.io/badge/Vite-7-646CFF?logo=vite&logoColor=white)](https://vite.dev/)
@@ -44,6 +45,7 @@
 - **运营管理台**：React + TypeScript 管理会话、景区、服务点和知识内容。
 - **微信小程序入口**：原生 WXML / WXSS / JavaScript，完成登录、聊天和历史会话。
 - **安全认证**：微信登录与管理端登录统一使用 JWT，刷新令牌存储在 Redis。
+- **Agent 可观测**：节点与专家调用的输入输出、Token、耗时和错误经 Kafka 异步写入 MySQL，仅在管理端会话详情展示。
 
 ## 系统架构
 
@@ -55,6 +57,7 @@ flowchart LR
     workflow["LangGraph4j 多智能体编排"];
     mysql[("MySQL")];
     redis[("Redis")];
+    kafka[("Kafka")];
     es[("Elasticsearch 地理索引")];
     neo4j[("Neo4j 图关系")];
     amap["高德地图 API"];
@@ -64,6 +67,8 @@ flowchart LR
     admin --> api;
     api --> workflow;
     workflow --> model;
+    workflow --> kafka;
+    kafka --> mysql;
     api --> mysql;
     api --> redis;
     api --> es;
@@ -129,7 +134,7 @@ flowchart TD
 | 层次 | 技术 |
 | --- | --- |
 | Backend | Java 21、Spring Boot 4、Spring AI Alibaba、LangGraph4j、Spring Security、MyBatis |
-| Data | MySQL、Redis、Elasticsearch、Neo4j |
+| Data | MySQL、Redis、Kafka、Elasticsearch、Neo4j |
 | Admin console | React 18、TypeScript、Vite、高德地图 JS API |
 | Mini program | 原生 JavaScript、WXML、WXSS |
 | API docs | Springdoc OpenAPI、NextDoc4j |
@@ -142,6 +147,7 @@ flowchart TD
 - Node.js 18+
 - MySQL、Redis，以及可访问的 Elasticsearch
 - 可选：Neo4j（启用旅行知识与路线专员时需要）
+- 可选：Kafka（启用 Agent 可观测时需要）
 - 阿里云百炼 DashScope API Key
 - 使用微信登录时，需要小程序 AppID / AppSecret；使用地图功能时，需要高德 Web 服务 Key
 
@@ -223,7 +229,7 @@ travel-agent/
 
 ## Docker 启动与部署
 
-Docker Compose 会启动管理台、API、MySQL 和 Redis。Elasticsearch 与 Neo4j 可部署在独立服务器，通过 `.env` 中的公网地址连接。
+Docker Compose 会启动管理台、API、MySQL 和 Redis。Elasticsearch、Neo4j 与 Kafka 可部署在独立服务器，通过 `.env` 中的公网地址连接。
 
 ```bash
 git clone <仓库地址> travel-agent
@@ -237,6 +243,10 @@ docker compose up -d --build
 ```env
 TRAVEL_AGENT_AGENT_ELASTICSEARCH_HOST=<ES 公网地址>
 TRAVEL_AGENT_NEO4J_ENABLED=false
+# 启用 Agent 可观测时需要：
+SPRING_KAFKA_HOST=<Kafka 地址>
+SPRING_KAFKA_PORT=9092
+TRAVEL_AGENT_OBSERVABILITY_ENABLED=false
 # 仅启用图谱时需要：
 SPRING_NEO4J_URI=bolt://<Neo4j 公网地址>:7687
 NEO4J_PASSWORD=<Neo4j 密码>
@@ -257,6 +267,7 @@ docker compose up -d --build
 ```
 
 数据由 Docker volumes 持久化；不要执行 `docker compose down -v`，否则会删除 MySQL 与 Redis 数据。
+`schema.sql` 仅在 MySQL 数据卷首次初始化时执行；已有数据库的结构升级需通过发布流程迁移。
 
 ## 开发与测试
 
@@ -272,6 +283,16 @@ docker compose up -d --build
 cd fe
 npm run check
 npm run build
+```
+
+## Agent 可观测
+
+启用 `TRAVEL_AGENT_OBSERVABILITY_ENABLED=true` 后，LangGraph4j 节点与四个专家的调用日志会由 Hook 直接发送至 Kafka `agent-observation`，消费者异步写入 `agent_observation_log`。记录通过 `message_id` 关联用户消息，包含 LLM 输入输出、模型、Token、耗时和错误信息；仅在管理端会话详情中展示，不会返回给用户端。Kafka 未部署或开关关闭时，不会记录观测日志。
+
+```env
+SPRING_KAFKA_HOST=localhost
+SPRING_KAFKA_PORT=9092
+TRAVEL_AGENT_OBSERVABILITY_ENABLED=true
 ```
 
 ## 开源协议

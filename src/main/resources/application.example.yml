@@ -27,6 +27,9 @@ spring:
       max-lifetime: ${SPRING_DATASOURCE_HIKARI_MAX_LIFETIME:1700000}
       keepalive-time: ${SPRING_DATASOURCE_HIKARI_KEEPALIVE_TIME:300000}
       connection-timeout: ${SPRING_DATASOURCE_HIKARI_CONNECTION_TIMEOUT:30000}
+  sql:
+    init:
+      mode: never
   data:
     redis:
       host: ${SPRING_DATA_REDIS_HOST:localhost}
@@ -36,6 +39,12 @@ spring:
     authentication:
       username: ${SPRING_NEO4J_AUTHENTICATION_USERNAME:neo4j}
       password: ${SPRING_NEO4J_AUTHENTICATION_PASSWORD:}
+  kafka:
+    bootstrap-servers: "${SPRING_KAFKA_HOST:localhost}:${SPRING_KAFKA_PORT:9092}"
+    producer:
+      acks: all
+      properties:
+        "[enable.idempotence]": true
 
 mybatis:
   mapper-locations: classpath*:com/travelagent/travelagent/**/*Mapper.xml
@@ -77,10 +86,12 @@ travel-agent:
       default-locale: ${TRAVEL_AGENT_AGENT_PROFILE_DEFAULT_LOCALE:zh-CN}
     tool:
       enabled: ${TRAVEL_AGENT_AGENT_TOOL_ENABLED:true}
-    prompt:
-      override: ${TRAVEL_AGENT_AGENT_PROMPT_OVERRIDE:}
     elasticsearch:
       host: ${TRAVEL_AGENT_AGENT_ELASTICSEARCH_HOST:localhost}
       port: ${TRAVEL_AGENT_AGENT_ELASTICSEARCH_PORT:9200}
       scheme: ${TRAVEL_AGENT_AGENT_ELASTICSEARCH_SCHEME:http}
       geo-index-name: ${TRAVEL_AGENT_AGENT_ELASTICSEARCH_GEO_INDEX_NAME:travel-agent-geo}
+  observability:
+    enabled: ${TRAVEL_AGENT_OBSERVABILITY_ENABLED:false}
+    kafka-topic: ${TRAVEL_AGENT_OBSERVABILITY_KAFKA_TOPIC:agent-observation}
+    consumer-group: ${TRAVEL_AGENT_OBSERVABILITY_CONSUMER_GROUP:travel-agent-observation-writer}

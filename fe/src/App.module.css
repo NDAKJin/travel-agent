@@ -894,6 +894,26 @@
   font: inherit;
 }
 
+.observationDetails {
+  margin-top: 12px;
+  color: #173b27;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 10px;
+  padding: 8px;
+  font-size: 12px;
+}
+
+.observationItem {
+  margin-top: 8px;
+  word-break: break-word;
+}
+
+.observationItem pre {
+  max-height: 220px;
+  overflow: auto;
+  white-space: pre-wrap;
+}
+
 .markdownParagraph,
 .markdownList,
 .markdownQuote,
