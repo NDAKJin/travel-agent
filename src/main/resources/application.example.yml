@@ -63,7 +63,7 @@ nextdoc4j:
 
 travel-agent:
   neo4j:
-    enabled: ${TRAVEL_AGENT_NEO4J_ENABLED:false}
+    enabled: ${TRAVEL_AGENT_NEO4J_ENABLED:true}
   amap:
     web-service-key: ${TRAVEL_AGENT_AMAP_WEB_SERVICE_KEY:}
     city: ${AMAP_SEARCH_CITY:全国}
@@ -92,6 +92,6 @@ travel-agent:
       scheme: ${TRAVEL_AGENT_AGENT_ELASTICSEARCH_SCHEME:http}
       geo-index-name: ${TRAVEL_AGENT_AGENT_ELASTICSEARCH_GEO_INDEX_NAME:travel-agent-geo}
   observability:
-    enabled: ${TRAVEL_AGENT_OBSERVABILITY_ENABLED:false}
+    enabled: ${TRAVEL_AGENT_OBSERVABILITY_ENABLED:true}
     kafka-topic: ${TRAVEL_AGENT_OBSERVABILITY_KAFKA_TOPIC:agent-observation}
     consumer-group: ${TRAVEL_AGENT_OBSERVABILITY_CONSUMER_GROUP:travel-agent-observation-writer}
