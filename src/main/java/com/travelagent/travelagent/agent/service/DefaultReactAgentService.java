@@ -7,7 +7,6 @@ import com.travelagent.travelagent.agent.dto.AgentSessionDetailResponse;
 import com.travelagent.travelagent.agent.dto.AgentSessionSummaryResponse;
 import com.travelagent.travelagent.agent.model.AgentMessage;
 import com.travelagent.travelagent.agent.model.AgentSessionContext;
-import com.travelagent.travelagent.agent.prompt.TravelAssistantPromptProvider;
 import com.travelagent.travelagent.auth.exception.AuthException;
 import com.travelagent.travelagent.auth.security.AuthenticatedUser;
 import com.travelagent.travelagent.config.AgentProperties;
@@ -16,34 +15,24 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.messages.AssistantMessage;
-import org.springframework.ai.chat.messages.Message;
-import org.springframework.ai.chat.messages.SystemMessage;
-import org.springframework.ai.chat.messages.UserMessage;
-import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.stereotype.Service;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.util.StringUtils;
 
 @Service
 @Slf4j
 public class DefaultReactAgentService {
 
     private final AgentProperties agentProperties;
-    private final TravelAssistantPromptProvider promptProvider;
-    private final ChatClient chatClient;
+    private final LangGraphTravelAgent agentGraph;
     private final AgentConversationStore conversationStore;
     private final String model;
 
     public DefaultReactAgentService(AgentProperties agentProperties,
-                                    TravelAssistantPromptProvider promptProvider,
-                                    ChatClient chatClient,
+                                    LangGraphTravelAgent agentGraph,
                                     AgentConversationStore conversationStore,
                                     @Value("${SPRING_AI_DASHSCOPE_CHAT_OPTIONS_MODEL:qwen3.7-flash}") String model) {
         this.agentProperties = agentProperties;
-        this.promptProvider = promptProvider;
-        this.chatClient = chatClient;
+        this.agentGraph = agentGraph;
         this.conversationStore = conversationStore;
         this.model = model;
     }
@@ -137,20 +126,11 @@ public class DefaultReactAgentService {
     }
 
     private String callModel(List<AgentMessage> history) {
-        List<Message> messages = toChatMessages(promptProvider.systemPrompt(), history);
         log.debug("Calling chat model: model={}, sessionMessageCount={}, toolEnabled={}",
                 model,
-                messages.size(),
+                history.size(),
                 agentProperties.getTool().isEnabled());
-        ChatResponse response = chatClient.prompt()
-                .messages(messages)
-                .call()
-                .chatResponse();
-        log.info("Chat model completed: model={}, hasToolCalls={}, generationCount={}",
-                model,
-                response.hasToolCalls(),
-                response.getResults().size());
-        return response.getResult().getOutput().getText();
+        return agentGraph.run(history);
     }
 
     private String normalizeSessionId(String sessionId) {
@@ -166,25 +146,6 @@ public class DefaultReactAgentService {
             return List.copyOf(messages);
         }
         return List.copyOf(messages.subList(messages.size() - max, messages.size()));
-    }
-
-    private List<Message> toChatMessages(String systemPrompt, List<AgentMessage> conversation) {
-        List<Message> messages = new ArrayList<>();
-        messages.add(new SystemMessage(systemPrompt));
-        for (AgentMessage message : conversation) {
-            messages.add(toChatMessage(message));
-        }
-        return messages;
-    }
-
-    private Message toChatMessage(AgentMessage message) {
-        if ("assistant".equalsIgnoreCase(message.role())) {
-            return new AssistantMessage(message.content());
-        }
-        if (StringUtils.hasText(message.role()) && !"user".equalsIgnoreCase(message.role())) {
-            return new SystemMessage(message.content());
-        }
-        return new UserMessage(message.content());
     }
 
     private String buildTitle(List<AgentMessage> messages) {

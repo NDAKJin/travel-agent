@@ -23,6 +23,6 @@ public class PoiSearchAgent {
 
     @Tool(name = "delegate_poi_search", description = "委派给 POI 搜索专员，查询用户当前位置附近的景点、餐厅、酒店或便民服务。")
     public String searchPoi(String task) {
-        return runner.run("poi", chatClient, promptResourceLoader.load("poi-agent"), task);
+        return runner.run(chatClient, promptResourceLoader.load("poi-agent"), task);
     }
 }
