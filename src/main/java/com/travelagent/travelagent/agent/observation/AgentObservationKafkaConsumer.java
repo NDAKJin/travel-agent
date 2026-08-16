@@ -41,6 +41,7 @@ public class AgentObservationKafkaConsumer {
         observationLog.setPromptTokens(event.promptTokens());
         observationLog.setCompletionTokens(event.completionTokens());
         observationLog.setTotalTokens(event.totalTokens());
+        observationLog.setNextDecision(event.nextDecision());
         observationLog.setDurationMs(event.durationMs());
         observationLog.setErrorMessage(event.errorMessage());
         observationLog.setCreatedAt(event.createdAt() == null ? Instant.now() : event.createdAt());

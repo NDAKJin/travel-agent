@@ -21,6 +21,7 @@ public class AgentObservationLog {
     private Integer promptTokens;
     private Integer completionTokens;
     private Integer totalTokens;
+    private String nextDecision;
     private Long durationMs;
     private String errorMessage;
     private Instant createdAt;

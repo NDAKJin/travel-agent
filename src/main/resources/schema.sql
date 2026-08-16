@@ -58,6 +58,7 @@ CREATE TABLE IF NOT EXISTS agent_observation_log (
     prompt_tokens INT,
     completion_tokens INT,
     total_tokens INT,
+    next_decision VARCHAR(64),
     duration_ms BIGINT,
     error_message MEDIUMTEXT,
     created_at TIMESTAMP NOT NULL,
@@ -66,6 +67,9 @@ CREATE TABLE IF NOT EXISTS agent_observation_log (
         REFERENCES agent_conversation_message (id) ON DELETE CASCADE,
     INDEX idx_agent_observation_message_sequence (message_id, sequence_no)
 );
+
+ALTER TABLE agent_observation_log
+    ADD COLUMN IF NOT EXISTS next_decision VARCHAR(64);
 
 CREATE TABLE IF NOT EXISTS service_point_category (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,

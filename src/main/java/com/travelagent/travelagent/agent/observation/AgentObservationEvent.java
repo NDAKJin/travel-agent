@@ -16,6 +16,7 @@ public record AgentObservationEvent(
         Integer promptTokens,
         Integer completionTokens,
         Integer totalTokens,
+        String nextDecision,
         Long durationMs,
         String errorMessage,
         Instant createdAt) {
