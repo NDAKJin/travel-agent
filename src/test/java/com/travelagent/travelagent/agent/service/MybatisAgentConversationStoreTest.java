@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.when;
 
 import com.travelagent.travelagent.agent.mapper.AgentConversationSessionMapper;
@@ -74,6 +75,29 @@ class MybatisAgentConversationStoreTest {
         assertThat(loaded.orElseThrow().messages())
                 .containsExactly(new AgentMessage("user", "Plan a trip"),
                         new AgentMessage("assistant", "Start with the lake"));
+    }
+
+    @Test
+    void appendReturnsStableMessageIdWithoutReplacingExistingRows() {
+        Instant now = Instant.now();
+        AgentConversationSession session = new AgentConversationSession();
+        session.setId(42L);
+        session.setTitle("Plan a trip");
+        when(mapper.findByUserIdAndSessionIdForUpdate(7L, "session-1")).thenReturn(session);
+        when(mapper.nextMessageSequenceNo(42L)).thenReturn(2);
+        doAnswer(invocation -> {
+            invocation.<AgentConversationMessage>getArgument(0).setId(99L);
+            return 1;
+        }).when(mapper).insertMessage(any(AgentConversationMessage.class));
+
+        List<Long> ids = store.append(7L, new AgentSessionContext("session-1", List.of(
+                new AgentMessage("user", "Plan a trip"),
+                new AgentMessage("assistant", "Start with the lake"),
+                new AgentMessage("user", "What about day two?")), now, now),
+                List.of(new AgentMessage("user", "What about day two?")));
+
+        assertThat(ids).containsExactly(99L);
+        verify(mapper, never()).deleteMessagesBySessionId(42L);
     }
 
     private AgentConversationMessage message(long sessionId, int sequenceNo, String role, String content) {

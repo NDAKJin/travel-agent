@@ -55,9 +55,9 @@ public class MybatisAgentConversationStore implements AgentConversationStore {
 
     @Transactional
     @Override
-    public void append(long userId, AgentSessionContext sessionContext, List<AgentMessage> messages) {
+    public List<Long> append(long userId, AgentSessionContext sessionContext, List<AgentMessage> messages) {
         if (messages.isEmpty()) {
-            return;
+            return List.of();
         }
         AgentConversationSession session = mapper.findByUserIdAndSessionIdForUpdate(
                 userId, sessionContext.sessionId());
@@ -73,18 +73,17 @@ public class MybatisAgentConversationStore implements AgentConversationStore {
             mapper.insert(session);
         }
 
-        List<AgentMessage> boundedMessages = sessionContext.messages();
+        int firstSequenceNo = mapper.nextMessageSequenceNo(session.getId());
+        List<AgentConversationMessage> entities = toMessageEntities(session.getId(), firstSequenceNo, messages);
+        entities.forEach(mapper::insertMessage);
         session.setTitle(session.getTitle() == null || session.getTitle().isBlank()
                 || "new-chat".equals(session.getTitle())
                 ? buildTitle(sessionContext.messages()) : session.getTitle());
         session.setPreview(buildPreview(messages));
-        session.setMessageCount(boundedMessages.size());
+        session.setMessageCount(firstSequenceNo + messages.size());
         session.setUpdatedAt(sessionContext.updatedAt());
         mapper.update(session);
-        mapper.deleteMessagesBySessionId(session.getId());
-        if (!boundedMessages.isEmpty()) {
-            mapper.insertMessages(toMessageEntities(session.getId(), 0, boundedMessages));
-        }
+        return entities.stream().map(AgentConversationMessage::getId).toList();
     }
 
     @Override

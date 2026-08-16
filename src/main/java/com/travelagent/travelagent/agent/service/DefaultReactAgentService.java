@@ -7,6 +7,8 @@ import com.travelagent.travelagent.agent.dto.AgentSessionDetailResponse;
 import com.travelagent.travelagent.agent.dto.AgentSessionSummaryResponse;
 import com.travelagent.travelagent.agent.model.AgentMessage;
 import com.travelagent.travelagent.agent.model.AgentSessionContext;
+import com.travelagent.travelagent.agent.observation.AgentObservationContext;
+import com.travelagent.travelagent.agent.observation.AgentObservationPublisher;
 import com.travelagent.travelagent.auth.exception.AuthException;
 import com.travelagent.travelagent.auth.security.AuthenticatedUser;
 import com.travelagent.travelagent.config.AgentProperties;
@@ -25,15 +27,18 @@ public class DefaultReactAgentService {
     private final AgentProperties agentProperties;
     private final LangGraphTravelAgent agentGraph;
     private final AgentConversationStore conversationStore;
+    private final AgentObservationPublisher observationPublisher;
     private final String model;
 
     public DefaultReactAgentService(AgentProperties agentProperties,
                                     LangGraphTravelAgent agentGraph,
                                     AgentConversationStore conversationStore,
+                                    AgentObservationPublisher observationPublisher,
                                     @Value("${SPRING_AI_DASHSCOPE_CHAT_OPTIONS_MODEL:qwen3.7-flash}") String model) {
         this.agentProperties = agentProperties;
         this.agentGraph = agentGraph;
         this.conversationStore = conversationStore;
+        this.observationPublisher = observationPublisher;
         this.model = model;
     }
 
@@ -58,17 +63,23 @@ public class DefaultReactAgentService {
             log.debug("Loaded conversation history: sessionId={}, existingMessageCount={}", sessionId, history.size());
             history.add(new AgentMessage("user", request.message()));
 
-            String reply = callModel(history);
+            Instant startedAt = Instant.now();
+            Instant createdAt = existingSession == null ? startedAt : existingSession.createdAt();
+            List<AgentMessage> userHistory = boundedHistory(history);
+            long messageId = conversationStore.append(user.userId(),
+                    new AgentSessionContext(sessionId, userHistory, createdAt, startedAt),
+                    List.of(new AgentMessage("user", request.message()))).getLast();
+
+            String reply = callModel(history, new AgentObservationContext(messageId, observationPublisher));
             boolean locationPermissionRequired = LocationPermissionContext.isRequested();
 
             if (!locationPermissionRequired) {
                 history.add(new AgentMessage("assistant", reply));
                 Instant now = Instant.now();
-                Instant createdAt = existingSession == null ? now : existingSession.createdAt();
                 List<AgentMessage> storedHistory = boundedHistory(history);
                 conversationStore.append(user.userId(),
                         new AgentSessionContext(sessionId, storedHistory, createdAt, now),
-                        List.of(new AgentMessage("user", request.message()), new AgentMessage("assistant", reply)));
+                        List.of(new AgentMessage("assistant", reply)));
             }
             log.info("Completed react-agent chat: sessionId={}, totalMessageCount={}, replyLength={}",
                     sessionId,
@@ -125,12 +136,12 @@ public class DefaultReactAgentService {
         conversationStore.delete(user.userId(), normalizeSessionId(sessionId));
     }
 
-    private String callModel(List<AgentMessage> history) {
+    private String callModel(List<AgentMessage> history, AgentObservationContext observation) {
         log.debug("Calling chat model: model={}, sessionMessageCount={}, toolEnabled={}",
                 model,
                 history.size(),
                 agentProperties.getTool().isEnabled());
-        return agentGraph.run(history);
+        return agentGraph.run(history, observation);
     }
 
     private String normalizeSessionId(String sessionId) {

@@ -23,6 +23,6 @@ public class BudgetAgent {
 
     @Tool(name = "delegate_budget_estimate", description = "委派给预算专员，根据已知的门票、住宿、餐饮和交通数据汇总预算；缺失价格必须标记待确认。")
     public String estimateBudget(String task) {
-        return runner.run(chatClient, promptResourceLoader.load("budget-agent"), task);
+        return runner.run("budget", chatClient, promptResourceLoader.load("budget-agent"), task);
     }
 }

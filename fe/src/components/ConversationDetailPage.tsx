@@ -1,9 +1,9 @@
 import type { ReactNode } from "react";
 import styles from "../App.module.css";
-import type { AgentSessionDetail } from "../types";
+import type { AdminConversationDetail } from "../types";
 
 type ConversationDetailPageProps = {
-  detail: AgentSessionDetail | null;
+  detail: AdminConversationDetail | null;
   loading: boolean;
   onBack: () => void;
   renderMarkdown: (value: string) => ReactNode;
@@ -35,6 +35,24 @@ export default function ConversationDetailPage({ detail, loading, onBack, render
                       <pre className={styles.userMessage}>{message.content}</pre>
                     )}
                   </div>
+                  {message.observations.length > 0 ? (
+                    <details className={styles.observationDetails}>
+                      <summary>查看 Agent 观测（{message.observations.length} 条）</summary>
+                      {message.observations.map((observation, observationIndex) => (
+                        <details key={`${message.id}-${observationIndex}`} className={styles.observationItem}>
+                          <summary>
+                            {observation.agentName} · {observation.phase} · {observation.status}
+                            {observation.durationMs == null ? "" : ` · ${observation.durationMs}ms`}
+                          </summary>
+                          <div>模型：{observation.model ?? "-"}</div>
+                          <div>Token：输入 {observation.promptTokens ?? "-"} / 输出 {observation.completionTokens ?? "-"} / 总计 {observation.totalTokens ?? "-"}</div>
+                          {observation.errorMessage ? <pre>{observation.errorMessage}</pre> : null}
+                          {observation.llmInput ? <details><summary>LLM 输入</summary><pre>{observation.llmInput}</pre></details> : null}
+                          {observation.llmOutput ? <details><summary>LLM 输出</summary><pre>{observation.llmOutput}</pre></details> : null}
+                        </details>
+                      ))}
+                    </details>
+                  ) : null}
                 </article>
               ))}
             </div>

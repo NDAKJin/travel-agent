@@ -14,6 +14,9 @@ import java.util.List;
 import java.util.Queue;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.ai.chat.model.Generation;
 
 class LangGraphTravelAgentTest {
 
@@ -82,7 +85,8 @@ class LangGraphTravelAgentTest {
         when(request.user(anyString())).thenReturn(request);
         when(request.messages(any(List.class))).thenReturn(request);
         when(request.call()).thenReturn(response);
-        when(response.content()).thenAnswer(ignored -> values.remove());
+        when(response.chatResponse()).thenAnswer(ignored -> new ChatResponse(
+                List.of(new Generation(new AssistantMessage(values.remove())))));
         return client;
     }
 }

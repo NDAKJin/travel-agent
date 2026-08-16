@@ -1,9 +1,12 @@
 package com.travelagent.travelagent.admin.service;
 
-import com.travelagent.travelagent.agent.dto.AgentConversationMessageResponse;
-import com.travelagent.travelagent.agent.dto.AgentSessionDetailResponse;
+import com.travelagent.travelagent.agent.mapper.AgentObservationLogMapper;
+import com.travelagent.travelagent.agent.model.AgentObservationLog;
 import com.travelagent.travelagent.agent.mapper.AgentConversationSessionMapper;
 import com.travelagent.travelagent.agent.model.AgentConversationMessage;
+import com.travelagent.travelagent.admin.dto.AdminAgentObservationResponse;
+import com.travelagent.travelagent.admin.dto.AdminConversationDetailResponse;
+import com.travelagent.travelagent.admin.dto.AdminConversationMessageResponse;
 import com.travelagent.travelagent.admin.model.AdminConversationSessionView;
 import com.travelagent.travelagent.admin.dto.AdminConversationSummaryResponse;
 import com.travelagent.travelagent.admin.dto.AdminConversationUserResponse;
@@ -13,6 +16,8 @@ import com.travelagent.travelagent.auth.mapper.WxUserMapper;
 import com.travelagent.travelagent.auth.model.WxUser;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -23,6 +28,7 @@ public class AdminManagementService {
 
     private final WxUserMapper wxUserMapper;
     private final AgentConversationSessionMapper conversationSessionMapper;
+    private final AgentObservationLogMapper observationLogMapper;
 
     public PageResponse<AdminWxUserResponse> searchWxUsers(String keyword, int page, int size) {
         String normalized = normalizeKeyword(keyword);
@@ -57,12 +63,13 @@ public class AdminManagementService {
         return new PageResponse<>(content, total, safePage, safeSize);
     }
 
-    public AgentSessionDetailResponse getSessionDetail(long conversationId) {
+    public AdminConversationDetailResponse getSessionDetail(long conversationId) {
         var session = conversationSessionMapper.findForAdminById(conversationId);
         if (session == null) {
             throw new IllegalArgumentException("Conversation session not found");
         }
         return toDetail(session.getSessionId(), conversationSessionMapper.findMessagesBySessionId(session.getId()),
+                observationLogMapper.findBySessionId(session.getId()),
                 session.getCreatedAt(), session.getUpdatedAt());
     }
 
@@ -104,16 +111,27 @@ public class AdminManagementService {
         return StringUtils.hasText(keyword) ? keyword.trim() : "";
     }
 
-    private AgentSessionDetailResponse toDetail(String sessionId, List<AgentConversationMessage> messages,
-                                                Instant createdAt, Instant updatedAt) {
-        return new AgentSessionDetailResponse(
+    private AdminConversationDetailResponse toDetail(String sessionId, List<AgentConversationMessage> messages,
+                                                      List<AgentObservationLog> observations,
+                                                      Instant createdAt, Instant updatedAt) {
+        Map<Long, List<AdminAgentObservationResponse>> byMessageId = observations.stream()
+                .collect(Collectors.groupingBy(AgentObservationLog::getMessageId,
+                        Collectors.mapping(this::toObservation, Collectors.toList())));
+        return new AdminConversationDetailResponse(
                 sessionId,
                 buildTitle(messages),
                 messages.stream()
-                        .map(message -> new AgentConversationMessageResponse(message.getRole(), message.getContent()))
+                        .map(message -> new AdminConversationMessageResponse(message.getId(), message.getRole(), message.getContent(),
+                                byMessageId.getOrDefault(message.getId(), List.of())))
                         .toList(),
                 createdAt,
                 updatedAt);
+    }
+
+    private AdminAgentObservationResponse toObservation(AgentObservationLog log) {
+        return new AdminAgentObservationResponse(log.getAgentName(), log.getPhase(), log.getStatus(), log.getModel(),
+                log.getLlmInput(), log.getLlmOutput(), log.getPromptTokens(), log.getCompletionTokens(),
+                log.getTotalTokens(), log.getDurationMs(), log.getErrorMessage(), log.getCreatedAt());
     }
 
     private String buildTitle(List<AgentConversationMessage> messages) {
