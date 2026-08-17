@@ -50,8 +50,6 @@ public class DefaultReactAgentService {
             throw new IllegalArgumentException("sessionId exceeds the configured maximum length");
         }
         String sessionId = normalizeSessionId(request.sessionId());
-        CurrentUserLocationContext.set(request.location());
-        LocationPermissionContext.clear();
         log.info("Starting react-agent chat: sessionId={}, requestedSessionId={}, toolEnabled={}",
                 sessionId,
                 request.sessionId(),
@@ -72,16 +70,12 @@ public class DefaultReactAgentService {
 
             String reply = callModel(history, new AgentObservationContext(messageId, observationPublisher));
             String userReply = userFacingReply(reply);
-            boolean locationPermissionRequired = LocationPermissionContext.isRequested();
-
-            if (!locationPermissionRequired) {
-                history.add(new AgentMessage("assistant", reply));
-                Instant now = Instant.now();
-                List<AgentMessage> storedHistory = boundedHistory(history);
-                conversationStore.append(user.userId(),
-                        new AgentSessionContext(sessionId, storedHistory, createdAt, now),
-                        List.of(new AgentMessage("assistant", reply)));
-            }
+            history.add(new AgentMessage("assistant", reply));
+            Instant now = Instant.now();
+            List<AgentMessage> storedHistory = boundedHistory(history);
+            conversationStore.append(user.userId(),
+                    new AgentSessionContext(sessionId, storedHistory, createdAt, now),
+                    List.of(new AgentMessage("assistant", reply)));
             log.info("Completed react-agent chat: sessionId={}, totalMessageCount={}, replyLength={}",
                     sessionId,
                     history.size(),
@@ -91,14 +85,9 @@ public class DefaultReactAgentService {
                     userReply,
                     agentProperties.getProfile().getName(),
                     model,
-                    agentProperties.getTool().isEnabled(),
-                    NearbySearchContext.get(),
-                    locationPermissionRequired);
+                    agentProperties.getTool().isEnabled());
         }
         finally {
-            NearbySearchContext.clear();
-            LocationPermissionContext.clear();
-            CurrentUserLocationContext.clear();
         }
     }
 

@@ -4,10 +4,7 @@ import com.travelagent.travelagent.agent.dto.AgentChatRequest;
 import com.travelagent.travelagent.agent.dto.AgentChatResponse;
 import com.travelagent.travelagent.agent.dto.AgentSessionDetailResponse;
 import com.travelagent.travelagent.agent.dto.AgentSessionSummaryResponse;
-import com.travelagent.travelagent.agent.dto.NearbyNextPageRequest;
-import com.travelagent.travelagent.agent.dto.NearbySearchResult;
 import com.travelagent.travelagent.agent.service.DefaultReactAgentService;
-import com.travelagent.travelagent.agent.service.NearbyPoiSearchService;
 import com.travelagent.travelagent.auth.security.AuthenticatedUser;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -35,7 +32,6 @@ import org.springframework.web.bind.annotation.RestController;
 public class AgentController {
 
     private final DefaultReactAgentService reactAgentService;
-    private final NearbyPoiSearchService nearbyPoiSearchService;
 
     @PostMapping("/chat")
     @Operation(summary = "与旅行助手对话", description = "通过会话标识保留多轮上下文，可附带当前位置")
@@ -66,13 +62,6 @@ public class AgentController {
     @Operation(summary = "查询会话详情", description = "查询当前用户的一段历史会话")
     public AgentSessionDetailResponse getSession(@Parameter(description = "会话标识") @PathVariable String sessionId, Authentication authentication) {
         return reactAgentService.getSession(currentUser(authentication), sessionId);
-    }
-
-    @PostMapping("/nearby/next")
-    @Operation(summary = "加载附近地点下一页", description = "使用上一页返回的游标继续查询")
-    public NearbySearchResult nearbyNext(@Valid @RequestBody NearbyNextPageRequest request) {
-        return nearbyPoiSearchService.search(request.latitude(), request.longitude(), request.keyword(),
-                request.radiusMeters() == null ? 20_000 : request.radiusMeters(), request.searchAfter());
     }
 
     @DeleteMapping("/sessions/{sessionId}")

@@ -13,7 +13,6 @@ import com.travelagent.travelagent.agent.dto.AgentConversationMessageResponse;
 import com.travelagent.travelagent.agent.dto.AgentSessionDetailResponse;
 import com.travelagent.travelagent.agent.dto.AgentSessionSummaryResponse;
 import com.travelagent.travelagent.agent.service.DefaultReactAgentService;
-import com.travelagent.travelagent.agent.service.NearbyPoiSearchService;
 import com.travelagent.travelagent.auth.security.AuthenticatedUser;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -34,7 +33,7 @@ class AgentControllerTest {
     @BeforeEach
     void setUp() {
         reactAgentService = mock(DefaultReactAgentService.class);
-        AgentController agentController = new AgentController(reactAgentService, mock(NearbyPoiSearchService.class));
+        AgentController agentController = new AgentController(reactAgentService);
         mockMvc = MockMvcBuilders.standaloneSetup(agentController).build();
     }
 

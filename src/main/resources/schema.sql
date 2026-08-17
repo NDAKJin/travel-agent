@@ -67,12 +67,3 @@ CREATE TABLE IF NOT EXISTS agent_observation_log (
         REFERENCES agent_conversation_message (id) ON DELETE CASCADE,
     INDEX idx_agent_observation_message_sequence (message_id, sequence_no)
 );
-
-CREATE TABLE IF NOT EXISTS service_point_category (
-    id BIGINT PRIMARY KEY AUTO_INCREMENT,
-    name VARCHAR(64) NOT NULL UNIQUE,
-    created_at TIMESTAMP NOT NULL
-);
-
-INSERT IGNORE INTO service_point_category (name, created_at) VALUES
-    ('停车场', CURRENT_TIMESTAMP), ('文旅服务点', CURRENT_TIMESTAMP), ('卫生间', CURRENT_TIMESTAMP);

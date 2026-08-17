@@ -54,6 +54,7 @@ public class LangGraphTravelAgent {
     private final ChatClient normalServiceChatClient;
     private final ChatClient finalizerChatClient;
     private final PromptResourceLoader promptResourceLoader;
+    private final StateGraph<WorkflowState> workflow;
     private final CompiledGraph<WorkflowState> graph;
 
     public LangGraphTravelAgent(@Qualifier("orchestrationChatClient") ChatClient orchestrationChatClient,
@@ -66,7 +67,8 @@ public class LangGraphTravelAgent {
         this.normalServiceChatClient = normalServiceChatClient;
         this.finalizerChatClient = finalizerChatClient;
         this.promptResourceLoader = promptResourceLoader;
-        this.graph = buildGraph();
+        this.workflow = buildWorkflow();
+        this.graph = compile(workflow);
     }
 
     public String run(List<AgentMessage> history) {
@@ -87,7 +89,11 @@ public class LangGraphTravelAgent {
         }
     }
 
-    private CompiledGraph<WorkflowState> buildGraph() {
+    public StateGraph<WorkflowState> studioWorkflow() {
+        return workflow;
+    }
+
+    private StateGraph<WorkflowState> buildWorkflow() {
         try {
             return new StateGraph<WorkflowState>(STATE_SCHEMA, WorkflowState::new)
                     .addNode("supervisor", AsyncNodeAction.node_async(this::supervise))
@@ -102,8 +108,15 @@ public class LangGraphTravelAgent {
                     .addEdge("routePlanner", "routeReviewer")
                     .addConditionalEdges("routeReviewer", AsyncEdgeAction.edge_async(this::afterReview), edges("routePlanner", "finalize"))
                     .addEdge("normalService", "finalize")
-                    .addEdge("finalize", StateGraph.END)
-                    .compile();
+                    .addEdge("finalize", StateGraph.END);
+        } catch (GraphStateException exception) {
+            throw new IllegalStateException("Unable to build travel agent graph", exception);
+        }
+    }
+
+    private CompiledGraph<WorkflowState> compile(StateGraph<WorkflowState> workflow) {
+        try {
+            return workflow.compile();
         } catch (GraphStateException exception) {
             throw new IllegalStateException("Unable to build travel agent graph", exception);
         }
@@ -315,7 +328,7 @@ public class LangGraphTravelAgent {
                 ? new SystemMessage(message.content()) : new UserMessage(message.content());
     }
 
-    private static class WorkflowState extends AgentState {
+    public static class WorkflowState extends AgentState {
 
         WorkflowState(Map<String, Object> data) {
             super(data);

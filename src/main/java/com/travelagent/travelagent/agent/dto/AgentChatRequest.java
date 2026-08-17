@@ -11,10 +11,4 @@ public record AgentChatRequest(
         @Size(max = 4000, message = "message must not exceed 4000 characters")
         String message,
         @Schema(description = "会话标识；为空时创建新会话", example = "session-1")
-        @Size(max = 64, message = "sessionId must not exceed 64 characters") String sessionId,
-        @Schema(description = "小程序提供的可选当前位置")
-        AgentUserLocation location) {
-    public AgentChatRequest(String message, String sessionId) {
-        this(message, sessionId, null);
-    }
-}
+        @Size(max = 64, message = "sessionId must not exceed 64 characters") String sessionId) { }

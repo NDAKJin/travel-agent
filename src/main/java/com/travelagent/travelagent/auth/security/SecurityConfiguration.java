@@ -3,6 +3,7 @@ package com.travelagent.travelagent.auth.security;
 import java.util.List;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -16,6 +17,9 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 @Configuration
 public class SecurityConfiguration {
+
+    @Value("${travel-agent.studio.enabled:false}")
+    private boolean studioEnabled;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http,
@@ -40,6 +44,7 @@ public class SecurityConfiguration {
                                 "/nextdoc/**",
                                 "/favicon.ico",
                                 "/v3/api-docs/**").permitAll()
+                        .requestMatchers(studioEnabled ? new String[]{"/", "/init", "/stream/**"} : new String[0]).permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated())
                 .addFilterBefore(accessTokenAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)

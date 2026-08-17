@@ -107,28 +107,6 @@ export type AdminConversationSummary = {
   user: AdminConversationUser;
 };
 
-export type AdminScenicSpot = {
-  id: string;
-  name: string;
-  city: string;
-  category: string;
-  description: string;
-  longitude: number;
-  latitude: number;
-  updatedAt: string;
-};
-
-export type AdminServicePoint = {
-  id: string;
-  name: string;
-  category: string;
-  description: string;
-  address: string;
-  longitude: number;
-  latitude: number;
-  updatedAt: string;
-};
-
 export type PageResponse<T> = {
   content: T[];
   total: number;

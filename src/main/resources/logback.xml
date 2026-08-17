@@ -39,8 +39,6 @@
     </appender>
 
     <logger name="com.travelagent.travelagent" level="INFO"/>
-    <logger name="com.travelagent.travelagent.agent.service.NearbyPoiSearchService" level="DEBUG"/>
-    <logger name="com.travelagent.travelagent.admin.service.ScenicSpotGeoService" level="DEBUG"/>
 
     <root level="INFO">
         <appender-ref ref="ASYNC_CONSOLE"/>
