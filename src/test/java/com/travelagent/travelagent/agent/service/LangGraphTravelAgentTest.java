@@ -10,9 +10,13 @@ import static org.mockito.Mockito.when;
 import com.travelagent.travelagent.agent.model.AgentMessage;
 import com.travelagent.travelagent.agent.observation.AgentObservationContext;
 import com.travelagent.travelagent.agent.prompt.PromptResourceLoader;
+import com.travelagent.travelagent.agent.subagent.BudgetAgent;
+import com.travelagent.travelagent.agent.subagent.KnowledgePlanningAgent;
+import com.travelagent.travelagent.agent.subagent.RoutePlanningAgent;
 import java.util.ArrayDeque;
 import java.util.List;
 import java.util.Queue;
+import org.bsc.langgraph4j.checkpoint.MemorySaver;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.AssistantMessage;
@@ -96,6 +100,21 @@ class LangGraphTravelAgentTest {
     }
 
     @Test
+    void delegatesExpertInsideRoutePlanningSubgraph() {
+        KnowledgePlanningAgent knowledge = mock(KnowledgePlanningAgent.class);
+        when(knowledge.planKnowledge(anyString())).thenReturn("{\"facts\":[]}");
+        LangGraphTravelAgent graph = new LangGraphTravelAgent(
+                client(route(), confirmed(), approved()),
+                client(delegate("KNOWLEDGE"), plan()), client(), client(finalReply("Final itinerary")),
+                new PromptResourceLoader(), new MemorySaver(), knowledge,
+                mock(RoutePlanningAgent.class), mock(BudgetAgent.class));
+
+        assertThat(graph.run(List.of(new AgentMessage("user", "Plan a one-day trip"))))
+                .isEqualTo("Final itinerary");
+        verify(knowledge).planKnowledge(anyString());
+    }
+
+    @Test
     void normalRequestUsesNormalServiceThenFinalizer() {
         LangGraphTravelAgent graph = new LangGraphTravelAgent(
                 client(normal()), client(), client(normalAnswer("Service answer")),
@@ -129,6 +148,11 @@ class LangGraphTravelAgentTest {
     private static String plan() {
         return "{\"itinerary\":[],\"budget\":{\"knownItems\":[],\"unknownItems\":[],\"summary\":\"\"},"
                 + "\"notes\":[],\"pending\":[]}";
+    }
+
+    private static String delegate(String expert) {
+        return "{\"action\":\"DELEGATE\",\"expert\":\"" + expert
+                + "\",\"task\":{\"requirements\":{}}}";
     }
 
     private static String approved() {

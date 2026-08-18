@@ -3,7 +3,6 @@ package com.travelagent.travelagent.agent.subagent;
 import com.travelagent.travelagent.agent.prompt.PromptResourceLoader;
 import com.travelagent.travelagent.agent.service.SpecialistAgentRunner;
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
@@ -21,7 +20,6 @@ public class RoutePlanningAgent {
         this.runner = runner;
     }
 
-    @Tool(name = "delegate_route_planning", description = "委派给路线规划专员，根据用户给出的起终点、时间和偏好设计合理的行程顺序。")
     public String planRoute(String task) {
         return runner.run("route", chatClient, promptResourceLoader.load("route-agent"), task);
     }

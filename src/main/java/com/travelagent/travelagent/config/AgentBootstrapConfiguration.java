@@ -1,8 +1,5 @@
 package com.travelagent.travelagent.config;
 
-import com.travelagent.travelagent.agent.subagent.BudgetAgent;
-import com.travelagent.travelagent.agent.subagent.KnowledgePlanningAgent;
-import com.travelagent.travelagent.agent.subagent.RoutePlanningAgent;
 import javax.sql.DataSource;
 import org.bsc.langgraph4j.checkpoint.BaseCheckpointSaver;
 import org.bsc.langgraph4j.checkpoint.CreateOption;
@@ -36,19 +33,13 @@ public class AgentBootstrapConfiguration {
     }
 
     @Bean("routePlannerChatClient")
-    ChatClient routePlannerChatClient(ChatModel chatModel,
-                                      KnowledgePlanningAgent knowledgeAgent,
-                                      RoutePlanningAgent routeAgent,
-                                      BudgetAgent budgetAgent) {
-        return specialistChatClient(chatModel, knowledgeAgent, routeAgent, budgetAgent);
+    ChatClient routePlannerChatClient(ChatModel chatModel) {
+        return ChatClient.builder(chatModel).build();
     }
 
     @Bean("normalServiceChatClient")
-    ChatClient normalServiceChatClient(ChatModel chatModel,
-                                       KnowledgePlanningAgent knowledgeAgent,
-                                       RoutePlanningAgent routeAgent,
-                                       BudgetAgent budgetAgent) {
-        return specialistChatClient(chatModel, knowledgeAgent, routeAgent, budgetAgent);
+    ChatClient normalServiceChatClient(ChatModel chatModel) {
+        return ChatClient.builder(chatModel).build();
     }
 
     @Bean("knowledgePlanningChatClient")
@@ -64,15 +55,6 @@ public class AgentBootstrapConfiguration {
     @Bean("budgetChatClient")
     ChatClient budgetChatClient(ChatModel chatModel) {
         return ChatClient.builder(chatModel).build();
-    }
-
-    private ChatClient specialistChatClient(ChatModel chatModel,
-                                            KnowledgePlanningAgent knowledgeAgent,
-                                            RoutePlanningAgent routeAgent,
-                                            BudgetAgent budgetAgent) {
-        return ChatClient.builder(chatModel)
-                .defaultTools(knowledgeAgent, routeAgent, budgetAgent)
-                .build();
     }
 
 }

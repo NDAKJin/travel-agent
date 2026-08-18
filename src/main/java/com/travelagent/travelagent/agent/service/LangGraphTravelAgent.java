@@ -8,6 +8,9 @@ import com.travelagent.travelagent.agent.model.AgentMessage;
 import com.travelagent.travelagent.agent.observation.AgentObservationContext;
 import com.travelagent.travelagent.agent.observation.AgentObservationContextHolder;
 import com.travelagent.travelagent.agent.prompt.PromptResourceLoader;
+import com.travelagent.travelagent.agent.subagent.BudgetAgent;
+import com.travelagent.travelagent.agent.subagent.KnowledgePlanningAgent;
+import com.travelagent.travelagent.agent.subagent.RoutePlanningAgent;
 import java.util.List;
 import java.util.Map;
 import org.bsc.langgraph4j.CompiledGraph;
@@ -48,6 +51,9 @@ public class LangGraphTravelAgent {
             Map.entry("review", Channels.base(() -> "")),
             Map.entry("reviewApproved", Channels.base(() -> false)),
             Map.entry("reviewAttempts", Channels.base(() -> 0)),
+            Map.entry("routeNext", Channels.base(() -> "routeReviewer")),
+            Map.entry("expertTask", Channels.base(() -> "{}")),
+            Map.entry("expertResults", Channels.base(() -> "{}")),
             Map.entry("normalReply", Channels.base(() -> "")),
             Map.entry("reply", Channels.base(() -> "")));
 
@@ -57,6 +63,9 @@ public class LangGraphTravelAgent {
     private final ChatClient finalizerChatClient;
     private final PromptResourceLoader promptResourceLoader;
     private final BaseCheckpointSaver checkpointSaver;
+    private final KnowledgePlanningAgent knowledgeAgent;
+    private final RoutePlanningAgent routeAgent;
+    private final BudgetAgent budgetAgent;
     private final CompileConfig compileConfig;
     private final StateGraph<WorkflowState> workflow;
     private final CompiledGraph<WorkflowState> graph;
@@ -67,7 +76,7 @@ public class LangGraphTravelAgent {
                                 @Qualifier("finalizerChatClient") ChatClient finalizerChatClient,
                                 PromptResourceLoader promptResourceLoader) {
         this(orchestrationChatClient, routePlannerChatClient, normalServiceChatClient, finalizerChatClient,
-                promptResourceLoader, new MemorySaver());
+                promptResourceLoader, new MemorySaver(), null, null, null);
     }
 
     @org.springframework.beans.factory.annotation.Autowired
@@ -76,13 +85,19 @@ public class LangGraphTravelAgent {
                                 @Qualifier("normalServiceChatClient") ChatClient normalServiceChatClient,
                                 @Qualifier("finalizerChatClient") ChatClient finalizerChatClient,
                                 PromptResourceLoader promptResourceLoader,
-                                BaseCheckpointSaver checkpointSaver) {
+                                BaseCheckpointSaver checkpointSaver,
+                                KnowledgePlanningAgent knowledgeAgent,
+                                RoutePlanningAgent routeAgent,
+                                BudgetAgent budgetAgent) {
         this.orchestrationChatClient = orchestrationChatClient;
         this.routePlannerChatClient = routePlannerChatClient;
         this.normalServiceChatClient = normalServiceChatClient;
         this.finalizerChatClient = finalizerChatClient;
         this.promptResourceLoader = promptResourceLoader;
         this.checkpointSaver = checkpointSaver;
+        this.knowledgeAgent = knowledgeAgent;
+        this.routeAgent = routeAgent;
+        this.budgetAgent = budgetAgent;
         this.compileConfig = CompileConfig.builder()
                 .checkpointSaver(checkpointSaver)
                 .interruptBefore("awaitUserInput")
@@ -148,16 +163,14 @@ public class LangGraphTravelAgent {
             return new StateGraph<WorkflowState>(STATE_SCHEMA, WorkflowState::new)
                     .addNode("supervisor", AsyncNodeAction.node_async(this::supervise))
                     .addNode("requirements", AsyncNodeAction.node_async(this::collectRequirements))
-                    .addNode("routePlanner", AsyncNodeAction.node_async(this::planRoute))
-                    .addNode("routeReviewer", AsyncNodeAction.node_async(this::reviewRoute))
+                    .addSubgraph("routePlanning", buildRoutePlanningSubgraph())
                     .addNode("normalService", AsyncNodeAction.node_async(this::serveNormally))
                     .addNode("finalize", AsyncNodeAction.node_async(this::finalizeReply))
                     .addNode("awaitUserInput", AsyncNodeAction.node_async(state -> Map.of()))
                     .addEdge(StateGraph.START, "supervisor")
                     .addConditionalEdges("supervisor", AsyncEdgeAction.edge_async(this::afterSupervisor), edges("requirements", "normalService"))
-                    .addConditionalEdges("requirements", AsyncEdgeAction.edge_async(this::afterRequirements), edges("routePlanner", "finalize"))
-                    .addEdge("routePlanner", "routeReviewer")
-                    .addConditionalEdges("routeReviewer", AsyncEdgeAction.edge_async(this::afterReview), edges("routePlanner", "finalize"))
+                    .addConditionalEdges("requirements", AsyncEdgeAction.edge_async(this::afterRequirements), edges("routePlanning", "finalize"))
+                    .addEdge("routePlanning", "finalize")
                     .addEdge("normalService", "finalize")
                     .addConditionalEdges("finalize", AsyncEdgeAction.edge_async(this::afterFinalize),
                             edges("awaitUserInput", StateGraph.END))
@@ -165,6 +178,23 @@ public class LangGraphTravelAgent {
         } catch (GraphStateException exception) {
             throw new IllegalStateException("Unable to build travel agent graph", exception);
         }
+    }
+
+    private StateGraph<WorkflowState> buildRoutePlanningSubgraph() throws GraphStateException {
+        return new StateGraph<WorkflowState>(STATE_SCHEMA, WorkflowState::new)
+                .addNode("routePlanner", AsyncNodeAction.node_async(this::planRoute))
+                .addNode("knowledgeExpert", AsyncNodeAction.node_async(this::runKnowledgeExpert))
+                .addNode("routeExpert", AsyncNodeAction.node_async(this::runRouteExpert))
+                .addNode("budgetExpert", AsyncNodeAction.node_async(this::runBudgetExpert))
+                .addNode("routeReviewer", AsyncNodeAction.node_async(this::reviewRoute))
+                .addEdge(StateGraph.START, "routePlanner")
+                .addConditionalEdges("routePlanner", AsyncEdgeAction.edge_async(this::afterRoutePlanner),
+                        edges("knowledgeExpert", "routeExpert", "budgetExpert", "routeReviewer"))
+                .addEdge("knowledgeExpert", "routePlanner")
+                .addEdge("routeExpert", "routePlanner")
+                .addEdge("budgetExpert", "routePlanner")
+                .addConditionalEdges("routeReviewer", AsyncEdgeAction.edge_async(this::afterReview),
+                        edges("routePlanner", StateGraph.END));
     }
 
     private CompiledGraph<WorkflowState> compile(StateGraph<WorkflowState> workflow) {
@@ -199,11 +229,39 @@ public class LangGraphTravelAgent {
         try (AgentObservationContextHolder.Scope ignored = AgentObservationContextHolder.open(state.observation())) {
             String systemPrompt = prompt("route-planner");
             String input = routePlanningInput(state);
-            String plan = call("routePlanner", systemPrompt + "\n\n" + input,
+            String raw = call("routePlanner", systemPrompt + "\n\n" + input,
                     routePlannerChatClient.prompt().system(systemPrompt).user(input).call(),
-                    state.observation(), output -> "routeReviewer");
-            return Map.of("routePlan", plan);
+                    state.observation(), output -> plannerDecision(output).next());
+            PlannerDecision decision = plannerDecision(raw);
+            if (!decision.delegates()) {
+                return Map.of("routePlan", decision.plan(), "routeNext", "routeReviewer");
+            }
+            return Map.of("routeNext", decision.next(), "expertTask", decision.task());
         }
+    }
+
+    private Map<String, Object> runKnowledgeExpert(WorkflowState state) {
+        return recordExpertResult(state, "knowledge", requireExpert(knowledgeAgent).planKnowledge(state.expertTask()));
+    }
+
+    private Map<String, Object> runRouteExpert(WorkflowState state) {
+        return recordExpertResult(state, "route", requireExpert(routeAgent).planRoute(state.expertTask()));
+    }
+
+    private Map<String, Object> runBudgetExpert(WorkflowState state) {
+        return recordExpertResult(state, "budget", requireExpert(budgetAgent).estimateBudget(state.expertTask()));
+    }
+
+    private Map<String, Object> recordExpertResult(WorkflowState state, String expert, String output) {
+        JSONObject results = parseJson(state.expertResults());
+        if (results == null) results = new JSONObject();
+        results.put(expert, jsonOrText(output));
+        return Map.of("expertResults", JSON.toJSONString(results, JSONWriter.Feature.WriteMapNullValue));
+    }
+
+    private <T> T requireExpert(T expert) {
+        if (expert == null) throw new IllegalStateException("Route planning expert is unavailable");
+        return expert;
     }
 
     private Map<String, Object> reviewRoute(WorkflowState state) {
@@ -253,11 +311,15 @@ public class LangGraphTravelAgent {
     }
 
     private String afterRequirements(WorkflowState state) {
-        return state.requirementsConfirmed() ? "routePlanner" : "finalize";
+        return state.requirementsConfirmed() ? "routePlanning" : "finalize";
+    }
+
+    private String afterRoutePlanner(WorkflowState state) {
+        return state.routeNext();
     }
 
     private String afterReview(WorkflowState state) {
-        return !state.reviewApproved() && state.reviewAttempts() <= MAX_ROUTE_REVISIONS ? "routePlanner" : "finalize";
+        return !state.reviewApproved() && state.reviewAttempts() <= MAX_ROUTE_REVISIONS ? "routePlanner" : StateGraph.END;
     }
 
     private String afterFinalize(WorkflowState state) {
@@ -350,6 +412,26 @@ public class LangGraphTravelAgent {
                 && issues.stream().allMatch(item -> item instanceof String text && StringUtils.hasText(text));
     }
 
+    private PlannerDecision plannerDecision(String output) {
+        JSONObject json = parseJson(output);
+        if (json == null) return new PlannerDecision("routeReviewer", output, "", false);
+        if ("DELEGATE".equalsIgnoreCase(json.getString("action"))) {
+            String expert = json.getString("expert");
+            Object task = json.get("task");
+            String next = switch (expert == null ? "" : expert.toUpperCase()) {
+                case "KNOWLEDGE" -> "knowledgeExpert";
+                case "ROUTE" -> "routeExpert";
+                case "BUDGET" -> "budgetExpert";
+                default -> null;
+            };
+            if (next != null && task != null) {
+                return new PlannerDecision(next, "", JSON.toJSONString(task, JSONWriter.Feature.WriteMapNullValue), true);
+            }
+        }
+        Object plan = json.get("plan");
+        return new PlannerDecision("routeReviewer", plan == null ? output : JSON.toJSONString(plan), "", false);
+    }
+
     private static JSONObject parseJson(String output) {
         if (!StringUtils.hasText(output)) return null;
         String value = output.trim();
@@ -395,6 +477,7 @@ public class LangGraphTravelAgent {
         input.put("currentUserLocation", jsonOrText(state.currentUserLocation()));
         input.put("requirements", jsonOrText(requirementData(state.requirements())));
         input.put("review", state.review().isBlank() ? null : jsonOrText(state.review()));
+        input.put("expertResults", jsonOrText(state.expertResults()));
         return JSON.toJSONString(input, JSONWriter.Feature.WriteMapNullValue);
     }
 
@@ -496,6 +579,9 @@ public class LangGraphTravelAgent {
         String review() { return this.<String>value("review").orElse(""); }
         boolean reviewApproved() { return this.<Boolean>value("reviewApproved").orElse(false); }
         int reviewAttempts() { return this.<Integer>value("reviewAttempts").orElse(0); }
+        String routeNext() { return this.<String>value("routeNext").orElse("routeReviewer"); }
+        String expertTask() { return this.<String>value("expertTask").orElse("{}"); }
+        String expertResults() { return this.<String>value("expertResults").orElse("{}"); }
         String normalReply() { return this.<String>value("normalReply").orElse(""); }
         String reply() { return this.<String>value("reply").orElse(""); }
     }
@@ -503,4 +589,6 @@ public class LangGraphTravelAgent {
     private record RequirementDecision(boolean confirmed, String structuredOutput) { }
 
     private record ReviewDecision(boolean approved, String structuredOutput) { }
+
+    private record PlannerDecision(String next, String plan, String task, boolean delegates) { }
 }

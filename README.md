@@ -68,22 +68,33 @@ flowchart LR
 
 ## 多智能体协作
 
-主流程由 **LangGraph4j** 管理，专家能力仍通过 **Spring AI Tool Calling** 接入。总控只做意图判断；路线规划师和普通服务者按需调用专家，专家结果以结构化 JSON 返回上层模型。
+主流程由 **LangGraph4j** 管理。路线规划子图包含规划师、三位专家和审核师；规划师按需委派专家，专家结果以结构化 JSON 返回规划师。普通服务者直接回答非规划问题，不进入路线规划子图。
 
 ```mermaid
 flowchart TD
     message(["用户消息和当前位置"])
     supervisor["总控：识别意图"]
     requirements["需求询问师"]
-    planner["路线规划师"]
-    reviewer["路线审核师"]
+    subgraph routePlanning["旅游路线规划子图"]
+        direction TB
+        planner["路线规划师"]
+        knowledge["旅行知识专家"]
+        routeExpert["路线规划专家"]
+        budget["预算专家"]
+        reviewer["路线审核师"]
+        planner -.->|按需委派| knowledge
+        planner -.->|按需委派| routeExpert
+        planner -.->|按需委派| budget
+        knowledge --> planner
+        routeExpert --> planner
+        budget --> planner
+        planner --> reviewer
+        reviewer -->|需要修改且次数不超过 2 次| planner
+    end
     normal["普通服务者"]
     finalize["最终答复编辑"]
     wait["awaitUserInput：等待用户输入"]
     response(["最终回复"])
-    knowledge["旅行知识专家"]
-    routeExpert["路线规划专家"]
-    budget["预算专家"]
 
     message -->|新会话| supervisor
     message -->|恢复 Checkpoint| requirements
@@ -91,17 +102,9 @@ flowchart TD
     supervisor -->|普通服务| normal
     requirements -->|已确认| planner
     requirements -->|待补充| finalize
-    planner --> reviewer
     reviewer -->|审核通过| finalize
-    reviewer -->|需要修改且次数不超过 2 次| planner
     reviewer -->|达到修改上限| finalize
     normal --> finalize
-    planner -.->|按需 Function Calling| knowledge
-    planner -.->|按需 Function Calling| routeExpert
-    planner -.->|按需 Function Calling| budget
-    normal -.->|按需 Function Calling| knowledge
-    normal -.->|按需 Function Calling| routeExpert
-    normal -.->|按需 Function Calling| budget
     finalize -->|需求未确认| wait
     finalize -->|结果已完成| response
     wait -->|下一轮消息和新位置| message
@@ -115,15 +118,15 @@ flowchart TD
 | --- | --- | --- |
 | 总控 | 判断路线规划或普通服务 | 始终启用 |
 | 路线需求询问师 | 收集并确认路线规划需求 | 路线规划 |
-| 路线规划师 | 制定行程，按需调用三位专家 | 路线规划 |
+| 路线规划师 | 制定行程，按需委派三位专家 | 路线规划 |
 | 路线审核师 | 审核行程；最多要求修改两次 | 路线规划 |
-| 普通服务者 | 直接处理非路线规划问题，按需调用三位专家 | 普通服务 |
+| 普通服务者 | 直接处理非路线规划问题 | 普通服务 |
 | 最终答复编辑 | 将已完成结果整理为面向用户的自然回复 | 始终启用 |
 | 旅行知识规划专员 | 提供旅行知识与目的地建议 | 按需调用 |
 | 路线规划专员 | 提供路线与行程安排建议 | 按需调用 |
 | 预算专员 | 汇总已知门票、住宿、餐饮与交通费用；缺失价格标记待确认 | 按需调用 |
 
-三位专家统一返回结构化 JSON，供路线规划师或普通服务者直接综合。专家不是 LangGraph 节点，而是由两个主 Agent 按需通过 Spring AI Function Calling 调用；未被模型选中时不会执行。提示词位于 `src/main/resources/prompt/`，统一使用“角色、输入、输出、约束”结构。
+三位专家统一返回结构化 JSON，均为路线规划子图内的 LangGraph 节点；规划师按需路由，未被选中时不会执行。提示词位于 `src/main/resources/prompt/`，统一使用“角色、输入、输出、约束”结构。
 
 ## 技术栈
 
