@@ -64,6 +64,10 @@ travel-agent:
     jwt-secret: ${TRAVEL_AGENT_AUTH_JWT_SECRET:}
     access-token-ttl: ${TRAVEL_AGENT_AUTH_ACCESS_TOKEN_TTL:PT15M}
     refresh-token-ttl: ${TRAVEL_AGENT_AUTH_REFRESH_TOKEN_TTL:P1D}
+    bootstrap-admin:
+      username: ${TRAVEL_AGENT_AUTH_BOOTSTRAP_ADMIN_USERNAME:}
+      password: ${TRAVEL_AGENT_AUTH_BOOTSTRAP_ADMIN_PASSWORD:}
+      display-name: ${TRAVEL_AGENT_AUTH_BOOTSTRAP_ADMIN_DISPLAY_NAME:ops-admin}
     wx:
       app-id: ${TRAVEL_AGENT_AUTH_WX_APP_ID:}
       secret: ${TRAVEL_AGENT_AUTH_WX_SECRET:}

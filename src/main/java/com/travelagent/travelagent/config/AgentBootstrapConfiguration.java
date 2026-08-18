@@ -2,9 +2,11 @@ package com.travelagent.travelagent.config;
 
 import com.travelagent.travelagent.agent.subagent.BudgetAgent;
 import com.travelagent.travelagent.agent.subagent.KnowledgePlanningAgent;
-import com.travelagent.travelagent.agent.subagent.PoiSearchAgent;
 import com.travelagent.travelagent.agent.subagent.RoutePlanningAgent;
-import com.travelagent.travelagent.agent.tool.CurrentTimeTool;
+import javax.sql.DataSource;
+import org.bsc.langgraph4j.checkpoint.BaseCheckpointSaver;
+import org.bsc.langgraph4j.checkpoint.CreateOption;
+import org.bsc.langgraph4j.checkpoint.MysqlSaver;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.context.annotation.Bean;
@@ -16,9 +18,15 @@ public class AgentBootstrapConfiguration {
 
     @Bean
     @Primary
-    ChatClient finalizerChatClient(ChatModel chatModel, CurrentTimeTool currentTimeTool) {
-        return ChatClient.builder(chatModel)
-                .defaultTools(currentTimeTool)
+    ChatClient finalizerChatClient(ChatModel chatModel) {
+        return ChatClient.builder(chatModel).build();
+    }
+
+    @Bean
+    BaseCheckpointSaver checkpointSaver(DataSource dataSource) {
+        return MysqlSaver.builder()
+                .dataSource(dataSource)
+                .createOption(CreateOption.CREATE_IF_NOT_EXISTS)
                 .build();
     }
 
@@ -31,18 +39,16 @@ public class AgentBootstrapConfiguration {
     ChatClient routePlannerChatClient(ChatModel chatModel,
                                       KnowledgePlanningAgent knowledgeAgent,
                                       RoutePlanningAgent routeAgent,
-                                      PoiSearchAgent poiAgent,
                                       BudgetAgent budgetAgent) {
-        return specialistChatClient(chatModel, knowledgeAgent, routeAgent, poiAgent, budgetAgent);
+        return specialistChatClient(chatModel, knowledgeAgent, routeAgent, budgetAgent);
     }
 
     @Bean("normalServiceChatClient")
     ChatClient normalServiceChatClient(ChatModel chatModel,
                                        KnowledgePlanningAgent knowledgeAgent,
                                        RoutePlanningAgent routeAgent,
-                                       PoiSearchAgent poiAgent,
                                        BudgetAgent budgetAgent) {
-        return specialistChatClient(chatModel, knowledgeAgent, routeAgent, poiAgent, budgetAgent);
+        return specialistChatClient(chatModel, knowledgeAgent, routeAgent, budgetAgent);
     }
 
     @Bean("knowledgePlanningChatClient")
@@ -55,11 +61,6 @@ public class AgentBootstrapConfiguration {
         return ChatClient.builder(chatModel).build();
     }
 
-    @Bean("poiSearchChatClient")
-    ChatClient poiSearchChatClient(ChatModel chatModel) {
-        return ChatClient.builder(chatModel).build();
-    }
-
     @Bean("budgetChatClient")
     ChatClient budgetChatClient(ChatModel chatModel) {
         return ChatClient.builder(chatModel).build();
@@ -68,13 +69,10 @@ public class AgentBootstrapConfiguration {
     private ChatClient specialistChatClient(ChatModel chatModel,
                                             KnowledgePlanningAgent knowledgeAgent,
                                             RoutePlanningAgent routeAgent,
-                                            PoiSearchAgent poiAgent,
                                             BudgetAgent budgetAgent) {
-        var tools = new java.util.ArrayList<Object>();
-        tools.add(knowledgeAgent);
-        tools.add(routeAgent);
-        tools.add(poiAgent);
-        tools.add(budgetAgent);
-        return ChatClient.builder(chatModel).defaultTools(tools.toArray()).build();
+        return ChatClient.builder(chatModel)
+                .defaultTools(knowledgeAgent, routeAgent, budgetAgent)
+                .build();
     }
+
 }

@@ -25,6 +25,7 @@ public class LangGraphStudioConfiguration extends LangGraphStudioConfig {
         return Map.of("travel-agent", LangGraphStudioServer.Instance.builder()
                 .title("旅行助手 Agent 编排")
                 .graph(travelAgent.studioWorkflow())
+                .compileConfig(travelAgent.studioCompileConfig())
                 .addInputStringArg("history", true, this::toHistory)
                 .build());
     }

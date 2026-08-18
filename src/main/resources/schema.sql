@@ -18,6 +18,11 @@ CREATE TABLE IF NOT EXISTS admin_user (
     updated_at TIMESTAMP NOT NULL
 );
 
+INSERT INTO admin_user (username, password_hash, display_name, enabled, created_at, updated_at)
+SELECT 'admin', '$2a$10$IwZ9b12R6T0GiluTfHNCh.XLAh6JuQnPyqsAn9xrjjABxBDZ.Gob2', 'ops-admin', 1,
+       CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+WHERE NOT EXISTS (SELECT 1 FROM admin_user WHERE username = 'admin');
+
 CREATE TABLE IF NOT EXISTS agent_conversation_session (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     user_id BIGINT NOT NULL,

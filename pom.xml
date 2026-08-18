@@ -131,6 +131,11 @@
         </dependency>
         <dependency>
             <groupId>org.bsc.langgraph4j</groupId>
+            <artifactId>langgraph4j-mysql-saver</artifactId>
+            <version>${langgraph4j.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.bsc.langgraph4j</groupId>
             <artifactId>langgraph4j-studio-springboot</artifactId>
             <version>${langgraph4j.version}</version>
         </dependency>

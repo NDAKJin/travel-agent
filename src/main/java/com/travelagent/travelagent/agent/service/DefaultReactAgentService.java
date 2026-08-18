@@ -1,5 +1,7 @@
 package com.travelagent.travelagent.agent.service;
 
+import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONWriter;
 import com.travelagent.travelagent.agent.dto.AgentChatRequest;
 import com.travelagent.travelagent.agent.dto.AgentChatResponse;
 import com.travelagent.travelagent.agent.dto.AgentConversationMessageResponse;
@@ -68,14 +70,15 @@ public class DefaultReactAgentService {
                     new AgentSessionContext(sessionId, userHistory, createdAt, startedAt),
                     List.of(new AgentMessage("user", request.message()))).getLast();
 
-            String reply = callModel(history, new AgentObservationContext(messageId, observationPublisher));
+            AgentObservationContext observation = new AgentObservationContext(messageId, observationPublisher);
+            String reply = callModel(history, user.userId() + ":" + sessionId, observation, request.location());
             String userReply = userFacingReply(reply);
-            history.add(new AgentMessage("assistant", reply));
+            history.add(new AgentMessage("assistant", userReply));
             Instant now = Instant.now();
             List<AgentMessage> storedHistory = boundedHistory(history);
             conversationStore.append(user.userId(),
                     new AgentSessionContext(sessionId, storedHistory, createdAt, now),
-                    List.of(new AgentMessage("assistant", reply)));
+                    List.of(new AgentMessage("assistant", userReply)));
             log.info("Completed react-agent chat: sessionId={}, totalMessageCount={}, replyLength={}",
                     sessionId,
                     history.size(),
@@ -123,15 +126,31 @@ public class DefaultReactAgentService {
     }
 
     public void deleteSession(AuthenticatedUser user, String sessionId) {
-        conversationStore.delete(user.userId(), normalizeSessionId(sessionId));
+        String normalizedSessionId = normalizeSessionId(sessionId);
+        agentGraph.clear(user.userId() + ":" + normalizedSessionId);
+        conversationStore.delete(user.userId(), normalizedSessionId);
     }
 
-    private String callModel(List<AgentMessage> history, AgentObservationContext observation) {
+    private String callModel(List<AgentMessage> history, String conversationId,
+                             AgentObservationContext observation, AgentChatRequest.Location location) {
         log.debug("Calling chat model: model={}, sessionMessageCount={}, toolEnabled={}",
                 model,
                 history.size(),
                 agentProperties.getTool().isEnabled());
-        return agentGraph.run(history, observation);
+        String locationJson = locationJson(location);
+        return locationJson == null
+                ? agentGraph.run(history, conversationId, observation)
+                : agentGraph.run(history, conversationId, observation, locationJson);
+    }
+
+    private String locationJson(AgentChatRequest.Location location) {
+        if (location == null) return null;
+        java.util.Map<String, Object> value = new java.util.LinkedHashMap<>();
+        value.put("latitude", location.latitude());
+        value.put("longitude", location.longitude());
+        value.put("accuracy", location.accuracy());
+        value.put("updatedAt", Instant.now().toString());
+        return JSON.toJSONString(value, JSONWriter.Feature.WriteMapNullValue);
     }
 
     private String normalizeSessionId(String sessionId) {

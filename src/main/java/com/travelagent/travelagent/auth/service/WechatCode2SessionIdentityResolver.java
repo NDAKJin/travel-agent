@@ -47,6 +47,9 @@ public class WechatCode2SessionIdentityResolver implements WxMiniProgramIdentity
         } catch (AuthException ex) {
             throw ex;
         } catch (RuntimeException ex) {
+            log.warn("WeChat code2Session request failed: exceptionType={}, causeType={}",
+                    ex.getClass().getSimpleName(),
+                    ex.getCause() == null ? "none" : ex.getCause().getClass().getSimpleName());
             throw new AuthException("WeChat login failed: unable to resolve openId");
         }
     }

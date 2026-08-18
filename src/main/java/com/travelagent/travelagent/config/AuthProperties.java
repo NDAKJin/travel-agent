@@ -15,6 +15,16 @@ public class AuthProperties {
     private Duration accessTokenTtl = Duration.ofMinutes(15);
     private Duration refreshTokenTtl = Duration.ofDays(1);
     private WxMiniProgramProperties wx = new WxMiniProgramProperties();
+    private BootstrapAdminProperties bootstrapAdmin = new BootstrapAdminProperties();
+
+    @Getter
+    @Setter
+    public static class BootstrapAdminProperties {
+
+        private String username;
+        private String password;
+        private String displayName = "ops-admin";
+    }
 
     @Getter
     @Setter

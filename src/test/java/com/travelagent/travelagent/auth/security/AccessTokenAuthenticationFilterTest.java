@@ -94,10 +94,14 @@ class AccessTokenAuthenticationFilterTest {
     }
 
     @Test
-    void skipsNextDocAssetsAndOpenApiDocumentationPaths() {
+    void onlyFiltersProtectedApiPaths() {
         assertThat(filter.shouldNotFilter(new MockHttpServletRequest("GET", "/doc.html"))).isTrue();
         assertThat(filter.shouldNotFilter(new MockHttpServletRequest("GET", "/nextdoc/jse/index.js"))).isTrue();
         assertThat(filter.shouldNotFilter(new MockHttpServletRequest("GET", "/v3/api-docs"))).isTrue();
-        assertThat(filter.shouldNotFilter(new MockHttpServletRequest("GET", "/swagger-ui/index.html"))).isFalse();
+        assertThat(filter.shouldNotFilter(new MockHttpServletRequest("GET", ""))).isTrue();
+        assertThat(filter.shouldNotFilter(new MockHttpServletRequest("GET", "/init"))).isTrue();
+        assertThat(filter.shouldNotFilter(new MockHttpServletRequest("POST", "/stream/travel-agent"))).isTrue();
+        assertThat(filter.shouldNotFilter(new MockHttpServletRequest("GET", "/swagger-ui/index.html"))).isTrue();
+        assertThat(filter.shouldNotFilter(new MockHttpServletRequest("POST", "/api/agent/chat"))).isFalse();
     }
 }
