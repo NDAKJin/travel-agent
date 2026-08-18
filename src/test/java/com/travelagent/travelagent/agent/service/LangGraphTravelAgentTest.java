@@ -8,10 +8,15 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.travelagent.travelagent.agent.model.AgentMessage;
+import com.travelagent.travelagent.agent.observation.AgentObservationContext;
 import com.travelagent.travelagent.agent.prompt.PromptResourceLoader;
+import com.travelagent.travelagent.agent.subagent.BudgetAgent;
+import com.travelagent.travelagent.agent.subagent.KnowledgePlanningAgent;
+import com.travelagent.travelagent.agent.subagent.RoutePlanningAgent;
 import java.util.ArrayDeque;
 import java.util.List;
 import java.util.Queue;
+import org.bsc.langgraph4j.checkpoint.MemorySaver;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.AssistantMessage;
@@ -22,70 +27,148 @@ class LangGraphTravelAgentTest {
 
     @Test
     void asksForMissingRouteRequirementsWithoutPlanning() {
-        ChatClient orchestration = client("route", "questions: Which city and how many days?");
         ChatClient planner = client();
-        LangGraphTravelAgent graph = new LangGraphTravelAgent(orchestration, planner, client(),
-                client("请告诉我出发城市和旅行天数。"), new PromptResourceLoader());
+        LangGraphTravelAgent graph = new LangGraphTravelAgent(
+                client(route(), question("Where would you like to go?")), planner, client(),
+                client(finalReply("Where would you like to go?")), new PromptResourceLoader());
 
         assertThat(graph.run(List.of(new AgentMessage("user", "Plan a trip"))))
-                .isEqualTo("questions: 请告诉我出发城市和旅行天数。");
+                .isEqualTo("Where would you like to go?");
         verify(planner, org.mockito.Mockito.never()).prompt();
     }
 
     @Test
     void approvedRouteIsPlannedReviewedAndFinalized() {
         LangGraphTravelAgent graph = new LangGraphTravelAgent(
-                client("route", "confirmed: Hangzhou, two days", "approve: feasible"),
-                client("draft itinerary"), client(), client("final itinerary"), new PromptResourceLoader());
+                client(route(), confirmed(), approved()), client(plan()), client(),
+                client(finalReply("Final itinerary")), new PromptResourceLoader());
 
-        assertThat(graph.run(List.of(new AgentMessage("user", "Plan two days in Hangzhou"))))
-                .isEqualTo("final itinerary");
+        assertThat(graph.run(List.of(new AgentMessage("user", "Plan a one-day trip"))))
+                .isEqualTo("Final itinerary");
     }
 
     @Test
-    void acceptsStructuredControlAgentResponses() {
+    void invalidControlResponsesDoNotAdvanceRoutePlanning() {
+        ChatClient planner = client();
         LangGraphTravelAgent graph = new LangGraphTravelAgent(
-                client("{\"intent\":\"route\"}",
-                        "{\"status\":\"CONFIRMED\",\"question\":null,\"requirements\":{\"origin\":\"南京站\",\"destination\":\"南京南站\",\"days\":1}}",
-                        "{\"status\":\"APPROVED\",\"issues\":[]}"),
-                client("- 行程：总统府"), client(), client("final itinerary"), new PromptResourceLoader());
+                client(route(), "{\"status\":\"CONFIRMED\",\"requirements\":{}}"), planner, client(),
+                client(finalReply("Please provide the required details.")), new PromptResourceLoader());
 
-        assertThat(graph.run(List.of(new AgentMessage("user", "南京一日游"))))
-                .isEqualTo("final itinerary");
+        assertThat(graph.run(List.of(new AgentMessage("user", "Plan a trip"))))
+                .isEqualTo("Please provide the required details.");
+        verify(planner, org.mockito.Mockito.never()).prompt();
     }
 
     @Test
-    void followUpToRequirementsSkipsIntentClassification() {
+    void invalidIntentFallsBackToNormalService() {
+        ChatClient planner = client();
         LangGraphTravelAgent graph = new LangGraphTravelAgent(
-                client("confirmed: Hangzhou, two days", "approve: feasible"),
-                client("draft itinerary"), client(), client("final itinerary"), new PromptResourceLoader());
+                client("not-json"), planner, client(normalAnswer("Nearby places")),
+                client(finalReply("Nearby places")), new PromptResourceLoader());
 
+        assertThat(graph.run(List.of(new AgentMessage("user", "What is nearby?"))))
+                .isEqualTo("Nearby places");
+        verify(planner, org.mockito.Mockito.never()).prompt();
+    }
+
+    @Test
+    void requirementFollowUpResumesAtRequirementsNode() {
+        LangGraphTravelAgent graph = new LangGraphTravelAgent(
+                client(route(), question("Where do you start?"), confirmed(), approved()), client(plan()), client(),
+                client(finalReply("Where do you start?"), finalReply("Final itinerary")), new PromptResourceLoader());
+        String question = graph.run(List.of(new AgentMessage("user", "Plan a day trip")),
+                "1:session-1", AgentObservationContext.disabled());
+
+        assertThat(question).isEqualTo("Where do you start?");
         assertThat(graph.run(List.of(
-                new AgentMessage("user", "Plan a trip"),
-                new AgentMessage("assistant", "questions: Which city and how many days?"),
-                new AgentMessage("user", "Hangzhou, two days"))))
-                .isEqualTo("final itinerary");
+                new AgentMessage("user", "Plan a day trip"),
+                new AgentMessage("assistant", question),
+                new AgentMessage("user", "Start at the station")),
+                "1:session-1", AgentObservationContext.disabled())).isEqualTo("Final itinerary");
     }
 
     @Test
     void rejectedRouteReturnsToPlannerBeforeFinalizing() {
-        ChatClient planner = client("draft itinerary", "revised itinerary");
+        ChatClient planner = client(plan(), plan());
         LangGraphTravelAgent graph = new LangGraphTravelAgent(
-                client("route", "confirmed: Hangzhou, two days", "revise: add transport", "approve: feasible"),
-                planner, client(), client("final itinerary"), new PromptResourceLoader());
+                client(route(), confirmed(), revise(), approved()), planner, client(),
+                client(finalReply("Final itinerary")), new PromptResourceLoader());
 
-        assertThat(graph.run(List.of(new AgentMessage("user", "Plan two days in Hangzhou"))))
-                .isEqualTo("final itinerary");
+        assertThat(graph.run(List.of(new AgentMessage("user", "Plan a one-day trip"))))
+                .isEqualTo("Final itinerary");
         verify(planner, org.mockito.Mockito.times(2)).prompt();
+    }
+
+    @Test
+    void delegatesExpertInsideRoutePlanningSubgraph() {
+        KnowledgePlanningAgent knowledge = mock(KnowledgePlanningAgent.class);
+        when(knowledge.planKnowledge(anyString())).thenReturn("{\"facts\":[]}");
+        LangGraphTravelAgent graph = new LangGraphTravelAgent(
+                client(route(), confirmed(), approved()),
+                client(delegate("KNOWLEDGE"), plan()), client(), client(finalReply("Final itinerary")),
+                new PromptResourceLoader(), new MemorySaver(), knowledge,
+                mock(RoutePlanningAgent.class), mock(BudgetAgent.class));
+
+        assertThat(graph.run(List.of(new AgentMessage("user", "Plan a one-day trip"))))
+                .isEqualTo("Final itinerary");
+        verify(knowledge).planKnowledge(anyString());
     }
 
     @Test
     void normalRequestUsesNormalServiceThenFinalizer() {
         LangGraphTravelAgent graph = new LangGraphTravelAgent(
-                client("normal"), client(), client("service answer"), client("final answer"), new PromptResourceLoader());
+                client(normal()), client(), client(normalAnswer("Service answer")),
+                client(finalReply("Final answer")), new PromptResourceLoader());
 
         assertThat(graph.run(List.of(new AgentMessage("user", "What is nearby?"))))
-                .isEqualTo("final answer");
+                .isEqualTo("Final answer");
+    }
+
+    private static String route() {
+        return "{\"intent\":\"route\"}";
+    }
+
+    private static String normal() {
+        return "{\"intent\":\"normal\"}";
+    }
+
+    private static String question(String question) {
+        return "{\"status\":\"QUESTION\",\"question\":\"" + question
+                + "\",\"requirements\":{\"origin\":null,\"destination\":null,\"date\":null,"
+                + "\"days\":null,\"people\":null,\"budget\":null,\"interests\":null,\"constraints\":null}}";
+    }
+
+    private static String confirmed() {
+        return "{\"status\":\"CONFIRMED\",\"question\":null,\"requirements\":{"
+                + "\"origin\":\"Nanjing Station\",\"destination\":\"Nanjing South Station\","
+                + "\"date\":null,\"days\":\"1\",\"people\":\"2\",\"budget\":\"1000\","
+                + "\"interests\":null,\"constraints\":null}}";
+    }
+
+    private static String plan() {
+        return "{\"itinerary\":[],\"budget\":{\"knownItems\":[],\"unknownItems\":[],\"summary\":\"\"},"
+                + "\"notes\":[],\"pending\":[]}";
+    }
+
+    private static String delegate(String expert) {
+        return "{\"action\":\"DELEGATE\",\"expert\":\"" + expert
+                + "\",\"task\":{\"requirements\":{}}}";
+    }
+
+    private static String approved() {
+        return "{\"status\":\"APPROVED\",\"issues\":[]}";
+    }
+
+    private static String revise() {
+        return "{\"status\":\"REVISE\",\"issues\":[\"Add transport details\"]}";
+    }
+
+    private static String normalAnswer(String answer) {
+        return "{\"answer\":\"" + answer + "\"}";
+    }
+
+    private static String finalReply(String reply) {
+        return "{\"reply\":\"" + reply + "\"}";
     }
 
     private ChatClient client(String... responses) {

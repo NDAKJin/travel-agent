@@ -16,7 +16,7 @@ class PromptResourceLoaderTest {
     void promptsUseStructuredChineseContracts() {
         PromptResourceLoader loader = new PromptResourceLoader();
         List.of("budget-agent", "finalize", "intent-supervisor", "knowledge-agent", "normal-service",
-                        "poi-agent", "route-agent", "route-planner", "route-requirements", "route-reviewer")
+                        "route-agent", "route-planner", "route-requirements", "route-reviewer")
                 .forEach(name -> assertThat(loader.load(name)).contains("角色：", "输入：", "输出"));
     }
 }

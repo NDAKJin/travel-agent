@@ -1,18 +1,11 @@
 package com.travelagent.travelagent.config;
 
-import com.travelagent.travelagent.agent.subagent.BudgetAgent;
-import com.travelagent.travelagent.agent.subagent.KnowledgePlanningAgent;
-import com.travelagent.travelagent.agent.subagent.PoiSearchAgent;
-import com.travelagent.travelagent.agent.subagent.RoutePlanningAgent;
-import com.travelagent.travelagent.agent.tool.CurrentTimeTool;
-import com.travelagent.travelagent.agent.tool.CurrentUserLocationTool;
-import com.travelagent.travelagent.agent.tool.NearbySearchTool;
-import com.travelagent.travelagent.agent.tool.TravelPlanningKnowledgeTool;
-import com.travelagent.travelagent.agent.tool.LocationPermissionTool;
+import javax.sql.DataSource;
+import org.bsc.langgraph4j.checkpoint.BaseCheckpointSaver;
+import org.bsc.langgraph4j.checkpoint.CreateOption;
+import org.bsc.langgraph4j.checkpoint.MysqlSaver;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatModel;
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
@@ -22,12 +15,15 @@ public class AgentBootstrapConfiguration {
 
     @Bean
     @Primary
-    ChatClient finalizerChatClient(ChatModel chatModel,
-                                   CurrentTimeTool currentTimeTool,
-                                   CurrentUserLocationTool currentUserLocationTool,
-                                   LocationPermissionTool locationPermissionTool) {
-        return ChatClient.builder(chatModel)
-                .defaultTools(currentTimeTool, currentUserLocationTool, locationPermissionTool)
+    ChatClient finalizerChatClient(ChatModel chatModel) {
+        return ChatClient.builder(chatModel).build();
+    }
+
+    @Bean
+    BaseCheckpointSaver checkpointSaver(DataSource dataSource) {
+        return MysqlSaver.builder()
+                .dataSource(dataSource)
+                .createOption(CreateOption.CREATE_IF_NOT_EXISTS)
                 .build();
     }
 
@@ -37,41 +33,23 @@ public class AgentBootstrapConfiguration {
     }
 
     @Bean("routePlannerChatClient")
-    ChatClient routePlannerChatClient(ChatModel chatModel,
-                                      ObjectProvider<KnowledgePlanningAgent> knowledgeAgent,
-                                      ObjectProvider<RoutePlanningAgent> routeAgent,
-                                      PoiSearchAgent poiAgent,
-                                      BudgetAgent budgetAgent) {
-        return specialistChatClient(chatModel, knowledgeAgent, routeAgent, poiAgent, budgetAgent);
+    ChatClient routePlannerChatClient(ChatModel chatModel) {
+        return ChatClient.builder(chatModel).build();
     }
 
     @Bean("normalServiceChatClient")
-    ChatClient normalServiceChatClient(ChatModel chatModel,
-                                       ObjectProvider<KnowledgePlanningAgent> knowledgeAgent,
-                                       ObjectProvider<RoutePlanningAgent> routeAgent,
-                                       PoiSearchAgent poiAgent,
-                                       BudgetAgent budgetAgent) {
-        return specialistChatClient(chatModel, knowledgeAgent, routeAgent, poiAgent, budgetAgent);
+    ChatClient normalServiceChatClient(ChatModel chatModel) {
+        return ChatClient.builder(chatModel).build();
     }
 
     @Bean("knowledgePlanningChatClient")
-    @ConditionalOnProperty(prefix = "travel-agent.neo4j", name = "enabled", havingValue = "true")
-    ChatClient knowledgePlanningChatClient(ChatModel chatModel, TravelPlanningKnowledgeTool travelPlanningKnowledgeTool) {
-        return ChatClient.builder(chatModel).defaultTools(travelPlanningKnowledgeTool).build();
+    ChatClient knowledgePlanningChatClient(ChatModel chatModel) {
+        return ChatClient.builder(chatModel).build();
     }
 
     @Bean("routePlanningChatClient")
-    @ConditionalOnProperty(prefix = "travel-agent.neo4j", name = "enabled", havingValue = "true")
-    ChatClient routePlanningChatClient(ChatModel chatModel, TravelPlanningKnowledgeTool travelPlanningKnowledgeTool) {
-        return ChatClient.builder(chatModel).defaultTools(travelPlanningKnowledgeTool).build();
-    }
-
-    @Bean("poiSearchChatClient")
-    ChatClient poiSearchChatClient(ChatModel chatModel, CurrentUserLocationTool currentUserLocationTool,
-                                   LocationPermissionTool locationPermissionTool, NearbySearchTool nearbySearchTool) {
-        return ChatClient.builder(chatModel)
-                .defaultTools(currentUserLocationTool, locationPermissionTool, nearbySearchTool)
-                .build();
+    ChatClient routePlanningChatClient(ChatModel chatModel) {
+        return ChatClient.builder(chatModel).build();
     }
 
     @Bean("budgetChatClient")
@@ -79,16 +57,4 @@ public class AgentBootstrapConfiguration {
         return ChatClient.builder(chatModel).build();
     }
 
-    private ChatClient specialistChatClient(ChatModel chatModel,
-                                            ObjectProvider<KnowledgePlanningAgent> knowledgeAgent,
-                                            ObjectProvider<RoutePlanningAgent> routeAgent,
-                                            PoiSearchAgent poiAgent,
-                                            BudgetAgent budgetAgent) {
-        var tools = new java.util.ArrayList<Object>();
-        knowledgeAgent.ifAvailable(tools::add);
-        routeAgent.ifAvailable(tools::add);
-        tools.add(poiAgent);
-        tools.add(budgetAgent);
-        return ChatClient.builder(chatModel).defaultTools(tools.toArray()).build();
-    }
 }

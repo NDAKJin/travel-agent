@@ -4,7 +4,7 @@
 
 ### 让每一次出发，都有一位懂目的地的 AI 向导
 
-面向旅行场景的智能助手与运营管理平台：在微信小程序中对话、规划行程、发现附近地点；在管理台维护景区和服务点。
+面向旅行场景的智能助手与运营管理平台：在微信小程序中对话、规划行程；在管理台查看会话与 Agent 调用记录。
 
 [![Java](https://img.shields.io/badge/Java-21-ED8B00?logo=openjdk&logoColor=white)](https://openjdk.org/)
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.1-6DB33F?logo=springboot&logoColor=white)](https://spring.io/projects/spring-boot)
@@ -14,15 +14,13 @@
 [![MySQL](https://img.shields.io/badge/MySQL-4479A1?logo=mysql&logoColor=white)](https://www.mysql.com/)
 [![Redis](https://img.shields.io/badge/Redis-DC382D?logo=redis&logoColor=white)](https://redis.io/)
 [![Kafka](https://img.shields.io/badge/Apache%20Kafka-231F20?logo=apachekafka&logoColor=white)](https://kafka.apache.org/)
-[![Elasticsearch](https://img.shields.io/badge/Elasticsearch-005571?logo=elasticsearch&logoColor=white)](https://www.elastic.co/elasticsearch)
-[![Neo4j](https://img.shields.io/badge/Neo4j-008CC1?logo=neo4j&logoColor=white)](https://neo4j.com/)
 [![Vite](https://img.shields.io/badge/Vite-7-646CFF?logo=vite&logoColor=white)](https://vite.dev/)
 [![WeChat](https://img.shields.io/badge/WeChat%20Mini%20Program-07C160?logo=wechat&logoColor=white)](https://developers.weixin.qq.com/miniprogram/dev/framework/)
 [![License](https://img.shields.io/badge/license-MIT-2ea44f)](LICENSE)
 
-<a href="https://openjdk.org/"><img src="https://skillicons.dev/icons?i=java,spring,react,ts,mysql,redis,elasticsearch" alt="行迹 AI 旅行助手技术栈" /></a>
+<a href="https://openjdk.org/"><img src="https://skillicons.dev/icons?i=java,spring,react,ts,mysql,redis" alt="行迹 AI 旅行助手技术栈" /></a>
 
-**Java 21** · **Spring Boot 4** · **Spring AI Alibaba** · **LangGraph4j** · **React 18** · **微信小程序** · **Elasticsearch**
+**Java 21** · **Spring Boot 4** · **Spring AI Alibaba** · **LangGraph4j** · **React 18** · **微信小程序**
 
 [快速开始](#快速开始) · [系统架构](#系统架构) · [API 文档](#api-文档) · [项目结构](#项目结构)
 
@@ -30,19 +28,17 @@
 
 ## 项目简介
 
-行迹 AI 旅行助手将旅行问答、目的地知识和运营管理放进同一套系统：
+行迹 AI 旅行助手将旅行问答、路线规划和运营管理放进同一套系统：
 
 | 使用者 | 能做什么 |
 | --- | --- |
-| 旅行者 | 微信授权登录、AI 旅行问答、会话历史、附近景点与服务推荐 |
-| 运营人员 | 管理微信用户、会话、景区、服务点、地图地点与 Markdown 知识库 |
+| 旅行者 | 微信授权登录、AI 旅行问答、个性化行程规划、会话历史 |
+| 运营人员 | 管理微信用户、查看会话与 Agent 调用观测日志 |
 
 ## 核心能力
 
-- **多智能体旅行对话**：LangGraph4j 编排意图识别、需求收集、路线规划、审核与最终答复；规划师可按需调用旅行知识、路线、POI 与预算专家。
-- **附近地点推荐**：结合用户位置与高德地图服务搜索周边景点和文旅服务。
-- **可选图谱能力**：Neo4j 启用后提供景点知识检索、城市归属与景点间最短路径；关闭时不影响基础对话和 POI 搜索。
-- **运营管理台**：React + TypeScript 管理会话、景区、服务点和知识内容。
+- **多智能体旅行对话**：LangGraph4j 编排意图识别、需求收集、路线规划、审核与最终答复；规划师可按需调用旅行知识、路线与预算专家。
+- **运营管理台**：React + TypeScript 管理微信用户、会话及 Agent 可观测日志。
 - **微信小程序入口**：原生 WXML / WXSS / JavaScript，完成登录、聊天和历史会话。
 - **安全认证**：微信登录与管理端登录统一使用 JWT，刷新令牌存储在 Redis。
 - **Agent 可观测**：节点与专家调用的输入输出、Token、耗时和错误经 Kafka 异步写入 MySQL，仅在管理端会话详情展示。
@@ -51,91 +47,94 @@
 
 ```mermaid
 flowchart LR
-    mini["微信小程序"];
-    admin["React 管理台"];
-    api["行迹 API（Spring Boot）"];
-    workflow["LangGraph4j 多智能体编排"];
-    mysql[("MySQL")];
-    redis[("Redis")];
-    kafka[("Kafka")];
-    es[("Elasticsearch 地理索引")];
-    neo4j[("Neo4j 图关系")];
-    amap["高德地图 API"];
-    model["OpenAI 兼容模型"];
+    mini["微信小程序"]
+    admin["React 管理台"]
+    api["行迹 API（Spring Boot）"]
+    workflow["LangGraph4j 多智能体编排"]
+    mysql[("MySQL")]
+    redis[("Redis")]
+    kafka[("Kafka")]
+    model["DashScope 模型服务"]
 
-    mini --> api;
-    admin --> api;
-    api --> workflow;
-    workflow --> model;
-    workflow --> kafka;
-    kafka --> mysql;
-    api --> mysql;
-    api --> redis;
-    api --> es;
-    api --> neo4j;
-    api --> amap;
+    mini --> api
+    admin --> api
+    api --> workflow
+    workflow --> model
+    workflow --> kafka
+    kafka --> mysql
+    api --> mysql
+    api --> redis
 ```
 
 ## 多智能体协作
 
-主流程由 **LangGraph4j** 管理，专家能力仍通过 **Spring AI Tool Calling** 接入。总控只做意图判断；路线规划师和普通服务者按需调用专家，专家结果以 Markdown 列表返回上层模型。
+主流程由 **LangGraph4j** 管理。路线规划子图包含规划师、三位专家和审核师；规划师按需委派专家，专家结果以结构化 JSON 返回规划师。普通服务者直接回答非规划问题，不进入路线规划子图。
 
 ```mermaid
 flowchart TD
-    message(["用户消息"]);
-    control["总控：识别意图"];
-    requirements["需求询问师"];
-    planner["路线规划师"];
-    reviewer["路线审核师"];
-    normal["普通服务者"];
-    finalize["最终答复编辑"];
-    question["返回追问"];
-    response(["最终回复"]);
+    message(["用户消息和当前位置"])
+    supervisor["总控：识别意图"]
+    requirements["需求询问师"]
+    subgraph routePlanning["旅游路线规划子图"]
+        direction TB
+        planner["路线规划师"]
+        knowledge["旅行知识专家"]
+        routeExpert["路线规划专家"]
+        budget["预算专家"]
+        reviewer["路线审核师"]
+        planner -.->|按需委派| knowledge
+        planner -.->|按需委派| routeExpert
+        planner -.->|按需委派| budget
+        knowledge --> planner
+        routeExpert --> planner
+        budget --> planner
+        planner --> reviewer
+        reviewer -->|需要修改且次数不超过 2 次| planner
+    end
+    normal["普通服务者"]
+    finalize["最终答复编辑"]
+    wait["awaitUserInput：等待用户输入"]
+    response(["最终回复"])
 
-    message --> control;
-    control -->|路线规划| requirements;
-    control -->|普通服务| normal;
-    requirements -->|已确认| planner;
-    requirements -->|需补充| question;
-    planner --> reviewer;
-    reviewer -->|通过| finalize;
-    reviewer -->|需修改且审核次数不超过 2| planner;
-    reviewer -->|已达上限| finalize;
-    normal --> finalize;
-    finalize --> response;
+    message -->|新会话| supervisor
+    message -->|恢复 Checkpoint| requirements
+    supervisor -->|路线规划| requirements
+    supervisor -->|普通服务| normal
+    requirements -->|已确认| planner
+    requirements -->|待补充| finalize
+    reviewer -->|审核通过| finalize
+    reviewer -->|达到修改上限| finalize
+    normal --> finalize
+    finalize -->|需求未确认| wait
+    finalize -->|结果已完成| response
+    wait -->|下一轮消息和新位置| message
 ```
 
-路线需求的必填项为起点、终点、出行日期或天数、人数与预算；兴趣和约束为选填项，用户未提供时不阻塞规划。
+当前位置由 API 在进入 LangGraph 前注入共享 State，不作为 LangGraph 节点执行。
+
+路线需求必填项为起点与终点；兴趣和约束为选填项，用户未提供时不阻塞规划。
 
 | 角色 | 工具与职责 | 启用条件 |
 | --- | --- | --- |
 | 总控 | 判断路线规划或普通服务 | 始终启用 |
-| 路线需求询问师 | 收集并确认路线规划的必填需求 | 路线规划 |
-| 路线规划师 | 制定行程，按需调用四位专家 | 路线规划 |
+| 路线需求询问师 | 收集并确认路线规划需求 | 路线规划 |
+| 路线规划师 | 制定行程，按需委派三位专家 | 路线规划 |
 | 路线审核师 | 审核行程；最多要求修改两次 | 路线规划 |
-| 普通服务者 | 直接处理非路线规划问题，按需调用四位专家 | 普通服务 |
+| 普通服务者 | 直接处理非路线规划问题 | 普通服务 |
 | 最终答复编辑 | 将已完成结果整理为面向用户的自然回复 | 始终启用 |
-| 旅行知识规划专员 | 查询 Neo4j 景点、城市和兴趣知识 | `TRAVEL_AGENT_NEO4J_ENABLED=true` |
-| 路线规划专员 | 查询 `CONNECTED_TO` 与景点最短路径 | `TRAVEL_AGENT_NEO4J_ENABLED=true` |
-| POI 搜索专员 | 查询附近景点、餐厅、酒店和便民服务 | 始终启用 |
-| 预算专员 | 汇总已知门票、住宿、餐饮与交通费用；缺失价格标记待确认 | 始终启用 |
+| 旅行知识规划专员 | 提供旅行知识与目的地建议 | 按需调用 |
+| 路线规划专员 | 提供路线与行程安排建议 | 按需调用 |
+| 预算专员 | 汇总已知门票、住宿、餐饮与交通费用；缺失价格标记待确认 | 按需调用 |
 
-四位专家统一返回紧凑的 Markdown 列表，供路线规划师或普通服务者直接综合。例如路线专家：
-
-```text
-结论：已找到路线
-- 路线：起点 ID → 途经景点 → 终点 ID｜累计距离｜跳数
-```
-
-提示词位于 `src/main/resources/prompt/`，统一使用“角色、输入、输出、约束”结构。
+三位专家统一返回结构化 JSON，均为路线规划子图内的 LangGraph 节点；规划师按需路由，未被选中时不会执行。提示词位于 `src/main/resources/prompt/`，统一使用“角色、输入、输出、约束”结构。
 
 ## 技术栈
 
 | 层次 | 技术 |
 | --- | --- |
 | Backend | Java 21、Spring Boot 4、Spring AI Alibaba、LangGraph4j、Spring Security、MyBatis |
-| Data | MySQL、Redis、Kafka、Elasticsearch、Neo4j |
-| Admin console | React 18、TypeScript、Vite、高德地图 JS API |
+| Data | MySQL、Redis、Kafka |
+| Admin console | React 18、TypeScript、Vite |
 | Mini program | 原生 JavaScript、WXML、WXSS |
 | API docs | Springdoc OpenAPI、NextDoc4j |
 
@@ -145,11 +144,10 @@ flowchart TD
 
 - JDK 21+
 - Node.js 18+
-- MySQL、Redis，以及可访问的 Elasticsearch
-- 可选：Neo4j（启用旅行知识与路线专员时需要）
+- MySQL、Redis
 - 可选：Kafka（启用 Agent 可观测时需要）
 - 阿里云百炼 DashScope API Key
-- 使用微信登录时，需要小程序 AppID / AppSecret；使用地图功能时，需要高德 Web 服务 Key
+- 使用微信登录时，需要小程序 AppID / AppSecret
 
 ### 1. 配置并启动后端
 
@@ -159,12 +157,11 @@ flowchart TD
 Copy-Item src/main/resources/application.example.yml src/main/resources/application.yml
 ```
 
-在 `application.yml` 中填写数据库、Redis、模型服务、微信、高德地图和 Elasticsearch 配置。Neo4j 默认关闭；需要图谱能力时设置：
+在 `application.yml` 中填写数据库、Redis、模型服务、微信和 JWT 配置。启用 Agent 可观测时，还需要设置 Kafka：
 
-```yaml
-travel-agent:
-  neo4j:
-    enabled: true
+```env
+SPRING_KAFKA_BOOTSTRAP_SERVERS=<Kafka 地址>:9092
+TRAVEL_AGENT_OBSERVABILITY_ENABLED=true
 ```
 
 启动 API：
@@ -200,6 +197,22 @@ npm run dev
 
 真机调试需要 HTTPS 地址，并在微信公众平台配置合法域名。
 
+## LangGraph4j Studio
+
+Studio 用于本地可视化、运行和调试多 Agent 工作流。设置后启动应用：
+
+```env
+TRAVEL_AGENT_STUDIO_ENABLED=true
+```
+
+访问 `http://localhost:8080/?instance=travel-agent`。输入框填写对话历史 JSON，例如：
+
+```json
+[{"role":"user","content":"帮我规划南京一日游"}]
+```
+
+Studio 会触发真实模型调用，仅建议本地开启。
+
 ## API 文档
 
 后端启动后访问：
@@ -212,8 +225,8 @@ npm run dev
 | 分组 | 示例 |
 | --- | --- |
 | 认证 | `POST /api/auth/wx/login`、`POST /api/auth/admin/login`、`POST /api/auth/refresh` |
-| AI 助手 | `POST /api/agent/chat`、`GET /api/agent/sessions`、`POST /api/agent/nearby/next` |
-| 运营管理 | `/api/admin/scenic-spots`、`/api/admin/service-points`、`/api/admin/sessions` |
+| AI 助手 | `POST /api/agent/chat`、`POST /api/agent/sessions`、`GET /api/agent/sessions` |
+| 运营管理 | `/api/admin/wx-users`、`/api/admin/sessions` |
 
 ## 项目结构
 
@@ -229,26 +242,19 @@ travel-agent/
 
 ## Docker 启动与部署
 
-Docker Compose 会启动管理台、API、MySQL 和 Redis。Elasticsearch、Neo4j 与 Kafka 可部署在独立服务器，通过 `.env` 中的公网地址连接。
+Docker Compose 会启动管理台、API、MySQL 和 Redis。Kafka 可部署在独立服务器，通过 `.env` 中的地址连接。
 
 ```bash
 git clone <仓库地址> travel-agent
 cd travel-agent
 cp .env.example .env
-# 编辑 .env，填入数据库密码、模型 API Key、JWT 密钥、微信/高德与 Elasticsearch 配置
-# 图谱默认关闭；需要启用时设置 TRAVEL_AGENT_NEO4J_ENABLED=true
+# 编辑 .env，填入数据库密码、模型 API Key、JWT 密钥和微信配置
 docker compose up -d --build
 ```
 
 ```env
-TRAVEL_AGENT_AGENT_ELASTICSEARCH_HOST=<ES 公网地址>
-TRAVEL_AGENT_NEO4J_ENABLED=false
-# 启用 Agent 可观测时需要：
 SPRING_KAFKA_BOOTSTRAP_SERVERS=<Kafka 地址>:9092
-TRAVEL_AGENT_OBSERVABILITY_ENABLED=false
-# 仅启用图谱时需要：
-SPRING_NEO4J_URI=bolt://<Neo4j 公网地址>:7687
-NEO4J_PASSWORD=<Neo4j 密码>
+TRAVEL_AGENT_OBSERVABILITY_ENABLED=true
 ```
 
 查看状态和日志：
@@ -286,7 +292,7 @@ npm run build
 
 ## Agent 可观测
 
-启用 `TRAVEL_AGENT_OBSERVABILITY_ENABLED=true` 后，LangGraph4j 节点与四个专家的调用日志会由 Hook 直接发送至 Kafka `agent-observation`，消费者异步写入 `agent_observation_log`。记录通过 `message_id` 关联用户消息，包含 LLM 输入输出、模型、Token、耗时和错误信息；仅在管理端会话详情中展示，不会返回给用户端。Kafka 未部署或开关关闭时，不会记录观测日志。
+启用 `TRAVEL_AGENT_OBSERVABILITY_ENABLED=true` 后，LangGraph4j 节点与三个专家的调用日志会由 Hook 直接发送至 Kafka `agent-observation`，消费者异步写入 `agent_observation_log`。记录通过 `message_id` 关联用户消息，包含 LLM 输入输出、模型、Token、耗时和错误信息；仅在管理端会话详情中展示，不会返回给用户端。Kafka 未部署或开关关闭时，不会记录观测日志。
 
 ```env
 SPRING_KAFKA_BOOTSTRAP_SERVERS=localhost:9092

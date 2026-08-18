@@ -10,7 +10,6 @@ public class AgentProperties {
 
     private final ProfileProperties profile = new ProfileProperties();
     private final ToolProperties tool = new ToolProperties();
-    private final ElasticsearchProperties elasticsearch = new ElasticsearchProperties();
 
     @Setter
     private int maxMessageChars = 4000;
@@ -36,14 +35,4 @@ public class AgentProperties {
 
     }
 
-    @Getter
-    @Setter
-    public static class ElasticsearchProperties {
-
-        private String host = "localhost";
-        private int port = 9200;
-        private String scheme = "http";
-        private String geoIndexName = "travel-agent-geo";
-
-    }
 }

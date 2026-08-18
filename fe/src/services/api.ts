@@ -4,8 +4,6 @@ import type {
   AgentSessionDetail,
   AdminConversationDetail,
   AdminConversationSummary,
-  AdminScenicSpot,
-  AdminServicePoint,
   AdminWxUser,
   AuthSession,
   PageResponse
@@ -36,14 +34,6 @@ type WxLoginPayload = {
   openId: string;
   nickname?: string;
   avatarUrl?: string;
-};
-
-export type AdminMapPlace = {
-  id: string;
-  name: string;
-  address: string;
-  longitude: number;
-  latitude: number;
 };
 
 export class ApiError extends Error {
@@ -178,60 +168,5 @@ export const api = {
     return request<AdminConversationDetail>(`/api/admin/sessions/${conversationId}`, {
       accessToken
     });
-  },
-  listScenicSpots(accessToken: string) {
-    return request<AdminScenicSpot[]>("/api/admin/scenic-spots", { accessToken });
-  },
-  getScenicSpot(accessToken: string, id: string) {
-    return request<AdminScenicSpot>(`/api/admin/scenic-spots/${id}`, { accessToken });
-  },
-  searchMapPlaces(accessToken: string, keyword: string) {
-    const query = new URLSearchParams({ keyword });
-    return request<AdminMapPlace[]>(`/api/admin/map/places?${query.toString()}`, { accessToken });
-  },
-  createScenicSpot(accessToken: string, payload: { name: string; city: string; description: string; longitude: number; latitude: number }) {
-    return request<AdminScenicSpot>("/api/admin/scenic-spots", {
-      method: "POST",
-      body: payload,
-      accessToken
-    });
-  },
-  updateScenicSpot(accessToken: string, id: string, payload: { name: string; city: string; description: string; longitude: number; latitude: number }) {
-    return request<AdminScenicSpot>(`/api/admin/scenic-spots/${id}`, {
-      method: "PUT",
-      body: payload,
-      accessToken
-    });
-  },
-  deleteScenicSpot(accessToken: string, id: string) {
-    return request<void>(`/api/admin/scenic-spots/${id}`, {
-      method: "DELETE",
-      accessToken
-    });
-  },
-  listServicePoints(accessToken: string, params: { category?: string; page: number; size: number }) {
-    const query = new URLSearchParams();
-    if (params.category) query.set("category", params.category);
-    query.set("page", String(params.page));
-    query.set("size", String(params.size));
-    return request<PageResponse<AdminServicePoint>>(`/api/admin/service-points?${query.toString()}`, { accessToken });
-  },
-  getServicePoint(accessToken: string, id: string) {
-    return request<AdminServicePoint>(`/api/admin/service-points/${id}`, { accessToken });
-  },
-  createServicePoint(accessToken: string, payload: Omit<AdminServicePoint, "id" | "updatedAt">) {
-    return request<AdminServicePoint>("/api/admin/service-points", { method: "POST", body: payload, accessToken });
-  },
-  updateServicePoint(accessToken: string, id: string, payload: Omit<AdminServicePoint, "id" | "updatedAt">) {
-    return request<AdminServicePoint>(`/api/admin/service-points/${id}`, { method: "PUT", body: payload, accessToken });
-  },
-  deleteServicePoint(accessToken: string, id: string) {
-    return request<void>(`/api/admin/service-points/${id}`, { method: "DELETE", accessToken });
-  },
-  listServicePointCategories(accessToken: string) {
-    return request<string[]>("/api/admin/service-point-categories", { accessToken });
-  },
-  createServicePointCategory(accessToken: string, name: string) {
-    return request<string>("/api/admin/service-point-categories", { method: "POST", body: name, accessToken });
   }
 };

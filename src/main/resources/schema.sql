@@ -18,6 +18,11 @@ CREATE TABLE IF NOT EXISTS admin_user (
     updated_at TIMESTAMP NOT NULL
 );
 
+INSERT INTO admin_user (username, password_hash, display_name, enabled, created_at, updated_at)
+SELECT 'admin', '$2a$10$IwZ9b12R6T0GiluTfHNCh.XLAh6JuQnPyqsAn9xrjjABxBDZ.Gob2', 'ops-admin', 1,
+       CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+WHERE NOT EXISTS (SELECT 1 FROM admin_user WHERE username = 'admin');
+
 CREATE TABLE IF NOT EXISTS agent_conversation_session (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     user_id BIGINT NOT NULL,
@@ -67,12 +72,3 @@ CREATE TABLE IF NOT EXISTS agent_observation_log (
         REFERENCES agent_conversation_message (id) ON DELETE CASCADE,
     INDEX idx_agent_observation_message_sequence (message_id, sequence_no)
 );
-
-CREATE TABLE IF NOT EXISTS service_point_category (
-    id BIGINT PRIMARY KEY AUTO_INCREMENT,
-    name VARCHAR(64) NOT NULL UNIQUE,
-    created_at TIMESTAMP NOT NULL
-);
-
-INSERT IGNORE INTO service_point_category (name, created_at) VALUES
-    ('停车场', CURRENT_TIMESTAMP), ('文旅服务点', CURRENT_TIMESTAMP), ('卫生间', CURRENT_TIMESTAMP);

@@ -11,10 +11,6 @@ spring:
         options:
           model: ${SPRING_AI_DASHSCOPE_CHAT_OPTIONS_MODEL:qwen3.8-max}
           multi-model: ${SPRING_AI_DASHSCOPE_CHAT_OPTIONS_MULTI_MODEL:true}
-      embedding:
-        options:
-          model: ${SPRING_AI_DASHSCOPE_EMBEDDING_OPTIONS_MODEL:text-embedding-v4}
-          dimensions: ${SPRING_AI_DASHSCOPE_EMBEDDING_OPTIONS_DIMENSIONS:1024}
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/travelagent?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC}
     driver-class-name: ${SPRING_DATASOURCE_DRIVER_CLASS_NAME:com.mysql.cj.jdbc.Driver}
@@ -34,11 +30,6 @@ spring:
     redis:
       host: ${SPRING_DATA_REDIS_HOST:localhost}
       port: ${SPRING_DATA_REDIS_PORT:6379}
-  neo4j:
-    uri: ${SPRING_NEO4J_URI:bolt://localhost:7687}
-    authentication:
-      username: ${SPRING_NEO4J_AUTHENTICATION_USERNAME:neo4j}
-      password: ${SPRING_NEO4J_AUTHENTICATION_PASSWORD:}
   kafka:
     bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     producer:
@@ -62,8 +53,8 @@ nextdoc4j:
     password: 123456
 
 travel-agent:
-  neo4j:
-    enabled: ${TRAVEL_AGENT_NEO4J_ENABLED:true}
+  studio:
+    enabled: ${TRAVEL_AGENT_STUDIO_ENABLED:false}
   amap:
     web-service-key: ${TRAVEL_AGENT_AMAP_WEB_SERVICE_KEY:}
     city: ${AMAP_SEARCH_CITY:全国}
@@ -73,6 +64,10 @@ travel-agent:
     jwt-secret: ${TRAVEL_AGENT_AUTH_JWT_SECRET:}
     access-token-ttl: ${TRAVEL_AGENT_AUTH_ACCESS_TOKEN_TTL:PT15M}
     refresh-token-ttl: ${TRAVEL_AGENT_AUTH_REFRESH_TOKEN_TTL:P1D}
+    bootstrap-admin:
+      username: ${TRAVEL_AGENT_AUTH_BOOTSTRAP_ADMIN_USERNAME:}
+      password: ${TRAVEL_AGENT_AUTH_BOOTSTRAP_ADMIN_PASSWORD:}
+      display-name: ${TRAVEL_AGENT_AUTH_BOOTSTRAP_ADMIN_DISPLAY_NAME:ops-admin}
     wx:
       app-id: ${TRAVEL_AGENT_AUTH_WX_APP_ID:}
       secret: ${TRAVEL_AGENT_AUTH_WX_SECRET:}
@@ -86,11 +81,6 @@ travel-agent:
       default-locale: ${TRAVEL_AGENT_AGENT_PROFILE_DEFAULT_LOCALE:zh-CN}
     tool:
       enabled: ${TRAVEL_AGENT_AGENT_TOOL_ENABLED:true}
-    elasticsearch:
-      host: ${TRAVEL_AGENT_AGENT_ELASTICSEARCH_HOST:localhost}
-      port: ${TRAVEL_AGENT_AGENT_ELASTICSEARCH_PORT:9200}
-      scheme: ${TRAVEL_AGENT_AGENT_ELASTICSEARCH_SCHEME:http}
-      geo-index-name: ${TRAVEL_AGENT_AGENT_ELASTICSEARCH_GEO_INDEX_NAME:travel-agent-geo}
   observability:
     enabled: ${TRAVEL_AGENT_OBSERVABILITY_ENABLED:true}
     kafka-topic: ${TRAVEL_AGENT_OBSERVABILITY_KAFKA_TOPIC:agent-observation}

@@ -1,9 +1,7 @@
 package com.travelagent.travelagent.config;
 
 import com.travelagent.travelagent.auth.model.AdminUser;
-import com.travelagent.travelagent.auth.model.WxUser;
 import com.travelagent.travelagent.auth.mapper.AdminUserMapper;
-import com.travelagent.travelagent.auth.mapper.WxUserMapper;
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
 import java.time.Clock;
 import java.time.Instant;
@@ -20,6 +18,7 @@ import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.util.StringUtils;
 
 @Configuration
 public class AuthBootstrapConfiguration {
@@ -54,31 +53,25 @@ public class AuthBootstrapConfiguration {
     }
 
     @Bean
-    public CommandLineRunner seedUsers(WxUserMapper wxUserMapper,
+    public CommandLineRunner bootstrapAdmin(AuthProperties authProperties,
                                        AdminUserMapper adminUserMapper,
                                        PasswordEncoder passwordEncoder,
                                        Clock clock) {
         return args -> {
+            AuthProperties.BootstrapAdminProperties bootstrapAdmin = authProperties.getBootstrapAdmin();
+            if (!StringUtils.hasText(bootstrapAdmin.getUsername()) || !StringUtils.hasText(bootstrapAdmin.getPassword())
+                    || adminUserMapper.findByUsername(bootstrapAdmin.getUsername()) != null) {
+                return;
+            }
             Instant now = clock.instant();
-            if (wxUserMapper.count() == 0) {
-                WxUser user = new WxUser();
-                user.setOpenId("wx-open-id-demo");
-                user.setNickname("wx-user");
-                user.setEnabled(true);
-                user.setCreatedAt(now);
-                user.setUpdatedAt(now);
-                wxUserMapper.insert(user);
-            }
-            if (adminUserMapper.count() == 0) {
-                AdminUser adminUser = new AdminUser();
-                adminUser.setUsername("admin");
-                adminUser.setPasswordHash(passwordEncoder.encode("admin123"));
-                adminUser.setDisplayName("ops-admin");
-                adminUser.setEnabled(true);
-                adminUser.setCreatedAt(now);
-                adminUser.setUpdatedAt(now);
-                adminUserMapper.insert(adminUser);
-            }
+            AdminUser adminUser = new AdminUser();
+            adminUser.setUsername(bootstrapAdmin.getUsername());
+            adminUser.setPasswordHash(passwordEncoder.encode(bootstrapAdmin.getPassword()));
+            adminUser.setDisplayName(bootstrapAdmin.getDisplayName());
+            adminUser.setEnabled(true);
+            adminUser.setCreatedAt(now);
+            adminUser.setUpdatedAt(now);
+            adminUserMapper.insert(adminUser);
         };
     }
 }

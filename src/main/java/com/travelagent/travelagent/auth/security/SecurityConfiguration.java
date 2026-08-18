@@ -33,15 +33,10 @@ public class SecurityConfiguration {
                                 "/api/auth/wx/login",
                                 "/api/auth/admin/login",
                                 "/api/auth/refresh",
-                                "/api/auth/logout",
-                                "/error",
-                                "/doc.html",
-                                "/doc.html/**",
-                                "/nextdoc/**",
-                                "/favicon.ico",
-                                "/v3/api-docs/**").permitAll()
+                                "/api/auth/logout").permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
-                        .anyRequest().authenticated())
+                        .requestMatchers("/api/**").authenticated()
+                        .anyRequest().permitAll())
                 .addFilterBefore(accessTokenAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .exceptionHandling(Customizer.withDefaults());
         return http.build();
@@ -64,4 +59,5 @@ public class SecurityConfiguration {
         source.registerCorsConfiguration("/**", configuration);
         return source;
     }
+
 }
