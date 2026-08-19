@@ -5,8 +5,22 @@ spring:
   application:
     name: travel-agent
   ai:
+    model:
+      embedding:
+        text: dashscope
+    vectorstore:
+      type: qdrant
+      qdrant:
+        host: ${SPRING_AI_VECTORSTORE_QDRANT_HOST:localhost}
+        port: ${SPRING_AI_VECTORSTORE_QDRANT_PORT:6334}
+        api-key: ${SPRING_AI_VECTORSTORE_QDRANT_API_KEY:}
+        collection-name: ${SPRING_AI_VECTORSTORE_QDRANT_COLLECTION_NAME:travel_knowledge}
+        initialize-schema: true
     dashscope:
       api-key: ${SPRING_AI_DASHSCOPE_API_KEY:}
+      embedding:
+        options:
+          model: ${SPRING_AI_DASHSCOPE_EMBEDDING_OPTIONS_MODEL:text-embedding-v4}
       chat:
         options:
           model: ${SPRING_AI_DASHSCOPE_CHAT_OPTIONS_MODEL:qwen3.8-max}
@@ -30,6 +44,8 @@ spring:
     redis:
       host: ${SPRING_DATA_REDIS_HOST:localhost}
       port: ${SPRING_DATA_REDIS_PORT:6379}
+      username: ${SPRING_DATA_REDIS_USERNAME:}
+      password: ${SPRING_DATA_REDIS_PASSWORD:}
   kafka:
     bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     producer:
@@ -53,6 +69,9 @@ nextdoc4j:
     password: 123456
 
 travel-agent:
+  rag:
+    top-k: ${TRAVEL_AGENT_RAG_TOP_K:5}
+    similarity-threshold: ${TRAVEL_AGENT_RAG_SIMILARITY_THRESHOLD:0.65}
   studio:
     enabled: ${TRAVEL_AGENT_STUDIO_ENABLED:false}
   amap:

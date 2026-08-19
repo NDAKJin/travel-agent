@@ -16,6 +16,8 @@ import com.travelagent.travelagent.agent.subagent.RoutePlanningAgent;
 import java.util.ArrayDeque;
 import java.util.List;
 import java.util.Queue;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import org.bsc.langgraph4j.checkpoint.MemorySaver;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.client.ChatClient;
@@ -100,18 +102,22 @@ class LangGraphTravelAgentTest {
     }
 
     @Test
-    void delegatesExpertInsideRoutePlanningSubgraph() {
+    void delegatesExpertsInParallelInsideRoutePlanningSubgraph() {
+        CountDownLatch started = new CountDownLatch(2);
         KnowledgePlanningAgent knowledge = mock(KnowledgePlanningAgent.class);
-        when(knowledge.planKnowledge(anyString())).thenReturn("{\"facts\":[]}");
+        when(knowledge.planKnowledge(anyString())).thenAnswer(ignored -> parallelResult(started, "{\"facts\":[]}"));
+        BudgetAgent budget = mock(BudgetAgent.class);
+        when(budget.estimateBudget(anyString())).thenAnswer(ignored -> parallelResult(started, "{\"budget\":{}}"));
         LangGraphTravelAgent graph = new LangGraphTravelAgent(
                 client(route(), confirmed(), approved()),
-                client(delegate("KNOWLEDGE"), plan()), client(), client(finalReply("Final itinerary")),
+                client(delegate("KNOWLEDGE", "BUDGET"), plan()), client(), client(finalReply("Final itinerary")),
                 new PromptResourceLoader(), new MemorySaver(), knowledge,
-                mock(RoutePlanningAgent.class), mock(BudgetAgent.class));
+                mock(RoutePlanningAgent.class), budget);
 
         assertThat(graph.run(List.of(new AgentMessage("user", "Plan a one-day trip"))))
                 .isEqualTo("Final itinerary");
         verify(knowledge).planKnowledge(anyString());
+        verify(budget).estimateBudget(anyString());
     }
 
     @Test
@@ -150,9 +156,17 @@ class LangGraphTravelAgentTest {
                 + "\"notes\":[],\"pending\":[]}";
     }
 
-    private static String delegate(String expert) {
-        return "{\"action\":\"DELEGATE\",\"expert\":\"" + expert
-                + "\",\"task\":{\"requirements\":{}}}";
+    private static String delegate(String... experts) {
+        return "{\"action\":\"DELEGATE\",\"tasks\":["
+                + java.util.Arrays.stream(experts)
+                .map(expert -> "{\"expert\":\"" + expert + "\",\"task\":{\"requirements\":{}}}")
+                .collect(java.util.stream.Collectors.joining(",")) + "]}";
+    }
+
+    private static String parallelResult(CountDownLatch started, String result) throws InterruptedException {
+        started.countDown();
+        if (!started.await(1, TimeUnit.SECONDS)) throw new AssertionError("Experts did not run in parallel");
+        return result;
     }
 
     private static String approved() {
