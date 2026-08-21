@@ -1,5 +1,6 @@
 package com.travelagent.travelagent.config;
 
+import com.travelagent.travelagent.agent.subagent.KnowledgePlanningAgent;
 import org.bsc.langgraph4j.checkpoint.BaseCheckpointSaver;
 import org.bsc.langgraph4j.checkpoint.RedisSaver;
 import org.springframework.ai.chat.client.ChatClient;
@@ -60,8 +61,8 @@ public class AgentBootstrapConfiguration {
     }
 
     @Bean("normalServiceChatClient")
-    ChatClient normalServiceChatClient(ChatModel chatModel) {
-        return ChatClient.builder(chatModel).build();
+    ChatClient normalServiceChatClient(ChatModel chatModel, KnowledgePlanningAgent knowledgeAgent) {
+        return ChatClient.builder(chatModel).defaultTools(knowledgeAgent).build();
     }
 
     @Bean("routePlanningChatClient")

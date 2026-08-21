@@ -72,3 +72,51 @@ CREATE TABLE IF NOT EXISTS agent_observation_log (
         REFERENCES agent_conversation_message (id) ON DELETE CASCADE,
     INDEX idx_agent_observation_message_sequence (message_id, sequence_no)
 );
+
+CREATE TABLE IF NOT EXISTS rag_document (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    document_key VARCHAR(128) NOT NULL UNIQUE,
+    file_name VARCHAR(255) NOT NULL,
+    media_type VARCHAR(128),
+    title VARCHAR(255) NOT NULL,
+    author VARCHAR(255) NOT NULL,
+    keywords TEXT NOT NULL,
+    summary TEXT NOT NULL,
+    questions TEXT NOT NULL,
+    enabled TINYINT(1) NOT NULL DEFAULT 1,
+    content MEDIUMTEXT NOT NULL,
+    chunk_count INT NOT NULL,
+    created_at TIMESTAMP NOT NULL,
+    updated_at TIMESTAMP NOT NULL,
+    INDEX idx_rag_document_updated (updated_at)
+);
+
+CREATE TABLE IF NOT EXISTS rag_chunk (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    document_id BIGINT NOT NULL,
+    chunk_key VARCHAR(160) NOT NULL UNIQUE,
+    chunk_index INT NOT NULL,
+    start_offset INT NOT NULL,
+    end_offset INT NOT NULL,
+    content MEDIUMTEXT NOT NULL,
+    keywords TEXT NOT NULL,
+    summary TEXT NOT NULL,
+    questions TEXT NOT NULL,
+    enabled TINYINT(1) NOT NULL DEFAULT 1,
+    created_at TIMESTAMP NOT NULL,
+    CONSTRAINT fk_rag_chunk_document FOREIGN KEY (document_id)
+        REFERENCES rag_document (id) ON DELETE CASCADE,
+    INDEX idx_rag_chunk_document_index (document_id, chunk_index)
+);
+
+CREATE TABLE IF NOT EXISTS rag_ingestion_task (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    file_name VARCHAR(255) NOT NULL,
+    status VARCHAR(16) NOT NULL,
+    chunk_count INT NOT NULL DEFAULT 0,
+    written_count INT NOT NULL DEFAULT 0,
+    error_message TEXT,
+    created_at TIMESTAMP NOT NULL,
+    updated_at TIMESTAMP NOT NULL,
+    INDEX idx_rag_ingestion_task_updated (updated_at)
+);

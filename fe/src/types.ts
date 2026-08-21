@@ -113,3 +113,45 @@ export type PageResponse<T> = {
   page: number;
   size: number;
 };
+
+export type RagDocument = {
+  id: number;
+  documentKey: string;
+  fileName: string;
+  mediaType: string | null;
+  title: string;
+  author: string;
+  keywords: string;
+  summary: string;
+  questions: string;
+  enabled: boolean;
+  chunkCount: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type RagChunk = {
+  id: number;
+  documentId: number;
+  documentKey: string;
+  fileName: string;
+  chunkIndex: number;
+  startOffset: number;
+  endOffset: number;
+  content: string;
+  keywords: string;
+  summary: string;
+  questions: string;
+  enabled: boolean;
+};
+
+export type RagIngestionTask = {
+  id: number;
+  fileName: string;
+  status: string;
+  chunkCount: number;
+  writtenCount: number;
+  error: string | null;
+  createdAt: string;
+  updatedAt: string;
+};

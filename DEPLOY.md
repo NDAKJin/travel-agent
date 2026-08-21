@@ -6,13 +6,12 @@ docker compose up -d --build
 docker compose ps
 ```
 
-必填：MySQL 密码、DashScope API Key、JWT 密钥。
+必填：MySQL 密码、DashScope API Key、JWT 密钥、Kafka 地址。
 
-启用 Agent 可观测时，在 `.env` 配置：
+在 `.env` 配置 Kafka：
 
 ```env
 SPRING_KAFKA_BOOTSTRAP_SERVERS=<Kafka地址>:9092
-TRAVEL_AGENT_OBSERVABILITY_ENABLED=true
 ```
 
 更新部署：

@@ -2,8 +2,6 @@ package com.travelagent.travelagent.agent.observation;
 
 import com.alibaba.fastjson2.JSON;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.core.KafkaTemplate;
@@ -12,16 +10,9 @@ import org.springframework.kafka.core.KafkaTemplate;
 class AgentObservationConfiguration {
 
     @Bean
-    @ConditionalOnProperty(prefix = "travel-agent.observability", name = "enabled", havingValue = "true")
     AgentObservationPublisher kafkaAgentObservationPublisher(KafkaTemplate<String, String> kafkaTemplate,
                                                               AgentObservationProperties properties) {
         return new KafkaAgentObservationPublisher(kafkaTemplate, properties);
-    }
-
-    @Bean
-    @ConditionalOnMissingBean(AgentObservationPublisher.class)
-    AgentObservationPublisher noopAgentObservationPublisher() {
-        return event -> { };
     }
 
     @Slf4j

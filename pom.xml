@@ -33,6 +33,7 @@
         <nextdoc4j.version>1.4.0</nextdoc4j.version>
         <swagger-core.version>2.2.47</swagger-core.version>
         <langgraph4j.version>1.8.24</langgraph4j.version>
+        <tika.version>3.2.3</tika.version>
     </properties>
     <dependencyManagement>
         <dependencies>
@@ -146,6 +147,16 @@
         <dependency>
             <groupId>org.springframework.ai</groupId>
             <artifactId>spring-ai-starter-vector-store-qdrant</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.tika</groupId>
+            <artifactId>tika-core</artifactId>
+            <version>${tika.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.tika</groupId>
+            <artifactId>tika-parsers-standard-package</artifactId>
+            <version>${tika.version}</version>
         </dependency>
         <dependency>
             <groupId>io.swagger.core.v3</groupId>

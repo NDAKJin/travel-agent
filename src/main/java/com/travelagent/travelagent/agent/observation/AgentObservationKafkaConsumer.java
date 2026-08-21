@@ -4,13 +4,11 @@ import com.alibaba.fastjson2.JSON;
 import com.travelagent.travelagent.agent.mapper.AgentObservationLogMapper;
 import com.travelagent.travelagent.agent.model.AgentObservationLog;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 @Component
-@ConditionalOnProperty(prefix = "travel-agent.observability", name = "enabled", havingValue = "true")
 @Slf4j
 public class AgentObservationKafkaConsumer {
     private final AgentObservationLogMapper mapper;
@@ -19,8 +17,8 @@ public class AgentObservationKafkaConsumer {
         this.mapper = mapper;
     }
 
-    @KafkaListener(topics = "${travel-agent.observability.kafka-topic}",
-            groupId = "${travel-agent.observability.consumer-group}")
+    @KafkaListener(topics = "${travel-agent.observability.kafka-topic:agent-observation}",
+            groupId = "${travel-agent.observability.consumer-group:travel-agent-observation-writer}")
     @Transactional
     public void consume(String payload) {
         AgentObservationEvent event = JSON.parseObject(payload, AgentObservationEvent.class);

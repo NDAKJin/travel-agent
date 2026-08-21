@@ -2,7 +2,7 @@ package com.travelagent.travelagent.agent.subagent;
 
 import com.travelagent.travelagent.agent.observation.AgentObservationContext;
 import com.travelagent.travelagent.agent.observation.AgentObservationContextHolder;
-import com.travelagent.travelagent.agent.service.KnowledgeRagService;
+import com.travelagent.travelagent.rag.KnowledgeRagService;
 import java.time.Instant;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.stereotype.Component;
