@@ -1,26 +1,38 @@
 package com.travelagent.travelagent.agent.subagent;
 
-import com.travelagent.travelagent.agent.prompt.PromptResourceLoader;
-import com.travelagent.travelagent.agent.service.SpecialistAgentRunner;
-import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.beans.factory.annotation.Qualifier;
+import com.travelagent.travelagent.agent.observation.AgentObservationContext;
+import com.travelagent.travelagent.agent.observation.AgentObservationContextHolder;
+import com.travelagent.travelagent.agent.service.KnowledgeRagService;
+import java.time.Instant;
+import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.stereotype.Component;
 
 @Component
 public class KnowledgePlanningAgent {
 
-    private final ChatClient chatClient;
-    private final PromptResourceLoader promptResourceLoader;
-    private final SpecialistAgentRunner runner;
+    private final KnowledgeRagService ragService;
 
-    public KnowledgePlanningAgent(@Qualifier("knowledgePlanningChatClient") ChatClient chatClient,
-                                  PromptResourceLoader promptResourceLoader, SpecialistAgentRunner runner) {
-        this.chatClient = chatClient;
-        this.promptResourceLoader = promptResourceLoader;
-        this.runner = runner;
+    public KnowledgePlanningAgent(KnowledgeRagService ragService) {
+        this.ragService = ragService;
     }
 
+    @Tool(name = "searchTravelKnowledge", description = "检索旅行知识库，返回与任务最相关的景点、城市和路线知识")
     public String planKnowledge(String task) {
-        return runner.run("knowledge", chatClient, promptResourceLoader.load("knowledge-agent"), task);
+        AgentObservationContext observation = AgentObservationContextHolder.current();
+        Instant startedAt = Instant.now();
+        try {
+            String output = ragService.enrich(task);
+            if (observation != null) {
+                observation.publish("knowledge", "tool", "success", startedAt, task, output,
+                        null, "return", null);
+            }
+            return output;
+        } catch (RuntimeException exception) {
+            if (observation != null) {
+                observation.publish("knowledge", "tool", "error", startedAt, task, null,
+                        null, null, exception);
+            }
+            throw exception;
+        }
     }
 }

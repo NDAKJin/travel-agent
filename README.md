@@ -38,6 +38,8 @@
 ## 核心能力
 
 - **多智能体旅行对话**：LangGraph4j 编排意图识别、需求收集、路线规划、审核与最终答复；规划师可按需调用旅行知识、路线与预算专家。
+- **对话状态持久化**：LangGraph4j Checkpoint 使用 RedisSaver 保存 Human-in-the-loop 状态，Checkpoint 自动保留 7 天。
+- **旅行知识 RAG**：旅行知识专家通过 Spring AI Qdrant Vector Store 检索相关知识，并将候选片段注入专家上下文；使用 DashScope Embedding 生成向量。
 - **运营管理台**：React + TypeScript 管理微信用户、会话及 Agent 可观测日志。
 - **微信小程序入口**：原生 WXML / WXSS / JavaScript，完成登录、聊天和历史会话。
 - **安全认证**：微信登录与管理端登录统一使用 JWT，刷新令牌存储在 Redis。
@@ -68,7 +70,7 @@ flowchart LR
 
 ## 多智能体协作
 
-主流程由 **LangGraph4j** 管理。路线规划子图包含规划师、三位专家和审核师；规划师按需委派专家，专家结果以结构化 JSON 返回规划师。普通服务者直接回答非规划问题，不进入路线规划子图。
+主流程由 **LangGraph4j** 管理。路线规划子图包含规划师、专家并行执行和审核师；规划师一次返回所需的专家任务，子图使用 `CompletableFuture` 并行执行，汇总结构化结果后回到规划师。普通服务者直接回答非规划问题，不进入路线规划子图。
 
 ```mermaid
 flowchart TD
@@ -78,17 +80,17 @@ flowchart TD
     subgraph routePlanning["旅游路线规划子图"]
         direction TB
         planner["路线规划师"]
+        parallel["专家并行执行"]
         knowledge["旅行知识专家"]
         routeExpert["路线规划专家"]
         budget["预算专家"]
         reviewer["路线审核师"]
-        planner -.->|按需委派| knowledge
-        planner -.->|按需委派| routeExpert
-        planner -.->|按需委派| budget
-        knowledge --> planner
-        routeExpert --> planner
-        budget --> planner
-        planner --> reviewer
+        planner -->|一次返回多个任务| parallel
+        parallel -.-> knowledge
+        parallel -.-> routeExpert
+        parallel -.-> budget
+        parallel -->|汇总结果| planner
+        planner -->|生成方案| reviewer
         reviewer -->|需要修改且次数不超过 2 次| planner
     end
     normal["普通服务者"]
@@ -118,15 +120,15 @@ flowchart TD
 | --- | --- | --- |
 | 总控 | 判断路线规划或普通服务 | 始终启用 |
 | 路线需求询问师 | 收集并确认路线规划需求 | 路线规划 |
-| 路线规划师 | 制定行程，按需委派三位专家 | 路线规划 |
+| 路线规划师 | 制定行程，一次返回多个专家任务 | 路线规划 |
 | 路线审核师 | 审核行程；最多要求修改两次 | 路线规划 |
 | 普通服务者 | 直接处理非路线规划问题 | 普通服务 |
 | 最终答复编辑 | 将已完成结果整理为面向用户的自然回复 | 始终启用 |
-| 旅行知识规划专员 | 提供旅行知识与目的地建议 | 按需调用 |
-| 路线规划专员 | 提供路线与行程安排建议 | 按需调用 |
-| 预算专员 | 汇总已知门票、住宿、餐饮与交通费用；缺失价格标记待确认 | 按需调用 |
+| 旅行知识规划专员 | 提供旅行知识与目的地建议 | 并行按需调用 |
+| 路线规划专员 | 提供路线与行程安排建议 | 并行按需调用 |
+| 预算专员 | 汇总已知门票、住宿、餐饮与交通费用；缺失价格标记待确认 | 并行按需调用 |
 
-三位专家统一返回结构化 JSON，均为路线规划子图内的 LangGraph 节点；规划师按需路由，未被选中时不会执行。提示词位于 `src/main/resources/prompt/`，统一使用“角色、输入、输出、约束”结构。
+三位专家统一返回结构化 JSON，由路线规划子图的并行执行节点按需调度；未被选中的专家不会执行。提示词位于 `src/main/resources/prompt/`，统一使用“角色、输入、输出、约束”结构。
 
 ## 技术栈
 
@@ -134,6 +136,7 @@ flowchart TD
 | --- | --- |
 | Backend | Java 21、Spring Boot 4、Spring AI Alibaba、LangGraph4j、Spring Security、MyBatis |
 | Data | MySQL、Redis、Kafka |
+| RAG | Qdrant、DashScope Embedding |
 | Admin console | React 18、TypeScript、Vite |
 | Mini program | 原生 JavaScript、WXML、WXSS |
 | API docs | Springdoc OpenAPI、NextDoc4j |
@@ -146,7 +149,22 @@ flowchart TD
 - Node.js 18+
 - MySQL、Redis
 - 可选：Kafka（启用 Agent 可观测时需要）
+- Qdrant（必需，使用 gRPC 端口 6334）
 - 阿里云百炼 DashScope API Key
+
+配置 Qdrant 与 Embedding：
+
+```text
+SPRING_AI_VECTORSTORE_QDRANT_HOST=localhost
+SPRING_AI_VECTORSTORE_QDRANT_PORT=6334
+SPRING_AI_VECTORSTORE_QDRANT_COLLECTION_NAME=travel_knowledge
+SPRING_AI_DASHSCOPE_EMBEDDING_OPTIONS_MODEL=text-embedding-v4
+```
+
+应用始终使用 Qdrant 和 DashScope Embedding；启动时 Qdrant 不可用会直接失败。需要先向 `travel_knowledge` collection 写入旅行知识文档。
+
+LangGraph4j Checkpoint 使用 Redis，默认保留 7 天；Redis 连接参数沿用 `SPRING_DATA_REDIS_HOST`、`SPRING_DATA_REDIS_PORT`、`SPRING_DATA_REDIS_USERNAME` 和 `SPRING_DATA_REDIS_PASSWORD`。
+
 - 使用微信登录时，需要小程序 AppID / AppSecret
 
 ### 1. 配置并启动后端

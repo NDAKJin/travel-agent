@@ -131,7 +131,7 @@
         </dependency>
         <dependency>
             <groupId>org.bsc.langgraph4j</groupId>
-            <artifactId>langgraph4j-mysql-saver</artifactId>
+            <artifactId>langgraph4j-redis-saver</artifactId>
             <version>${langgraph4j.version}</version>
         </dependency>
         <dependency>
@@ -142,6 +142,10 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-kafka</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-starter-vector-store-qdrant</artifactId>
         </dependency>
         <dependency>
             <groupId>io.swagger.core.v3</groupId>
