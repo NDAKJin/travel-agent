@@ -9,9 +9,8 @@ import org.mybatis.spring.annotation.MapperScan;
 @SpringBootApplication(excludeName = "com.alibaba.cloud.ai.autoconfigure.dashscope.DashScopeMultimodalEmbeddingAutoConfiguration")
 @ConfigurationPropertiesScan
 @MapperScan({
-        "com.travelagent.travelagent.auth.mapper",
-        "com.travelagent.travelagent.agent.mapper",
-        "com.travelagent.travelagent.admin.mapper"
+        "com.travelagent.travelagent.infrastructure.persistence.auth",
+        "com.travelagent.travelagent.infrastructure.persistence.agent"
 })
 public class TravelAgentApplication {
 

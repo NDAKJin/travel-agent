@@ -77,6 +77,19 @@ flowchart LR
     api --> redis
 ```
 
+### 领域与分层
+
+项目采用 DDD Lite 的模块化单体设计，按限界上下文划分业务边界：
+
+| 领域 | 职责 |
+| --- | --- |
+| `planning` | 旅行需求确认、路线规划、审核回流与对话工作流端口 |
+| `rag` | 文档导入、Chunk 管理、向量检索与 Qwen Rerank |
+| `auth` | 微信登录、管理员登录、JWT 与刷新令牌；Repository 端口隔离 MyBatis |
+| `observability` | Agent 调用观测、Kafka 投递与日志持久化端口 |
+
+顶层仅保留 `application`、`domain` 和 `infrastructure` 三层，每层再按业务模块划分。领域规则位于 `domain`，用例入口和端口位于 `application`，MySQL、Redis、Kafka、Qdrant、Spring AI 和 LangGraph4j 位于 `infrastructure`。各模块通过端口隔离外部依赖。
+
 ## 多智能体协作
 
 主流程由 **LangGraph4j** 管理。路线规划子图包含规划师、专家并行执行和审核师；规划师一次返回所需的专家任务，子图使用 `CompletableFuture` 并行执行，汇总结构化结果后回到规划师。普通服务者处理非规划问题，不进入路线规划子图，但可通过 Spring AI Tool 按需调用旅行知识专家检索 RAG。
@@ -320,7 +333,9 @@ Studio 会触发真实模型调用，仅建议本地开启。
 ```text
 travel-agent/
 ├── src/                 Spring Boot API：认证、Agent、管理端与 RAG
-│   └── .../rag/         RAG 检索、异步导入流水线与知识库管理
+│   ├── .../application/  用例、Controller、DTO 与端口；按 agent/admin/auth/rag/planning 划分
+│   ├── .../domain/       规划规则、RAG 分块规则、会话与账户领域模型
+│   └── .../infrastructure/ LangGraph、Spring AI、MyBatis、Redis、Kafka、Qdrant 与 Web 适配器
 ├── fe/                  React + TypeScript 管理台
 ├── miniprogram/         原生微信小程序
 ├── scripts/             部署与辅助脚本

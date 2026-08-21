@@ -1,0 +1,51 @@
+package com.travelagent.travelagent.infrastructure.observability.agent;
+
+import com.travelagent.travelagent.application.observability.model.AgentObservationEvent;
+
+import com.alibaba.fastjson2.JSON;
+import com.travelagent.travelagent.infrastructure.persistence.agent.AgentObservationLogMapper;
+import com.travelagent.travelagent.domain.agent.model.AgentObservationLog;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
+
+@Component
+@Slf4j
+public class AgentObservationKafkaConsumer {
+    private final AgentObservationLogMapper mapper;
+
+    public AgentObservationKafkaConsumer(AgentObservationLogMapper mapper) {
+        this.mapper = mapper;
+    }
+
+    @KafkaListener(topics = "${travel-agent.observability.kafka-topic:agent-observation}",
+            groupId = "${travel-agent.observability.consumer-group:travel-agent-observation-writer}")
+    @Transactional
+    public void consume(String payload) {
+        AgentObservationEvent event = JSON.parseObject(payload, AgentObservationEvent.class);
+        log.info("Received agent observation: eventId={}, messageId={}, sequenceNo={}",
+                event.eventId(), event.messageId(), event.sequenceNo());
+        AgentObservationLog observationLog = AgentObservationLog.builder()
+                .eventId(event.eventId())
+                .messageId(event.messageId())
+                .traceId(event.traceId())
+                .sequenceNo(event.sequenceNo())
+                .agentName(event.agentName())
+                .phase(event.phase())
+                .status(event.status())
+                .model(event.model())
+                .llmInput(event.llmInput())
+                .llmOutput(event.llmOutput())
+                .promptTokens(event.promptTokens())
+                .completionTokens(event.completionTokens())
+                .totalTokens(event.totalTokens())
+                .nextDecision(event.nextDecision())
+                .durationMs(event.durationMs())
+                .errorMessage(event.errorMessage())
+                .createdAt(event.createdAt() == null ? java.time.Instant.now() : event.createdAt())
+                .build();
+        int inserted = mapper.insertIgnore(observationLog);
+        log.info("Persisted agent observation: eventId={}, inserted={}", event.eventId(), inserted);
+    }
+}
