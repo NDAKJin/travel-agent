@@ -77,22 +77,7 @@ flowchart LR
     api --> redis
 ```
 
-### 领域与分层
-
-项目采用 DDD Lite 的模块化单体设计，按限界上下文划分业务边界：
-
-| 领域 | 职责 |
-| --- | --- |
-| `planning` | 旅行需求确认、路线规划、审核回流与对话工作流端口 |
-| `rag` | 文档导入、Chunk 管理、向量检索与 Qwen Rerank |
-| `auth` | 微信登录、管理员登录、JWT 与刷新令牌；Repository 端口隔离 MyBatis |
-| `observability` | Agent 调用观测、Kafka 投递与日志持久化端口 |
-
-顶层仅保留 `application`、`domain` 和 `infrastructure` 三层，每层再按业务模块划分。领域规则位于 `domain`，用例入口和端口位于 `application`，MySQL、Redis、Kafka、Qdrant、Spring AI 和 LangGraph4j 位于 `infrastructure`。各模块通过端口隔离外部依赖。
-
 ## 多智能体协作
-
-主流程由 **LangGraph4j** 管理。路线规划子图包含规划师、专家并行执行和审核师；规划师一次返回所需的专家任务，子图使用 `CompletableFuture` 并行执行，汇总结构化结果后回到规划师。普通服务者处理非规划问题，不进入路线规划子图，但可通过 Spring AI Tool 按需调用旅行知识专家检索 RAG。
 
 ```mermaid
 flowchart TD
@@ -133,10 +118,6 @@ flowchart TD
     finalize -->|结果已完成| response
     wait -->|下一轮消息和新位置| message
 ```
-
-当前位置由 API 在进入 LangGraph 前注入共享 State，不作为 LangGraph 节点执行。
-
-路线需求必填项为起点与终点；兴趣和约束为选填项，用户未提供时不阻塞规划。
 
 | 角色 | 工具与职责 | 启用条件 |
 | --- | --- | --- |
@@ -199,17 +180,6 @@ flowchart LR
     chunkMeta --> vector["VECTORIZING - Embedding + Qdrant"]
 ```
 
-节点之间通过 `RagIngestionContext` 传递中间结果，节点统一实现 `RagIngestionNode` 接口。每进入一个节点都会更新任务状态，后台可看到 `PARSING`、`DOC_ENRICHING`、`CHUNKING`、`CHUNK_ENRICHING` 和 `VECTORIZING` 等阶段；最终状态为 `SUCCESS` 或 `FAILED`。
-
-文档和 Chunk 都有 `enabled` 状态（`1` 启用、`0` 禁用）：
-
-- 启用 Chunk：从 MySQL 读取原始内容和元数据，重新生成向量并写回 Qdrant。
-- 禁用 Chunk：从 Qdrant 删除该 Chunk 的向量，但保留 MySQL 内容，之后可以恢复。
-- 禁用文档：联动禁用全部 Chunk，并删除该文档的全部向量。
-- 启用文档：联动启用全部 Chunk，并重新写入向量。
-- 禁止在文档未启用时单独启用 Chunk。
-
-应用启动时会自动检查并补充 `rag_document.enabled` 和 `rag_chunk.enabled` 字段，已有数据库不需要手动执行 SQL。
 
 ## 技术栈
 
@@ -229,24 +199,9 @@ flowchart LR
 - JDK 21+
 - Node.js 18+
 - MySQL、Redis
-- Kafka（Agent 可观测链路必需）
-- Qdrant（必需，使用 gRPC 端口 6334）
+- Kafka
+- Qdrant
 - 阿里云百炼 DashScope API Key
-
-配置 Qdrant 与 Embedding：
-
-```text
-SPRING_AI_VECTORSTORE_QDRANT_HOST=localhost
-SPRING_AI_VECTORSTORE_QDRANT_PORT=6334
-SPRING_AI_VECTORSTORE_QDRANT_COLLECTION_NAME=travel_knowledge
-SPRING_AI_DASHSCOPE_EMBEDDING_OPTIONS_MODEL=text-embedding-v4
-```
-
-应用始终使用 Qdrant 和 DashScope Embedding；启动时 Qdrant 不可用会直接失败。需要先向 `travel_knowledge` collection 写入旅行知识文档。
-
-LangGraph4j Checkpoint 使用 Redis，默认保留 7 天；Redis 连接参数沿用 `SPRING_DATA_REDIS_HOST`、`SPRING_DATA_REDIS_PORT`、`SPRING_DATA_REDIS_USERNAME` 和 `SPRING_DATA_REDIS_PASSWORD`。
-
-- 使用微信登录时，需要小程序 AppID / AppSecret
 
 ### 1. 配置并启动后端
 
@@ -333,9 +288,9 @@ Studio 会触发真实模型调用，仅建议本地开启。
 ```text
 travel-agent/
 ├── src/                 Spring Boot API：认证、Agent、管理端与 RAG
-│   ├── .../application/  用例、Controller、DTO 与端口；按 agent/admin/auth/rag/planning 划分
-│   ├── .../domain/       规划规则、RAG 分块规则、会话与账户领域模型
-│   └── .../infrastructure/ LangGraph、Spring AI、MyBatis、Redis、Kafka、Qdrant 与 Web 适配器
+│   ├── .../application/      用例、应用服务、DTO 与端口；按 agent/admin/auth/rag/planning 划分
+│   ├── .../domain/           规划规则、RAG 分块规则、会话与账户领域模型
+│   └── .../infrastructure/   LangGraph、Spring AI、JWT、MyBatis、Redis、Kafka、Qdrant 与 Web 适配器
 ├── fe/                  React + TypeScript 管理台
 ├── miniprogram/         原生微信小程序
 ├── scripts/             部署与辅助脚本
@@ -345,7 +300,7 @@ travel-agent/
 
 ## Docker 启动与部署
 
-Docker Compose 会启动管理台、API、MySQL 和 Redis。Kafka 需要单独部署（可部署在独立服务器），并通过 `.env` 中的地址连接。
+Docker Compose 会启动管理台、API、MySQL、Redis、Qdrant 和单节点 Kafka（KRaft）。API 在 Compose 网络内通过 `kafka:9092` 连接 Kafka，宿主机调试客户端可使用 `localhost:29092`。
 
 ```bash
 git clone <仓库地址> travel-agent
@@ -355,9 +310,7 @@ cp .env.example .env
 docker compose up -d --build
 ```
 
-```env
-SPRING_KAFKA_BOOTSTRAP_SERVERS=<Kafka 地址>:9092
-```
+如需连接外部 Kafka，将 `SPRING_KAFKA_BOOTSTRAP_SERVERS` 改为外部集群地址；Compose 内 Kafka 仍会启动，但 API 将使用外部地址。
 
 查看状态和日志：
 
@@ -373,7 +326,7 @@ git pull
 docker compose up -d --build
 ```
 
-数据由 Docker volumes 持久化；不要执行 `docker compose down -v`，否则会删除 MySQL 与 Redis 数据。
+数据由 Docker volumes 持久化；不要执行 `docker compose down -v`，否则会删除 MySQL、Kafka、Qdrant 和 Redis 数据。
 应用启动时会自动补充 RAG 状态字段；其他表结构仍由 `schema.sql` 在初始化阶段创建。
 
 ## 开发与测试
