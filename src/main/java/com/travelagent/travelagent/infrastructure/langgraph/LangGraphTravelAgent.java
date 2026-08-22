@@ -12,6 +12,7 @@ import com.travelagent.travelagent.infrastructure.ai.agent.BudgetAgent;
 import com.travelagent.travelagent.infrastructure.ai.agent.KnowledgePlanningAgent;
 import com.travelagent.travelagent.infrastructure.ai.agent.RoutePlanningAgent;
 import com.travelagent.travelagent.application.planning.port.out.RouteExpertGateway;
+import com.travelagent.travelagent.application.planning.port.out.RoutePlanSemanticCache;
 import com.travelagent.travelagent.application.planning.port.out.TravelWorkflowPort;
 import com.travelagent.travelagent.infrastructure.planning.agent.SpringAiRouteExpertGateway;
 import com.travelagent.travelagent.domain.planning.service.RouteReviewPolicy;
@@ -62,6 +63,8 @@ public class LangGraphTravelAgent implements TravelWorkflowPort {
             Map.entry("routeNext", Channels.base(() -> "routeReviewer")),
             Map.entry("expertTasks", Channels.base(() -> "[]")),
             Map.entry("expertResults", Channels.base(() -> "{}")),
+            Map.entry("routeCacheHit", Channels.base(() -> false)),
+            Map.entry("routeCacheScore", Channels.base(() -> 0.0d)),
             Map.entry("normalReply", Channels.base(() -> "")),
             Map.entry("reply", Channels.base(() -> "")));
 
@@ -72,6 +75,7 @@ public class LangGraphTravelAgent implements TravelWorkflowPort {
     private final PromptResourceLoader promptResourceLoader;
     private final BaseCheckpointSaver checkpointSaver;
     private final RouteExpertGateway routeExpertGateway;
+    private final RoutePlanSemanticCache routePlanSemanticCache;
     private final Executor routeExpertExecutor;
     private final CompileConfig compileConfig;
     private final StateGraph<WorkflowState> workflow;
@@ -83,7 +87,7 @@ public class LangGraphTravelAgent implements TravelWorkflowPort {
                                 @Qualifier("finalizerChatClient") ChatClient finalizerChatClient,
                                 PromptResourceLoader promptResourceLoader) {
         this(orchestrationChatClient, routePlannerChatClient, normalServiceChatClient, finalizerChatClient,
-                promptResourceLoader, new MemorySaver(), null, null, null, ForkJoinPool.commonPool());
+                promptResourceLoader, new MemorySaver(), null, null, null, null, ForkJoinPool.commonPool());
     }
 
     public LangGraphTravelAgent(@Qualifier("orchestrationChatClient") ChatClient orchestrationChatClient,
@@ -96,7 +100,7 @@ public class LangGraphTravelAgent implements TravelWorkflowPort {
                                 RoutePlanningAgent routeAgent,
                                 BudgetAgent budgetAgent) {
         this(orchestrationChatClient, routePlannerChatClient, normalServiceChatClient, finalizerChatClient,
-                promptResourceLoader, checkpointSaver, knowledgeAgent, routeAgent, budgetAgent, ForkJoinPool.commonPool());
+                promptResourceLoader, checkpointSaver, knowledgeAgent, routeAgent, budgetAgent, null, ForkJoinPool.commonPool());
     }
 
     @org.springframework.beans.factory.annotation.Autowired
@@ -109,6 +113,7 @@ public class LangGraphTravelAgent implements TravelWorkflowPort {
                                 KnowledgePlanningAgent knowledgeAgent,
                                 RoutePlanningAgent routeAgent,
                                 BudgetAgent budgetAgent,
+                                RoutePlanSemanticCache routePlanSemanticCache,
                                 @Qualifier("routeExpertExecutor") Executor routeExpertExecutor) {
         this.orchestrationChatClient = orchestrationChatClient;
         this.routePlannerChatClient = routePlannerChatClient;
@@ -117,6 +122,7 @@ public class LangGraphTravelAgent implements TravelWorkflowPort {
         this.promptResourceLoader = promptResourceLoader;
         this.checkpointSaver = checkpointSaver;
         this.routeExpertGateway = new SpringAiRouteExpertGateway(knowledgeAgent, routeAgent, budgetAgent);
+        this.routePlanSemanticCache = routePlanSemanticCache;
         this.routeExpertExecutor = routeExpertExecutor;
         this.compileConfig = CompileConfig.builder()
                 .checkpointSaver(checkpointSaver)
@@ -245,6 +251,14 @@ public class LangGraphTravelAgent implements TravelWorkflowPort {
 
     private Map<String, Object> planRoute(WorkflowState state) {
         try (AgentObservationContextHolder.Scope ignored = AgentObservationContextHolder.open(state.observation())) {
+            if (routePlanSemanticCache != null && state.initialRoutePlanning()) {
+                String requirements = requirementData(state.requirements());
+                var hit = routePlanSemanticCache.find(requirements);
+                if (hit.isPresent()) {
+                    return Map.of("routePlan", hit.get().routePlan(), "routeNext", "routeReviewer",
+                            "routeCacheHit", true, "routeCacheScore", hit.get().score());
+                }
+            }
             String systemPrompt = prompt("route-planner");
             String input = routePlanningInput(state);
             String raw = call("routePlanner", systemPrompt + "\n\n" + input,
@@ -290,6 +304,10 @@ public class LangGraphTravelAgent implements TravelWorkflowPort {
                         parseReview(output).approved(), state.reviewAttempts() + 1)
                         ? "finalize" : "routePlanner");
         ReviewDecision decision = parseReview(raw);
+        if (decision.approved() && routePlanSemanticCache != null && !state.routeCacheHit()
+                && StringUtils.hasText(state.routePlan())) {
+            routePlanSemanticCache.put(requirementData(state.requirements()), state.routePlan());
+        }
         return Map.of(
                 "review", decision.structuredOutput(),
                 "reviewApproved", decision.approved(),
@@ -594,6 +612,10 @@ public class LangGraphTravelAgent implements TravelWorkflowPort {
         String routeNext() { return this.<String>value("routeNext").orElse("routeReviewer"); }
         String expertTasks() { return this.<String>value("expertTasks").orElse("[]"); }
         String expertResults() { return this.<String>value("expertResults").orElse("{}"); }
+        boolean routeCacheHit() { return this.<Boolean>value("routeCacheHit").orElse(false); }
+        boolean initialRoutePlanning() {
+            return !StringUtils.hasText(routePlan()) && "[]".equals(expertTasks()) && "{}".equals(expertResults());
+        }
         String normalReply() { return this.<String>value("normalReply").orElse(""); }
         String reply() { return this.<String>value("reply").orElse(""); }
     }

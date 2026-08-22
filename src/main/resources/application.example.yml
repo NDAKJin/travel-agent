@@ -72,6 +72,9 @@ nextdoc4j:
     password: 123456
 
 travel-agent:
+  route-cache:
+    ttl: ${TRAVEL_AGENT_ROUTE_CACHE_TTL:PT24H}
+    similarity-threshold: ${TRAVEL_AGENT_ROUTE_CACHE_SIMILARITY_THRESHOLD:0.92}
   rag:
     top-k: ${TRAVEL_AGENT_RAG_TOP_K:5}
     recall-top-k: ${TRAVEL_AGENT_RAG_RECALL_TOP_K:20}
