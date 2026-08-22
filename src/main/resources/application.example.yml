@@ -47,7 +47,10 @@ spring:
       username: ${SPRING_DATA_REDIS_USERNAME:}
       password: ${SPRING_DATA_REDIS_PASSWORD:}
   kafka:
-    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS}
+    consumer:
+      properties:
+        "[max.poll.interval.ms]": ${SPRING_KAFKA_MAX_POLL_INTERVAL_MS:1800000}
     producer:
       acks: all
       properties:
@@ -71,7 +74,15 @@ nextdoc4j:
 travel-agent:
   rag:
     top-k: ${TRAVEL_AGENT_RAG_TOP_K:5}
+    recall-top-k: ${TRAVEL_AGENT_RAG_RECALL_TOP_K:20}
     similarity-threshold: ${TRAVEL_AGENT_RAG_SIMILARITY_THRESHOLD:0.65}
+    ingestion-topic: ${TRAVEL_AGENT_RAG_INGESTION_TOPIC:rag-ingestion}
+    ingestion-consumer-group: ${TRAVEL_AGENT_RAG_INGESTION_CONSUMER_GROUP:travel-agent-rag-ingestion}
+    ingestion-storage-dir: ${TRAVEL_AGENT_RAG_INGESTION_STORAGE_DIR:${java.io.tmpdir}/travel-agent-rag}
+    rerank:
+      endpoint: ${TRAVEL_AGENT_RAG_RERANK_ENDPOINT:https://dashscope.aliyuncs.com/api/v1/services/rerank/text-rerank}
+      model: ${TRAVEL_AGENT_RAG_RERANK_MODEL:qwen3-rerank}
+      top-n: ${TRAVEL_AGENT_RAG_RERANK_TOP_N:5}
   studio:
     enabled: ${TRAVEL_AGENT_STUDIO_ENABLED:false}
   amap:
@@ -101,6 +112,5 @@ travel-agent:
     tool:
       enabled: ${TRAVEL_AGENT_AGENT_TOOL_ENABLED:true}
   observability:
-    enabled: ${TRAVEL_AGENT_OBSERVABILITY_ENABLED:true}
     kafka-topic: ${TRAVEL_AGENT_OBSERVABILITY_KAFKA_TOPIC:agent-observation}
     consumer-group: ${TRAVEL_AGENT_OBSERVABILITY_CONSUMER_GROUP:travel-agent-observation-writer}

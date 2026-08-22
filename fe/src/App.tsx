@@ -1,5 +1,6 @@
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import ConversationDetailPage from "./components/ConversationDetailPage";
+import RagManagementPage from "./components/RagManagementPage";
 import styles from "./App.module.css";
 import { api } from "./services/api";
 import type { AdminConversationDetail, AdminConversationSummary, AdminWxUser, AuthSession, PageResponse } from "./types";
@@ -31,6 +32,7 @@ export default function App() {
   const [detail, setDetail] = useState<AdminConversationDetail | null>(null);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
+  const [page, setPage] = useState<"dashboard" | "rag">("dashboard");
 
   const load = async (accessToken: string, wxUserId = selectedUser) => {
     setLoading(true);
@@ -113,8 +115,11 @@ export default function App() {
     );
   }
 
+  if (page === "rag") return <RagManagementPage session={session} onBack={() => setPage("dashboard")} />;
+
   return (
     <main className={styles.appPage}>
+      <button className={styles.ragLaunchButton} type="button" onClick={() => setPage("rag")}>RAG 知识库管理 →</button>
       <aside className={styles.sidebar}><div className={styles.logo}><span>✦</span><div>TRAVEL<br /><small>AGENT OPS</small></div></div><div className={styles.sidebarLabel}>WORKSPACE</div><button className={styles.navActive} type="button">▦ <span>运营看板</span></button><button className={selectedUser === null ? styles.navActive : styles.navButton} type="button" onClick={() => selectUser(null)}>◷ <span>全部会话</span></button><div className={styles.sidebarLabel}>用户筛选</div><div className={styles.userNav}>{users?.content.slice(0, 8).map(user => <button key={user.id} className={selectedUser === user.id ? styles.userActive : styles.userButton} type="button" onClick={() => selectUser(user.id)}><span className={styles.avatar}>{(user.nickname || "用").slice(0, 1)}</span>{user.nickname || "未命名用户"}</button>)}</div><div className={styles.sidebarBottom}><div className={styles.account}><span className={styles.avatar}>A</span><div><strong>{session.user.displayName || "管理员"}</strong><small>Administrator</small></div></div><button type="button" className={styles.logout} onClick={() => { localStorage.removeItem(STORAGE_KEY); setSession(null); }}>退出登录</button></div></aside>
       <section className={styles.mainPanel}><header className={styles.topbar}><div><div className={styles.kicker}>OVERVIEW / REAL-TIME</div><h1>运营看板</h1><p className={styles.muted}>了解你的 AI 旅行助手正在发生什么。</p></div><div className={styles.topbarActions}><span className={styles.liveBadge}><span className={styles.statusDot} /> 系统运行中</span><button className={styles.refreshButton} type="button" onClick={() => void load(session.token.accessToken)}>↻ 刷新</button></div></header>{error ? <div className={styles.errorBanner}>{error}</div> : null}<section className={styles.metricGrid}><Metric label="会话总数" value={stats.conversations} hint="累计创建的对话" icon="◌" /><Metric label="用户总数" value={stats.users} hint="已接入的微信用户" icon="♙" /><Metric label="消息总量" value={stats.messages} hint="当前页会话统计" icon="↗" /><Metric label="今日更新" value={stats.today} hint="今天有新消息的会话" icon="✧" accent /></section><section className={styles.dashboardGrid}><div className={styles.panelCard}><div className={styles.panelHeading}><div><h2>最近会话</h2><p className={styles.muted}>点击查看完整对话与 Agent 调用日志</p></div><span className={styles.countPill}>{filteredConversations.length} 条</span></div><div className={styles.toolbar}><div className={styles.search}><span>⌕</span><input placeholder="搜索标题、内容或用户" value={search} onChange={event => setSearch(event.target.value)} /></div><span className={styles.muted}>{loading ? "同步中..." : `更新于 ${new Date().toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}`}</span></div><div className={styles.conversationList}>{filteredConversations.map(item => <button className={styles.conversationRow} type="button" key={item.id} onClick={() => void openDetail(item.id)}><span className={styles.conversationIcon}>✦</span><span className={styles.conversationBody}><strong>{item.title || "未命名会话"}</strong><span>{item.preview || "暂无消息"}</span><small>{item.user?.displayName || "匿名用户"} · {item.messageCount} 条消息</small></span><span className={styles.conversationTime}>{formatTime(item.updatedAt)}<b>›</b></span></button>)}{!filteredConversations.length ? <div className={styles.empty}>没有找到符合条件的会话</div> : null}</div></div><div className={styles.sideStack}><div className={styles.panelCard}><div className={styles.panelHeading}><div><h2>用户概览</h2><p className={styles.muted}>最近接入的用户</p></div><span className={styles.countPill}>{users?.content.length ?? 0}</span></div><div className={styles.userList}>{users?.content.slice(0, 6).map(user => <div className={styles.userRow} key={user.id}><span className={styles.avatar}>{(user.nickname || "用").slice(0, 1)}</span><span><strong>{user.nickname || "未命名用户"}</strong><small>{user.enabled ? "账号正常" : "已停用"}</small></span><i className={user.enabled ? styles.online : styles.offline} /></div>)}</div></div><div className={`${styles.panelCard} ${styles.signalCard}`}><div className={styles.kicker}>PLATFORM SIGNAL</div><h2>多 Agent 协同</h2><p>从意图识别到路线审核，每一条链路都可追踪。</p><div className={styles.signalLine}><span style={{ width: "82%" }} /></div><small>观测数据由 Kafka 异步写入</small></div></div></section></section>
     </main>

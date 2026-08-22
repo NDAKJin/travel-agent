@@ -37,9 +37,10 @@
 
 ## 核心能力
 
-- **多智能体旅行对话**：LangGraph4j 编排意图识别、需求收集、路线规划、审核与最终答复；规划师可按需调用旅行知识、路线与预算专家。
+- **多智能体旅行对话**：LangGraph4j 编排意图识别、需求收集、路线规划、审核与最终答复；路线规划师和普通服务者均可按需调用旅行知识专家，路线规划师还可调用路线与预算专家。
 - **对话状态持久化**：LangGraph4j Checkpoint 使用 RedisSaver 保存 Human-in-the-loop 状态，Checkpoint 自动保留 7 天。
-- **旅行知识 RAG**：旅行知识专家通过 Spring AI Qdrant Vector Store 检索相关知识，并将候选片段注入专家上下文；使用 DashScope Embedding 生成向量。
+- **旅行知识 RAG**：采用“Qdrant 向量召回 + Qwen Rerank 重排”的两阶段检索链路，筛选高相关知识片段后注入旅行知识专家上下文。
+- **RAG 知识库管理**：管理台支持多文件异步导入、文章级查看和 Chunk 级查看；文档与 Chunk 均支持启用/禁用，状态变化会同步删除或恢复 Qdrant 向量，禁用内容不会参与检索。
 - **运营管理台**：React + TypeScript 管理微信用户、会话及 Agent 可观测日志。
 - **微信小程序入口**：原生 WXML / WXSS / JavaScript，完成登录、聊天和历史会话。
 - **安全认证**：微信登录与管理端登录统一使用 JWT，刷新令牌存储在 Redis。
@@ -53,24 +54,30 @@ flowchart LR
     admin["React 管理台"]
     api["行迹 API（Spring Boot）"]
     workflow["LangGraph4j 多智能体编排"]
+    rag["RAG 知识库模块"]
     mysql[("MySQL")]
     redis[("Redis")]
     kafka[("Kafka")]
+    qdrant[("Qdrant 向量库")]
     model["DashScope 模型服务"]
 
     mini --> api
     admin --> api
     api --> workflow
+    api --> rag
     workflow --> model
+    workflow --> rag
     workflow --> kafka
+    rag --> qdrant
+    rag --> mysql
+    rag --> model
+    kafka --> rag
     kafka --> mysql
     api --> mysql
     api --> redis
 ```
 
 ## 多智能体协作
-
-主流程由 **LangGraph4j** 管理。路线规划子图包含规划师、专家并行执行和审核师；规划师一次返回所需的专家任务，子图使用 `CompletableFuture` 并行执行，汇总结构化结果后回到规划师。普通服务者直接回答非规划问题，不进入路线规划子图。
 
 ```mermaid
 flowchart TD
@@ -112,10 +119,6 @@ flowchart TD
     wait -->|下一轮消息和新位置| message
 ```
 
-当前位置由 API 在进入 LangGraph 前注入共享 State，不作为 LangGraph 节点执行。
-
-路线需求必填项为起点与终点；兴趣和约束为选填项，用户未提供时不阻塞规划。
-
 | 角色 | 工具与职责 | 启用条件 |
 | --- | --- | --- |
 | 总控 | 判断路线规划或普通服务 | 始终启用 |
@@ -130,13 +133,61 @@ flowchart TD
 
 三位专家统一返回结构化 JSON，由路线规划子图的并行执行节点按需调度；未被选中的专家不会执行。提示词位于 `src/main/resources/prompt/`，统一使用“角色、输入、输出、约束”结构。
 
+## RAG 知识库
+
+RAG 模块独立于 LangGraph 编排层，负责知识文档的导入、加工、向量化、检索和运营管理。路线规划师与普通服务者通过 Spring AI Tool 按需调用旅行知识专家；专家先从 Qdrant 召回候选 Chunk，再使用 Qwen Rerank 重排并筛选最终结果，最后将结构化知识上下文交给上层 Agent。
+
+### RAG 检索链路
+
+```mermaid
+flowchart LR
+    agent["路线规划师或普通服务者"]
+    tool["Spring AI Tool"]
+    rag["旅行知识专家"]
+    qdrant[("Qdrant")]
+    rerank["Qwen Rerank"]
+    context["最终知识上下文"]
+
+    agent --> tool
+    tool --> rag
+    rag -->|召回候选 Top-K| qdrant
+    qdrant --> rerank
+    rag --> rerank
+    rerank -->|重排并筛选 Top-N| context
+    context --> agent
+```
+
+RAG 检索使用两阶段参数：
+
+- `TRAVEL_AGENT_RAG_RECALL_TOP_K`：Qdrant 初始召回数量，默认 `20`。
+- `TRAVEL_AGENT_RAG_TOP_K`：Rerank 后最终注入数量，默认 `5`。
+- `TRAVEL_AGENT_RAG_SIMILARITY_THRESHOLD`：Qdrant 初始相似度阈值。
+- `TRAVEL_AGENT_RAG_RERANK_MODEL`：Rerank 模型，默认 `qwen3-rerank`。
+- `TRAVEL_AGENT_RAG_RERANK_TOP_N`：Rerank 返回数量，默认 `5`。
+
+向量中的正文、文档元数据和 Chunk 元数据用于帮助专家生成更准确的旅行知识结果。Rerank 是当前检索链路的必经步骤，调用失败会直接返回错误，不回退到未经重排的向量召回结果。
+
+### RAG 文档导入流水线
+
+导入接口只负责接收文件、保存任务和发送 Kafka 消息，不等待完整处理。Kafka 消费者使用固定顺序的节点流水线执行：
+
+```mermaid
+flowchart LR
+    parser["PARSING - Apache Tika"]
+    parser --> doc["DOC_ENRICHING - 文档元数据"]
+    doc --> chunk["CHUNKING - 文本分块"]
+    chunk --> chunkMeta["CHUNK_ENRICHING - Chunk 元数据"]
+    chunkMeta --> vector["VECTORIZING - Embedding + Qdrant"]
+```
+
+
 ## 技术栈
 
 | 层次 | 技术 |
 | --- | --- |
 | Backend | Java 21、Spring Boot 4、Spring AI Alibaba、LangGraph4j、Spring Security、MyBatis |
 | Data | MySQL、Redis、Kafka |
-| RAG | Qdrant、DashScope Embedding |
+| RAG | Qdrant、DashScope Embedding、Qwen Rerank |
 | Admin console | React 18、TypeScript、Vite |
 | Mini program | 原生 JavaScript、WXML、WXSS |
 | API docs | Springdoc OpenAPI、NextDoc4j |
@@ -148,24 +199,9 @@ flowchart TD
 - JDK 21+
 - Node.js 18+
 - MySQL、Redis
-- 可选：Kafka（启用 Agent 可观测时需要）
-- Qdrant（必需，使用 gRPC 端口 6334）
+- Kafka
+- Qdrant
 - 阿里云百炼 DashScope API Key
-
-配置 Qdrant 与 Embedding：
-
-```text
-SPRING_AI_VECTORSTORE_QDRANT_HOST=localhost
-SPRING_AI_VECTORSTORE_QDRANT_PORT=6334
-SPRING_AI_VECTORSTORE_QDRANT_COLLECTION_NAME=travel_knowledge
-SPRING_AI_DASHSCOPE_EMBEDDING_OPTIONS_MODEL=text-embedding-v4
-```
-
-应用始终使用 Qdrant 和 DashScope Embedding；启动时 Qdrant 不可用会直接失败。需要先向 `travel_knowledge` collection 写入旅行知识文档。
-
-LangGraph4j Checkpoint 使用 Redis，默认保留 7 天；Redis 连接参数沿用 `SPRING_DATA_REDIS_HOST`、`SPRING_DATA_REDIS_PORT`、`SPRING_DATA_REDIS_USERNAME` 和 `SPRING_DATA_REDIS_PASSWORD`。
-
-- 使用微信登录时，需要小程序 AppID / AppSecret
 
 ### 1. 配置并启动后端
 
@@ -175,11 +211,10 @@ LangGraph4j Checkpoint 使用 Redis，默认保留 7 天；Redis 连接参数沿
 Copy-Item src/main/resources/application.example.yml src/main/resources/application.yml
 ```
 
-在 `application.yml` 中填写数据库、Redis、模型服务、微信和 JWT 配置。启用 Agent 可观测时，还需要设置 Kafka：
+在 `application.yml` 中填写数据库、Redis、模型服务、微信、JWT 和 Kafka 配置。Kafka 是 Agent 可观测链路的必需依赖：
 
 ```env
 SPRING_KAFKA_BOOTSTRAP_SERVERS=<Kafka 地址>:9092
-TRAVEL_AGENT_OBSERVABILITY_ENABLED=true
 ```
 
 启动 API：
@@ -245,12 +280,17 @@ Studio 会触发真实模型调用，仅建议本地开启。
 | 认证 | `POST /api/auth/wx/login`、`POST /api/auth/admin/login`、`POST /api/auth/refresh` |
 | AI 助手 | `POST /api/agent/chat`、`POST /api/agent/sessions`、`GET /api/agent/sessions` |
 | 运营管理 | `/api/admin/wx-users`、`/api/admin/sessions` |
+| RAG 管理 | `POST /api/admin/rag/documents/import`、`GET /api/admin/rag/documents/import/tasks`、`GET /api/admin/rag/documents`、`GET /api/admin/rag/chunks` |
+| RAG 状态管理 | `PATCH /api/admin/rag/documents/{id}/enable`、`PATCH /api/admin/rag/chunks/{id}/enable`、`PATCH /api/admin/rag/chunks/batch-enable` |
 
 ## 项目结构
 
 ```text
 travel-agent/
-├── src/                 Spring Boot API：认证、Agent、管理端
+├── src/                 Spring Boot API：认证、Agent、管理端与 RAG
+│   ├── .../application/      用例、应用服务、DTO 与端口；按 agent/admin/auth/rag/planning 划分
+│   ├── .../domain/           规划规则、RAG 分块规则、会话与账户领域模型
+│   └── .../infrastructure/   LangGraph、Spring AI、JWT、MyBatis、Redis、Kafka、Qdrant 与 Web 适配器
 ├── fe/                  React + TypeScript 管理台
 ├── miniprogram/         原生微信小程序
 ├── scripts/             部署与辅助脚本
@@ -260,7 +300,7 @@ travel-agent/
 
 ## Docker 启动与部署
 
-Docker Compose 会启动管理台、API、MySQL 和 Redis。Kafka 可部署在独立服务器，通过 `.env` 中的地址连接。
+Docker Compose 会启动管理台、API、MySQL、Redis、Qdrant 和单节点 Kafka（KRaft）。API 在 Compose 网络内通过 `kafka:9092` 连接 Kafka，宿主机调试客户端可使用 `localhost:29092`。
 
 ```bash
 git clone <仓库地址> travel-agent
@@ -270,10 +310,7 @@ cp .env.example .env
 docker compose up -d --build
 ```
 
-```env
-SPRING_KAFKA_BOOTSTRAP_SERVERS=<Kafka 地址>:9092
-TRAVEL_AGENT_OBSERVABILITY_ENABLED=true
-```
+如需连接外部 Kafka，将 `SPRING_KAFKA_BOOTSTRAP_SERVERS` 改为外部集群地址；Compose 内 Kafka 仍会启动，但 API 将使用外部地址。
 
 查看状态和日志：
 
@@ -289,8 +326,8 @@ git pull
 docker compose up -d --build
 ```
 
-数据由 Docker volumes 持久化；不要执行 `docker compose down -v`，否则会删除 MySQL 与 Redis 数据。
-`schema.sql` 仅在 MySQL 数据卷首次初始化时执行；已有数据库的结构升级需通过发布流程迁移。
+数据由 Docker volumes 持久化；不要执行 `docker compose down -v`，否则会删除 MySQL、Kafka、Qdrant 和 Redis 数据。
+应用启动时会自动补充 RAG 状态字段；其他表结构仍由 `schema.sql` 在初始化阶段创建。
 
 ## 开发与测试
 
@@ -310,11 +347,10 @@ npm run build
 
 ## Agent 可观测
 
-启用 `TRAVEL_AGENT_OBSERVABILITY_ENABLED=true` 后，LangGraph4j 节点与三个专家的调用日志会由 Hook 直接发送至 Kafka `agent-observation`，消费者异步写入 `agent_observation_log`。记录通过 `message_id` 关联用户消息，包含 LLM 输入输出、模型、Token、耗时和错误信息；仅在管理端会话详情中展示，不会返回给用户端。Kafka 未部署或开关关闭时，不会记录观测日志。
+LangGraph4j 节点与专家的调用日志会由 Hook 直接发送至 Kafka `agent-observation`，消费者异步写入 `agent_observation_log`。记录通过 `message_id` 关联用户消息，包含 LLM 输入输出、模型、Token、耗时和错误信息；仅在管理端会话详情中展示，不会返回给用户端。Kafka 不可用时，应用无法正常启动或观测消息无法发送。
 
 ```env
 SPRING_KAFKA_BOOTSTRAP_SERVERS=localhost:9092
-TRAVEL_AGENT_OBSERVABILITY_ENABLED=true
 ```
 
 ## 开源协议
