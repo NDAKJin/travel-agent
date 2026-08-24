@@ -62,6 +62,19 @@ class LangGraphTravelAgentTest {
     }
 
     @Test
+    void structuredOutputsMayContainUnknownFields() {
+        LangGraphTravelAgent graph = new LangGraphTravelAgent(
+                client(route(), "{\"status\":\"CONFIRMED\",\"question\":null,\"source\":\"llm\","
+                        + "\"requirements\":{\"origin\":\"Nanjing Station\",\"destination\":\"Nanjing South Station\","
+                        + "\"date\":null,\"days\":\"1\",\"people\":\"2\",\"budget\":\"1000\","
+                        + "\"interests\":null,\"constraints\":null,\"extra\":\"ignored\"}}", approved()),
+                client(plan()), client(), client(finalReply("Final itinerary")), new PromptResourceLoader());
+
+        assertThat(graph.run(List.of(new AgentMessage("user", "Plan a one-day trip"))))
+                .isEqualTo("Final itinerary");
+    }
+
+    @Test
     void invalidIntentFallsBackToNormalService() {
         ChatClient planner = client();
         LangGraphTravelAgent graph = new LangGraphTravelAgent(
@@ -118,6 +131,36 @@ class LangGraphTravelAgentTest {
                 .isEqualTo("Final itinerary");
         verify(knowledge).planKnowledge(anyString());
         verify(budget).estimateBudget(anyString());
+    }
+
+    @Test
+    void skipsDuplicateExpertTasksInOnePlannerDecision() {
+        KnowledgePlanningAgent knowledge = mock(KnowledgePlanningAgent.class);
+        when(knowledge.planKnowledge(anyString())).thenReturn("{\"facts\":[]}");
+        LangGraphTravelAgent graph = new LangGraphTravelAgent(
+                client(route(), confirmed(), approved()),
+                client(delegate("KNOWLEDGE", "KNOWLEDGE"), plan()), client(), client(finalReply("Final itinerary")),
+                new PromptResourceLoader(), new MemorySaver(), knowledge,
+                mock(RoutePlanningAgent.class), mock(BudgetAgent.class));
+
+        assertThat(graph.run(List.of(new AgentMessage("user", "Plan a one-day trip"))))
+                .isEqualTo("Final itinerary");
+        verify(knowledge).planKnowledge(anyString());
+    }
+
+    @Test
+    void doesNotReinvokeExpertWhenPlannerRepeatsCompletedTask() {
+        KnowledgePlanningAgent knowledge = mock(KnowledgePlanningAgent.class);
+        when(knowledge.planKnowledge(anyString())).thenReturn("{\"facts\":[]}");
+        LangGraphTravelAgent graph = new LangGraphTravelAgent(
+                client(route(), confirmed(), approved()),
+                client(delegate("KNOWLEDGE"), delegate("KNOWLEDGE"), plan()), client(),
+                client(finalReply("Final itinerary")), new PromptResourceLoader(), new MemorySaver(), knowledge,
+                mock(RoutePlanningAgent.class), mock(BudgetAgent.class));
+
+        assertThat(graph.run(List.of(new AgentMessage("user", "Plan a one-day trip"))))
+                .isEqualTo("Final itinerary");
+        verify(knowledge).planKnowledge(anyString());
     }
 
     @Test

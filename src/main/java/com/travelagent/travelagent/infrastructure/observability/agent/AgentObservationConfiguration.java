@@ -1,6 +1,7 @@
 package com.travelagent.travelagent.infrastructure.observability.agent;
 
 import com.travelagent.travelagent.application.observability.model.AgentObservationEvent;
+import com.travelagent.travelagent.application.observability.port.out.AgentObservationPort;
 
 import com.alibaba.fastjson2.JSON;
 import lombok.extern.slf4j.Slf4j;
@@ -12,13 +13,13 @@ import org.springframework.kafka.core.KafkaTemplate;
 class AgentObservationConfiguration {
 
     @Bean
-    AgentObservationPublisher kafkaAgentObservationPublisher(KafkaTemplate<String, String> kafkaTemplate,
-                                                              AgentObservationProperties properties) {
+    AgentObservationPort kafkaAgentObservationPublisher(KafkaTemplate<String, String> kafkaTemplate,
+                                                        AgentObservationProperties properties) {
         return new KafkaAgentObservationPublisher(kafkaTemplate, properties);
     }
 
     @Slf4j
-    private static class KafkaAgentObservationPublisher implements AgentObservationPublisher {
+    private static class KafkaAgentObservationPublisher implements AgentObservationPort {
         private final KafkaTemplate<String, String> kafkaTemplate;
         private final AgentObservationProperties properties;
 

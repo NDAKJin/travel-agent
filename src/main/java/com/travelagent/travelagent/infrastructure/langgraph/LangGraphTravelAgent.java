@@ -20,6 +20,9 @@ import com.travelagent.travelagent.domain.planning.service.RequirementPolicy;
 import java.util.List;
 import java.util.Map;
 import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.Locale;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ForkJoinPool;
@@ -50,6 +53,7 @@ import java.util.HashMap;
 @Service
 public class LangGraphTravelAgent implements TravelWorkflowPort {
 
+    private static final Set<String> ROUTE_EXPERTS = Set.of("KNOWLEDGE", "ROUTE", "BUDGET");
     private final RouteReviewPolicy routeReviewPolicy = RouteReviewPolicy.standard();
     private static final Map<String, Channel<?>> STATE_SCHEMA = Map.ofEntries(
             Map.entry("history", Channels.<List<AgentMessage>>base(() -> List.of())),
@@ -234,9 +238,9 @@ public class LangGraphTravelAgent implements TravelWorkflowPort {
         String systemPrompt = prompt("intent-supervisor");
         String decision = call("supervisor", systemPrompt + "\n\n" + input,
                 orchestrationChatClient.prompt().system(systemPrompt).user(input).call(),
-                state.observation(), output -> "route".equals(parseIntent(output))
+                state.observation(), output -> "route".equals(WorkflowOutputParser.intent(output))
                         ? "requirements" : "normalService");
-        return Map.of("intent", "route".equals(parseIntent(decision)) ? "route" : "normal");
+        return Map.of("intent", "route".equals(WorkflowOutputParser.intent(decision)) ? "route" : "normal");
     }
 
     private Map<String, Object> collectRequirements(WorkflowState state) {
@@ -244,8 +248,8 @@ public class LangGraphTravelAgent implements TravelWorkflowPort {
         String systemPrompt = prompt("route-requirements");
         String raw = call("requirements", systemPrompt + "\n\n" + input,
                 orchestrationChatClient.prompt().system(systemPrompt).user(input).call(),
-                state.observation(), output -> parseRequirements(output).confirmed() ? "routePlanner" : "finalize");
-        RequirementDecision decision = parseRequirements(raw);
+                state.observation(), output -> WorkflowOutputParser.requirements(output).confirmed() ? "routePlanner" : "finalize");
+        WorkflowOutputParser.RequirementDecision decision = WorkflowOutputParser.requirements(raw);
         return Map.of("requirements", decision.structuredOutput());
     }
 
@@ -263,8 +267,8 @@ public class LangGraphTravelAgent implements TravelWorkflowPort {
             String input = routePlanningInput(state);
             String raw = call("routePlanner", systemPrompt + "\n\n" + input,
                     routePlannerChatClient.prompt().system(systemPrompt).user(input).call(),
-                    state.observation(), output -> plannerDecision(output).next());
-            PlannerDecision decision = plannerDecision(raw);
+                    state.observation(), output -> WorkflowOutputParser.planner(output).next());
+            WorkflowOutputParser.PlannerDecision decision = WorkflowOutputParser.planner(raw);
             if (!decision.delegates()) {
                 return Map.of("routePlan", decision.plan(), "routeNext", "routeReviewer");
             }
@@ -273,20 +277,30 @@ public class LangGraphTravelAgent implements TravelWorkflowPort {
     }
 
     private Map<String, Object> runExpertsParallel(WorkflowState state) {
-        JSONObject parsedResults = parseJson(state.expertResults());
+        JSONObject parsedResults = WorkflowOutputParser.parseJson(state.expertResults());
         final JSONObject results = parsedResults == null ? new JSONObject() : parsedResults;
         JSONArray tasks = JSON.parseArray(state.expertTasks());
         List<CompletableFuture<Void>> futures = new ArrayList<>();
+        Set<String> scheduled = new HashSet<>();
         for (Object item : tasks == null ? List.of() : tasks) {
             JSONObject task = item instanceof JSONObject json ? json : null;
             if (task == null) continue;
             String expert = task.getString("expert");
+            if (!StringUtils.hasText(expert)) continue;
+            expert = expert.trim().toUpperCase(Locale.ROOT);
+            if (!ROUTE_EXPERTS.contains(expert)) continue;
+            if (task.get("task") == null) continue;
             String payload = JSON.toJSONString(task.get("task"), JSONWriter.Feature.WriteMapNullValue);
+            // 每轮每个专家只保留一个任务，避免结果按专家键覆盖并浪费并行调用。
+            if (!scheduled.add(expert)) continue;
+            String resultKey = expert.toLowerCase(Locale.ROOT);
+            if (results.containsKey(resultKey)) continue;
+            String selectedExpert = expert;
             futures.add(CompletableFuture.runAsync(() -> {
                 try (AgentObservationContextHolder.Scope ignored = AgentObservationContextHolder.open(state.observation())) {
-                    String output = routeExpertGateway.execute(expert, payload);
+                    String output = routeExpertGateway.execute(selectedExpert, payload);
                     synchronized (results) {
-                        results.put(expert.toLowerCase(), jsonOrText(output));
+                        results.put(resultKey, jsonOrText(output));
                     }
                 }
             }, routeExpertExecutor));
@@ -301,9 +315,9 @@ public class LangGraphTravelAgent implements TravelWorkflowPort {
         String raw = call("routeReviewer", systemPrompt + "\n\n" + input,
                 orchestrationChatClient.prompt().system(systemPrompt).user(input).call(),
                 state.observation(), output -> routeReviewPolicy.mustFinalize(
-                        parseReview(output).approved(), state.reviewAttempts() + 1)
+                        WorkflowOutputParser.review(output).approved(), state.reviewAttempts() + 1)
                         ? "finalize" : "routePlanner");
-        ReviewDecision decision = parseReview(raw);
+        WorkflowOutputParser.ReviewDecision decision = WorkflowOutputParser.review(raw);
         if (decision.approved() && routePlanSemanticCache != null && !state.routeCacheHit()
                 && StringUtils.hasText(state.routePlan())) {
             routePlanSemanticCache.put(requirementData(state.requirements()), state.routePlan());
@@ -384,95 +398,6 @@ public class LangGraphTravelAgent implements TravelWorkflowPort {
         return value != null && value.trim().toLowerCase().startsWith(prefix);
     }
 
-    private String parseIntent(String output) {
-        JSONObject json = parseJson(output);
-        String intent = json != null && json.size() == 1 && json.containsKey("intent") ? json.getString("intent") : null;
-        return "route".equalsIgnoreCase(intent) ? "route" : "normal";
-    }
-
-    private RequirementDecision parseRequirements(String output) {
-        JSONObject json = parseJson(output);
-        if (json != null && validRequirements(json)) {
-            return new RequirementDecision("confirmed".equalsIgnoreCase(json.getString("status")),
-                    JSON.toJSONString(json, JSONWriter.Feature.WriteMapNullValue));
-        }
-        JSONObject fallback = new JSONObject();
-        fallback.put("status", "QUESTION");
-        fallback.put("question", "请先补充本次路线规划的必要信息。");
-        fallback.put("requirements", emptyRequirements());
-        return new RequirementDecision(false, JSON.toJSONString(fallback, JSONWriter.Feature.WriteMapNullValue));
-    }
-
-    private ReviewDecision parseReview(String output) {
-        JSONObject json = parseJson(output);
-        if (json != null && validReview(json)) {
-            return new ReviewDecision("approved".equalsIgnoreCase(json.getString("status")),
-                    JSON.toJSONString(json, JSONWriter.Feature.WriteMapNullValue));
-        }
-        JSONObject fallback = new JSONObject();
-        fallback.put("status", "REVISE");
-        fallback.put("issues", List.of("审核结果格式无效，请重新审核。"));
-        return new ReviewDecision(false, JSON.toJSONString(fallback));
-    }
-
-    private boolean validRequirements(JSONObject value) {
-        String status = value.getString("status");
-        JSONObject requirements = value.getJSONObject("requirements");
-        if (value.size() != 3 || !value.containsKey("status") || !value.containsKey("question")
-                || requirements == null || !hasRequirementFields(requirements)) return false;
-        if ("question".equalsIgnoreCase(status)) return StringUtils.hasText(value.getString("question"));
-        return "confirmed".equalsIgnoreCase(status) && StringUtils.hasText(requirements.getString("origin"))
-                && StringUtils.hasText(requirements.getString("destination"))
-                && StringUtils.hasText(requirements.getString("people"))
-                && StringUtils.hasText(requirements.getString("budget"))
-                && (StringUtils.hasText(requirements.getString("date")) || StringUtils.hasText(requirements.getString("days")));
-    }
-
-    private boolean hasRequirementFields(JSONObject requirements) {
-        return requirements.size() == 8 && List.of("origin", "destination", "date", "days", "people", "budget", "interests", "constraints")
-                .stream().allMatch(requirements::containsKey);
-    }
-
-    private JSONObject emptyRequirements() {
-        JSONObject requirements = new JSONObject();
-        List.of("origin", "destination", "date", "days", "people", "budget", "interests", "constraints")
-                .forEach(field -> requirements.put(field, null));
-        return requirements;
-    }
-
-    private boolean validReview(JSONObject value) {
-        String status = value.getString("status");
-        JSONArray issues = value.getJSONArray("issues");
-        if (value.size() != 2 || !value.containsKey("status") || !value.containsKey("issues") || issues == null) return false;
-        if ("approved".equalsIgnoreCase(status)) return issues.isEmpty();
-        return "revise".equalsIgnoreCase(status) && !issues.isEmpty() && issues.size() <= 3
-                && issues.stream().allMatch(item -> item instanceof String text && StringUtils.hasText(text));
-    }
-
-    private PlannerDecision plannerDecision(String output) {
-        JSONObject json = parseJson(output);
-        if (json == null) return new PlannerDecision("routeReviewer", output, "", false);
-        if ("DELEGATE".equalsIgnoreCase(json.getString("action"))) {
-            JSONArray tasks = json.getJSONArray("tasks");
-            if (tasks != null && !tasks.isEmpty()) {
-                return new PlannerDecision("expertsParallel", "", JSON.toJSONString(tasks), true);
-            }
-        }
-        Object plan = json.get("plan");
-        return new PlannerDecision("routeReviewer", plan == null ? output : JSON.toJSONString(plan), "", false);
-    }
-
-    private static JSONObject parseJson(String output) {
-        if (!StringUtils.hasText(output)) return null;
-        String value = output.trim();
-        if (!value.startsWith("{") || !value.endsWith("}")) return null;
-        try {
-            return JSON.parseObject(value);
-        } catch (RuntimeException ignored) {
-            return null;
-        }
-    }
-
     private String stripPrefix(String value, String prefix) {
         if (!startsWith(value, prefix)) return value == null ? "" : value.trim();
         return value.trim().substring(prefix.length()).trim();
@@ -484,13 +409,13 @@ public class LangGraphTravelAgent implements TravelWorkflowPort {
     }
 
     private String requirementData(String requirements) {
-        JSONObject result = parseJson(requirements);
+        JSONObject result = WorkflowOutputParser.parseJson(requirements);
         JSONObject data = result == null ? null : result.getJSONObject("requirements");
         return data == null ? "{}" : JSON.toJSONString(data, JSONWriter.Feature.WriteMapNullValue);
     }
 
     private String requirementQuestion(String requirements) {
-        JSONObject result = parseJson(requirements);
+        JSONObject result = WorkflowOutputParser.parseJson(requirements);
         return result == null ? "" : result.getString("question");
     }
 
@@ -546,18 +471,18 @@ public class LangGraphTravelAgent implements TravelWorkflowPort {
     }
 
     private Object jsonOrText(String value) {
-        JSONObject json = parseJson(value);
+        JSONObject json = WorkflowOutputParser.parseJson(value);
         return json == null ? value : json;
     }
 
     private String normalAnswer(String output) {
-        JSONObject json = parseJson(output);
+        JSONObject json = WorkflowOutputParser.parseJson(output);
         String answer = json == null ? null : json.getString("answer");
         return StringUtils.hasText(answer) ? answer.trim() : output == null ? "" : output.trim();
     }
 
     private String finalReply(String output) {
-        JSONObject json = parseJson(output);
+        JSONObject json = WorkflowOutputParser.parseJson(output);
         String reply = json == null ? null : json.getString("reply");
         return StringUtils.hasText(reply) ? reply.trim() : output == null ? "" : output.trim();
     }
@@ -602,7 +527,7 @@ public class LangGraphTravelAgent implements TravelWorkflowPort {
         String currentUserLocation() { return this.<String>value("currentUserLocation").orElse("{}"); }
         String requirements() { return this.<String>value("requirements").orElse("{}"); }
         boolean requirementsConfirmed() {
-            JSONObject result = parseJson(requirements());
+            JSONObject result = WorkflowOutputParser.parseJson(requirements());
             return result != null && RequirementPolicy.isConfirmed(result.getString("status"));
         }
         String routePlan() { return this.<String>value("routePlan").orElse(""); }
@@ -620,9 +545,4 @@ public class LangGraphTravelAgent implements TravelWorkflowPort {
         String reply() { return this.<String>value("reply").orElse(""); }
     }
 
-    private record RequirementDecision(boolean confirmed, String structuredOutput) { }
-
-    private record ReviewDecision(boolean approved, String structuredOutput) { }
-
-    private record PlannerDecision(String next, String plan, String tasks, boolean delegates) { }
 }

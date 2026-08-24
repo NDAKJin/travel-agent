@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -19,11 +20,13 @@ import org.springframework.web.client.RestClient;
 public class QwenRerankService implements RerankService {
 
     private final RerankProperties properties;
-    private final RestClient restClient = RestClient.create();
+    private final RestClient restClient;
 
     public QwenRerankService(RerankProperties properties,
-                             @Value("${spring.ai.dashscope.api-key:}") String dashScopeApiKey) {
+                             @Value("${spring.ai.dashscope.api-key:}") String dashScopeApiKey,
+                             @Qualifier("externalRestClient") RestClient restClient) {
         this.properties = properties;
+        this.restClient = restClient;
         if (!StringUtils.hasText(properties.getApiKey())) {
             properties.setApiKey(dashScopeApiKey);
         }

@@ -1,7 +1,6 @@
 package com.travelagent.travelagent.infrastructure.persistence.agent;
 
-import com.travelagent.travelagent.infrastructure.persistence.agent.AgentConversationSessionMapper;
-import com.travelagent.travelagent.application.agent.port.out.AgentConversationStore;
+import com.travelagent.travelagent.application.planning.port.out.ConversationStorePort;
 import com.travelagent.travelagent.domain.agent.model.AgentConversationMessage;
 import com.travelagent.travelagent.domain.agent.model.AgentConversationSession;
 import com.travelagent.travelagent.domain.agent.model.AgentMessage;
@@ -15,7 +14,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 @Component
-public class MybatisAgentConversationStore implements AgentConversationStore {
+public class MybatisAgentConversationStore implements ConversationStorePort {
 
     private final AgentConversationSessionMapper mapper;
 

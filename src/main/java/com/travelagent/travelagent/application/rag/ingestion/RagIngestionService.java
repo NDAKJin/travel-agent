@@ -12,7 +12,6 @@ import com.travelagent.travelagent.domain.rag.service.RagTextChunker;
 import java.io.ByteArrayInputStream;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -25,11 +24,9 @@ import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
-import org.springframework.web.multipart.MultipartFile;
 import org.apache.tika.parser.ParseContext;
 
 @Service
@@ -47,13 +44,6 @@ public class RagIngestionService {
 
     public RagIngestionService(VectorStore vectorStore,
                                @Qualifier("finalizerChatClient") ChatClient chatClient,
-                               PromptLoader promptResourceLoader) {
-        this(vectorStore, chatClient, promptResourceLoader, null);
-    }
-
-    @Autowired
-    public RagIngestionService(VectorStore vectorStore,
-                               @Qualifier("finalizerChatClient") ChatClient chatClient,
                                PromptLoader promptResourceLoader,
                                JdbcTemplate jdbcTemplate) {
         this.vectorStore = vectorStore;
@@ -64,14 +54,7 @@ public class RagIngestionService {
                 new ChunkMetadataNode(), new PersistNode());
     }
 
-    public List<RagIngestionResult> importFiles(List<MultipartFile> files) {
-        List<RagIngestionResult> results = new ArrayList<>();
-        for (MultipartFile file : files) {
-            results.add(importFile(file));
-        }
-        return results;
-    }
-
+    /*
     private RagIngestionResult importFile(MultipartFile file) {
         String fileName = StringUtils.hasText(file.getOriginalFilename()) ? file.getOriginalFilename() : "unknown";
         try {
@@ -84,6 +67,9 @@ public class RagIngestionService {
                     StringUtils.hasText(exception.getMessage()) ? exception.getMessage() : exception.getClass().getSimpleName());
         }
     }
+
+    }
+    */
 
     public RagIngestionResult process(String fileName, String contentType, byte[] bytes) {
         return process(fileName, contentType, bytes, ignored -> { });

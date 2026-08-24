@@ -58,7 +58,7 @@ public class KnowledgeRagService implements KnowledgeRetriever {
                 .topK(recallTopK)
                 .similarityThreshold(similarityThreshold)
                 .build());
-        List<Document> rerankedDocuments = rerank(task, documents);
+        List<RankedDocument> rerankedDocuments = rerank(task, documents);
         JSONObject input = new JSONObject();
         input.put("task", parseOrText(task));
         input.put("knowledgeContext", rerankedDocuments.stream()
@@ -67,7 +67,7 @@ public class KnowledgeRagService implements KnowledgeRetriever {
         return JSON.toJSONString(input, JSONWriter.Feature.WriteMapNullValue);
     }
 
-    private List<Document> rerank(String query, List<Document> documents) {
+    private List<RankedDocument> rerank(String query, List<Document> documents) {
         if (documents.isEmpty()) return List.of();
         List<RerankCandidate> candidates = documents.stream()
                 .map(document -> new RerankCandidate(document.getId(), document.getText()))
@@ -77,19 +77,24 @@ public class KnowledgeRagService implements KnowledgeRetriever {
                         LinkedHashMap::new));
         return rerankService.rerank(query, candidates).stream()
                 .limit(topK)
-                .map(RerankResult::id)
-                .map(documentsById::get)
-                .filter(document -> document != null)
+                .map(result -> new RankedDocument(documentsById.get(result.id()), result))
+                .filter(ranked -> ranked.document() != null)
                 .toList();
     }
 
-    private Map<String, Object> documentContext(Document document) {
+    private Map<String, Object> documentContext(RankedDocument ranked) {
+        Document document = ranked.document();
         Map<String, Object> context = new LinkedHashMap<>();
         context.put("content", document.getMetadata().getOrDefault("content", document.getText()));
         context.put("metadata", document.getMetadata());
-        context.put("score", document.getScore());
+        context.put("score", ranked.result().score());
+        context.put("rerankScore", ranked.result().score());
+        context.put("rerankRank", ranked.result().rank());
+        context.put("vectorScore", document.getScore());
         return context;
     }
+
+    private record RankedDocument(Document document, RerankResult result) { }
 
     private Object parseOrText(String value) {
         try {

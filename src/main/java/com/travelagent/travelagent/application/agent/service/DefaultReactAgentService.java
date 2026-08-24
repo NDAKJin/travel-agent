@@ -60,7 +60,6 @@ public class DefaultReactAgentService implements AgentConversationUseCase {
                 sessionId,
                 request.sessionId(),
                 agentProperties.getTool().isEnabled());
-        try {
             AgentSessionContext existingSession = conversationStore.load(user.userId(), sessionId).orElse(null);
             List<AgentMessage> history = new ArrayList<>(boundedHistory(
                     existingSession == null ? List.of() : existingSession.messages()));
@@ -93,9 +92,6 @@ public class DefaultReactAgentService implements AgentConversationUseCase {
                     agentProperties.getProfile().getName(),
                     model,
                     agentProperties.getTool().isEnabled());
-        }
-        finally {
-        }
     }
 
     @Override
