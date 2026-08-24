@@ -120,3 +120,21 @@ CREATE TABLE IF NOT EXISTS rag_ingestion_task (
     updated_at TIMESTAMP NOT NULL,
     INDEX idx_rag_ingestion_task_updated (updated_at)
 );
+
+CREATE TABLE IF NOT EXISTS rag_ingestion_outbox (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    task_id BIGINT NOT NULL UNIQUE,
+    topic VARCHAR(255) NOT NULL,
+    message_key VARCHAR(128) NOT NULL,
+    payload MEDIUMTEXT NOT NULL,
+    status VARCHAR(16) NOT NULL DEFAULT 'PENDING',
+    attempts INT NOT NULL DEFAULT 0,
+    next_attempt_at TIMESTAMP NOT NULL,
+    last_error TEXT,
+    created_at TIMESTAMP NOT NULL,
+    updated_at TIMESTAMP NOT NULL,
+    sent_at TIMESTAMP NULL,
+    CONSTRAINT fk_rag_ingestion_outbox_task FOREIGN KEY (task_id)
+        REFERENCES rag_ingestion_task (id) ON DELETE CASCADE,
+    INDEX idx_rag_ingestion_outbox_dispatch (status, next_attempt_at, updated_at)
+);

@@ -4,19 +4,24 @@ import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
 import com.travelagent.travelagent.application.auth.exception.AuthException;
 import com.travelagent.travelagent.application.auth.config.AuthProperties;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.util.UriComponentsBuilder;
 
 @Service
 @Slf4j
-@RequiredArgsConstructor
 public class WechatCode2SessionIdentityResolver implements WxMiniProgramIdentityResolver {
 
     private final AuthProperties authProperties;
-    private final RestClient restClient = RestClient.create();
+    private final RestClient restClient;
+
+    public WechatCode2SessionIdentityResolver(AuthProperties authProperties,
+                                              @Qualifier("externalRestClient") RestClient restClient) {
+        this.authProperties = authProperties;
+        this.restClient = restClient;
+    }
 
     @Override
     public WxSessionIdentity resolve(String code) {

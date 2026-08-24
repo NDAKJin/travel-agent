@@ -17,7 +17,6 @@ public class AgentProperties {
     @Getter @Setter
     public static class ProfileProperties {
         private String name = "Travel Buddy";
-        private String defaultLocale = "zh-CN";
     }
 
     @Getter @Setter

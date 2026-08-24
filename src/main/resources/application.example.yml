@@ -72,7 +72,14 @@ nextdoc4j:
     password: 123456
 
 travel-agent:
+  external-http:
+    connect-timeout: ${TRAVEL_AGENT_EXTERNAL_HTTP_CONNECT_TIMEOUT:PT3S}
+    read-timeout: ${TRAVEL_AGENT_EXTERNAL_HTTP_READ_TIMEOUT:PT15S}
+  route-cache:
+    ttl: ${TRAVEL_AGENT_ROUTE_CACHE_TTL:PT24H}
+    similarity-threshold: ${TRAVEL_AGENT_ROUTE_CACHE_SIMILARITY_THRESHOLD:0.92}
   rag:
+    outbox-dispatch-interval-ms: ${TRAVEL_AGENT_RAG_OUTBOX_DISPATCH_INTERVAL_MS:1000}
     top-k: ${TRAVEL_AGENT_RAG_TOP_K:5}
     recall-top-k: ${TRAVEL_AGENT_RAG_RECALL_TOP_K:20}
     similarity-threshold: ${TRAVEL_AGENT_RAG_SIMILARITY_THRESHOLD:0.65}
@@ -108,7 +115,6 @@ travel-agent:
     max-history-messages: ${TRAVEL_AGENT_AGENT_MAX_HISTORY_MESSAGES:40}
     profile:
       name: ${TRAVEL_AGENT_AGENT_PROFILE_NAME:Travel Buddy}
-      default-locale: ${TRAVEL_AGENT_AGENT_PROFILE_DEFAULT_LOCALE:zh-CN}
     tool:
       enabled: ${TRAVEL_AGENT_AGENT_TOOL_ENABLED:true}
   observability:

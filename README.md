@@ -38,6 +38,7 @@
 ## 核心能力
 
 - **多智能体旅行对话**：LangGraph4j 编排意图识别、需求收集、路线规划、审核与最终答复；路线规划师和普通服务者均可按需调用旅行知识专家，路线规划师还可调用路线与预算专家。
+- **Redis 语义缓存**：路线需求确认后，首次进入规划师前查询 Redis Stack 的 HNSW 向量索引；缓存默认保留 24 小时，命中后仍交给路线审核师复核。Redis 负责低延迟、短 TTL 的路线结果缓存，Qdrant 负责长期的 RAG 知识检索。
 - **对话状态持久化**：LangGraph4j Checkpoint 使用 RedisSaver 保存 Human-in-the-loop 状态，Checkpoint 自动保留 7 天。
 - **旅行知识 RAG**：采用“Qdrant 向量召回 + Qwen Rerank 重排”的两阶段检索链路，筛选高相关知识片段后注入旅行知识专家上下文。
 - **RAG 知识库管理**：管理台支持多文件异步导入、文章级查看和 Chunk 级查看；文档与 Chunk 均支持启用/禁用，状态变化会同步删除或恢复 Qdrant 向量，禁用内容不会参与检索。
@@ -136,6 +137,8 @@ flowchart TD
 ## RAG 知识库
 
 RAG 模块独立于 LangGraph 编排层，负责知识文档的导入、加工、向量化、检索和运营管理。路线规划师与普通服务者通过 Spring AI Tool 按需调用旅行知识专家；专家先从 Qdrant 召回候选 Chunk，再使用 Qwen Rerank 重排并筛选最终结果，最后将结构化知识上下文交给上层 Agent。
+
+Redis 语义缓存与 Qdrant RAG 分工明确：Redis 只保存已审核的路线方案，利用内存查询和 TTL 快速复用相似需求；Qdrant 保存知识库 Chunk，支持较大规模的向量召回、过滤和持久化。两者不互相替代。
 
 ### RAG 检索链路
 
@@ -290,7 +293,7 @@ travel-agent/
 ├── src/                 Spring Boot API：认证、Agent、管理端与 RAG
 │   ├── .../application/      用例、应用服务、DTO 与端口；按 agent/admin/auth/rag/planning 划分
 │   ├── .../domain/           规划规则、RAG 分块规则、会话与账户领域模型
-│   └── .../infrastructure/   LangGraph、Spring AI、JWT、MyBatis、Redis、Kafka、Qdrant 与 Web 适配器
+│   └── .../infrastructure/   LangGraph、Spring AI、JWT、MyBatis、Redis Stack、Kafka、Qdrant 与 Web 适配器
 ├── fe/                  React + TypeScript 管理台
 ├── miniprogram/         原生微信小程序
 ├── scripts/             部署与辅助脚本

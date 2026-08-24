@@ -44,5 +44,9 @@ class KnowledgeRagServiceTest {
 
         assertThat(JSON.parseObject(enriched).getJSONArray("knowledgeContext").getJSONObject(0)
                 .getString("content")).isEqualTo("second");
+        assertThat(JSON.parseObject(enriched).getJSONArray("knowledgeContext").getJSONObject(0)
+                .getDoubleValue("rerankScore")).isEqualTo(0.9);
+        assertThat(JSON.parseObject(enriched).getJSONArray("knowledgeContext").getJSONObject(0)
+                .getIntValue("rerankRank")).isEqualTo(1);
     }
 }

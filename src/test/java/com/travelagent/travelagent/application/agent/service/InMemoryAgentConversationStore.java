@@ -3,14 +3,14 @@ package com.travelagent.travelagent.application.agent.service;
 import com.travelagent.travelagent.domain.agent.model.AgentMessage;
 import com.travelagent.travelagent.domain.agent.model.AgentSessionContext;
 import com.travelagent.travelagent.domain.agent.model.AgentSessionSummary;
-import com.travelagent.travelagent.application.agent.port.out.AgentConversationStore;
+import com.travelagent.travelagent.application.planning.port.out.ConversationStorePort;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
-class InMemoryAgentConversationStore implements AgentConversationStore {
+class InMemoryAgentConversationStore implements ConversationStorePort {
 
     private final ConcurrentMap<String, AgentSessionContext> sessions = new ConcurrentHashMap<>();
 

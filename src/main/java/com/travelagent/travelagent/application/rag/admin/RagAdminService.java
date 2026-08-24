@@ -65,9 +65,16 @@ public class RagAdminService implements RagCatalogUseCase {
     public void toggleDocument(long documentId, boolean enabled) {
         DocumentRow document = document(documentId);
         int target = enabled ? 1 : 0;
-        if (document.enabled() == target) return;
         List<ChunkRow> chunks = chunkRows(documentId);
-        if (enabled) addVectors(document, chunks); else deleteVectors(chunks);
+        if (enabled) {
+            // 启用文档时补回所有未进入向量库的 Chunk；文档本身已启用时也要修复被单独禁用的 Chunk。
+            List<ChunkRow> chunksToAdd = document.enabled() == 1
+                    ? chunks.stream().filter(chunk -> chunk.enabled() != 1).toList()
+                    : chunks;
+            addVectors(document, chunksToAdd);
+        } else {
+            deleteVectors(chunks);
+        }
         jdbcTemplate.update("UPDATE rag_document SET enabled = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", target, documentId);
         jdbcTemplate.update("UPDATE rag_chunk SET enabled = ? WHERE document_id = ?", target, documentId);
     }
