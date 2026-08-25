@@ -32,7 +32,6 @@ export type AgentChatResponse = {
   reply: string;
   agentName: string;
   model: string;
-  toolEnabled: boolean;
 };
 
 export type AgentSession = {

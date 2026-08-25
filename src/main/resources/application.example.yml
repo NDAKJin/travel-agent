@@ -92,10 +92,6 @@ travel-agent:
       top-n: ${TRAVEL_AGENT_RAG_RERANK_TOP_N:5}
   studio:
     enabled: ${TRAVEL_AGENT_STUDIO_ENABLED:false}
-  amap:
-    web-service-key: ${TRAVEL_AGENT_AMAP_WEB_SERVICE_KEY:}
-    city: ${AMAP_SEARCH_CITY:全国}
-    page-size: ${AMAP_SEARCH_PAGE_SIZE:10}
   auth:
     issuer: ${TRAVEL_AGENT_AUTH_ISSUER:travel-agent}
     jwt-secret: ${TRAVEL_AGENT_AUTH_JWT_SECRET:}
@@ -115,8 +111,6 @@ travel-agent:
     max-history-messages: ${TRAVEL_AGENT_AGENT_MAX_HISTORY_MESSAGES:40}
     profile:
       name: ${TRAVEL_AGENT_AGENT_PROFILE_NAME:Travel Buddy}
-    tool:
-      enabled: ${TRAVEL_AGENT_AGENT_TOOL_ENABLED:true}
   observability:
     kafka-topic: ${TRAVEL_AGENT_OBSERVABILITY_KAFKA_TOPIC:agent-observation}
     consumer-group: ${TRAVEL_AGENT_OBSERVABILITY_CONSUMER_GROUP:travel-agent-observation-writer}

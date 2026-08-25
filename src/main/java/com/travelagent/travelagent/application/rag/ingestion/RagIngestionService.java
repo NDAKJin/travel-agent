@@ -54,23 +54,6 @@ public class RagIngestionService {
                 new ChunkMetadataNode(), new PersistNode());
     }
 
-    /*
-    private RagIngestionResult importFile(MultipartFile file) {
-        String fileName = StringUtils.hasText(file.getOriginalFilename()) ? file.getOriginalFilename() : "unknown";
-        try {
-            if (file.isEmpty()) {
-                return RagIngestionResult.failure(fileName, "文件为空");
-            }
-            return process(fileName, file.getContentType(), file.getBytes());
-        } catch (Exception exception) {
-            return RagIngestionResult.failure(fileName,
-                    StringUtils.hasText(exception.getMessage()) ? exception.getMessage() : exception.getClass().getSimpleName());
-        }
-    }
-
-    }
-    */
-
     public RagIngestionResult process(String fileName, String contentType, byte[] bytes) {
         return process(fileName, contentType, bytes, ignored -> { });
     }

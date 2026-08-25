@@ -34,7 +34,6 @@ class DefaultReactAgentServiceTest {
     void setUp() {
         AgentProperties properties = new AgentProperties();
         properties.getProfile().setName("Travel Buddy");
-        properties.getTool().setEnabled(true);
         reactAgentService = new DefaultReactAgentService(
                 properties, agentGraph, new InMemoryAgentConversationStore(), event -> { }, "qwen-plus");
     }
@@ -48,7 +47,6 @@ class DefaultReactAgentServiceTest {
 
         assertThat(response.sessionId()).isNotBlank();
         assertThat(response.reply()).isEqualTo("Welcome to Hangzhou");
-        assertThat(response.toolEnabled()).isTrue();
     }
 
     @Test

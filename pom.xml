@@ -31,7 +31,6 @@
         <spring-ai.version>2.0.0-M1</spring-ai.version>
         <springdoc.version>3.0.3</springdoc.version>
         <nextdoc4j.version>1.4.0</nextdoc4j.version>
-        <swagger-core.version>2.2.47</swagger-core.version>
         <langgraph4j.version>1.8.24</langgraph4j.version>
         <tika.version>3.2.3</tika.version>
     </properties>
@@ -58,20 +57,9 @@
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
-            <dependency>
-                <groupId>io.swagger.core.v3</groupId>
-                <artifactId>swagger-project-jakarta</artifactId>
-                <version>${swagger-core.version}</version>
-                <type>pom</type>
-                <scope>import</scope>
-            </dependency>
         </dependencies>
     </dependencyManagement>
     <dependencies>
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter</artifactId>
-        </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
@@ -157,16 +145,6 @@
             <groupId>org.apache.tika</groupId>
             <artifactId>tika-parsers-standard-package</artifactId>
             <version>${tika.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>io.swagger.core.v3</groupId>
-            <artifactId>swagger-annotations</artifactId>
-            <version>${swagger-core.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>io.swagger.core.v3</groupId>
-            <artifactId>swagger-annotations-jakarta</artifactId>
-            <version>${swagger-core.version}</version>
         </dependency>
         <dependency>
             <groupId>org.projectlombok</groupId>
