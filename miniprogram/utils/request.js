@@ -31,6 +31,7 @@ function baseRequest(path, options = {}) {
   return new Promise((resolve, reject) => {
     const requestId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
     const startedAt = Date.now();
+    const method = path === "/api/auth/refresh" ? "POST" : (options.method || "GET");
     const app = getApp();
     const session = app.globalData.session;
     const headers = Object.assign(
@@ -46,7 +47,7 @@ function baseRequest(path, options = {}) {
 
     wx.request({
       url: `${BASE_URL}${path}`,
-      method: options.method || "GET",
+      method,
       data: options.data,
       header: headers,
       success(res) {
@@ -71,7 +72,7 @@ function baseRequest(path, options = {}) {
       complete() {
         console.log("[mini-api] request completed", {
           requestId,
-          method: options.method || "GET",
+          method,
           path,
           durationMs: Date.now() - startedAt
         });
