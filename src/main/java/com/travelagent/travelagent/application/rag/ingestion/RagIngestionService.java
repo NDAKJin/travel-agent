@@ -16,6 +16,7 @@ import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import org.apache.tika.metadata.Metadata;
 import org.apache.tika.parser.AutoDetectParser;
@@ -57,11 +58,15 @@ public class RagIngestionService {
     }
 
     public RagIngestionResult process(String fileName, String contentType, byte[] bytes) {
-        return process(fileName, contentType, bytes, ignored -> { });
+        return process(fileName, contentType, bytes, (ignored, context) -> { });
+    }
+
+    public RagIngestionResult process(String fileName, String contentType, byte[] bytes, Consumer<String> stageListener) {
+        return process(fileName, contentType, bytes, (stage, ignored) -> stageListener.accept(stage));
     }
 
     public RagIngestionResult process(String fileName, String contentType, byte[] bytes,
-                                      Consumer<String> stageListener) {
+                                      BiConsumer<String, RagIngestionContext> stageListener) {
         RagIngestionContext context = new RagIngestionContext(fileName, contentType, bytes);
         String stage = "INITIALIZING";
         log.info("RAG ingestion started: fileName={}, contentType={}, bytes={}", fileName, contentType, bytes.length);
@@ -69,8 +74,9 @@ public class RagIngestionService {
             for (RagIngestionNode node : nodes) {
                 stage = node.stage();
                 log.info("RAG ingestion stage started: fileName={}, stage={}", fileName, stage);
-                stageListener.accept(node.stage());
+                stageListener.accept(node.stage(), context);
                 node.execute(context);
+                stageListener.accept(node.stage(), context);
                 log.info("RAG ingestion stage completed: fileName={}, stage={}, chunks={}, written={}",
                         fileName, stage, context.chunks().size(), context.writtenCount());
             }
@@ -81,7 +87,8 @@ public class RagIngestionService {
             log.error("RAG ingestion failed: fileName={}, stage={}, errorType={}, message={}",
                     fileName, stage, exception.getClass().getName(), exception.getMessage(), exception);
             return RagIngestionResult.failure(fileName,
-                    StringUtils.hasText(exception.getMessage()) ? exception.getMessage() : exception.getClass().getSimpleName());
+                    StringUtils.hasText(exception.getMessage()) ? exception.getMessage() : exception.getClass().getSimpleName(),
+                    context.chunks().size(), context.writtenCount());
         }
     }
 
@@ -114,8 +121,18 @@ public class RagIngestionService {
         public void execute(RagIngestionContext context) {
             List<EmbeddingChunk> chunks = context.chunks();
             for (int i = 0; i < chunks.size(); i++) {
-                chunks.set(i, chunks.get(i).withChunkMetadata(
-                        extractChunkMetadata(context.documentMetadata(), chunks.get(i))));
+                EmbeddingChunk chunk = chunks.get(i);
+                log.info("RAG chunk metadata started: fileName={}, chunk={}/{}, index={}, chars={}",
+                        context.fileName(), i + 1, chunks.size(), chunk.index(), chunk.content().length());
+                try {
+                    chunks.set(i, chunk.withChunkMetadata(extractChunkMetadata(context.documentMetadata(), chunk)));
+                    log.info("RAG chunk metadata completed: fileName={}, chunk={}/{}, index={}",
+                            context.fileName(), i + 1, chunks.size(), chunk.index());
+                } catch (Exception exception) {
+                    log.error("RAG chunk metadata failed: fileName={}, chunk={}/{}, index={}",
+                            context.fileName(), i + 1, chunks.size(), chunk.index(), exception);
+                    throw exception;
+                }
             }
         }
     }
