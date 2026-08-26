@@ -160,8 +160,11 @@ docker compose up -d --build
 
 后端启动后访问：
 
-- OpenAPI UI：`localhost:18080/doc.html`
-- OpenAPI JSON：`localhost:18080/v3/api-docs`
+`localhost:18080/doc.html`
+
+线上接口文档展示：[接口文档展示入口](http://admin.ndakjin.asia/doc.html)
+
+文档访问密码：`123456`
 
 ## 开源协议
 
