@@ -10,12 +10,14 @@ import com.travelagent.travelagent.domain.rag.model.DocumentMetadata;
 import com.travelagent.travelagent.domain.rag.model.EmbeddingChunk;
 import com.travelagent.travelagent.domain.rag.service.RagTextChunker;
 import java.io.ByteArrayInputStream;
+import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.BooleanSupplier;
@@ -231,7 +233,7 @@ public class RagIngestionService {
         log.info("RAG vectorization started: fileName={}, mediaType={}, chunks={}", fileName, mediaType, chunks.size());
         String fileHash = sha256(bytes);
         List<Document> documents = chunks.stream().map(chunk -> {
-            String id = fileHash + "-" + chunk.index();
+            String id = UUID.nameUUIDFromBytes((fileHash + "-" + chunk.index()).getBytes(StandardCharsets.UTF_8)).toString();
             Map<String, Object> metadata = new LinkedHashMap<>();
             metadata.put("file_name", fileName);
             metadata.put("media_type", mediaType);
