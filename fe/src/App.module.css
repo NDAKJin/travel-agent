@@ -22,6 +22,7 @@
 
 /* 防止工具栏、卡片和顶部操作在窄屏下互相挤压 */
 .ragSidebarButton{display:none}
+.sidebar:has(.userNav) > button:nth-of-type(2){display:none}
 .topbarActions{flex-wrap:wrap}
 .metricCard,.panelCard,.ragDocumentCard,.chunkCard{min-width:0}
 .ragToolbar,.ragTabs{flex-wrap:wrap}
