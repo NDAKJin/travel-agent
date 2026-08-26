@@ -137,7 +137,7 @@ public class RagIngestionTaskService implements RagIngestionUseCase {
         int claimed = jdbc.update("""
                 UPDATE rag_ingestion_task SET status = 'RUNNING', error_message = NULL,
                     updated_at = CURRENT_TIMESTAMP
-                WHERE id = ? AND status NOT IN ('RUNNING', 'SUCCESS')
+                WHERE id = ? AND status NOT IN ('RUNNING', 'SUCCESS', 'CANCELLED')
                 """, message.taskId());
         if (claimed != 1) {
             log.info("RAG ingestion task skipped because it is already handled: taskId={}", message.taskId());
@@ -148,10 +148,13 @@ public class RagIngestionTaskService implements RagIngestionUseCase {
             byte[] bytes = Files.readAllBytes(Path.of(message.path()));
             outcome = ingestionService.process(message.fileName(), message.contentType(), bytes,
                     (stage, context) -> {
+                        if (isCancelled(message.taskId())) {
+                            throw new IllegalStateException("任务已取消");
+                        }
                         log.info("RAG ingestion task stage updated: taskId={}, fileName={}, stage={}",
                                 message.taskId(), message.fileName(), stage);
                         updateStatus(message.taskId(), stage, null, context.chunks().size(), context.writtenCount());
-                    });
+                    }, () -> isCancelled(message.taskId()));
             if ("SUCCESS".equals(outcome.status())) {
                 updateStatus(message.taskId(), outcome.status(), outcome.error(), outcome.chunkCount(), outcome.writtenCount());
                 Files.deleteIfExists(Path.of(message.path()));
@@ -175,6 +178,21 @@ public class RagIngestionTaskService implements RagIngestionUseCase {
                 (rs, n) -> new RagIngestionTaskResponse(rs.getLong("id"), rs.getString("file_name"), rs.getString("status"),
                         rs.getInt("chunk_count"), rs.getInt("written_count"), rs.getString("error_message"),
                         rs.getTimestamp("created_at").toInstant(), rs.getTimestamp("updated_at").toInstant()));
+    }
+
+    @Override
+    public void cancel(long taskId) {
+        int updated = jdbc.update("""
+                UPDATE rag_ingestion_task
+                SET status = 'CANCELLED', error_message = '任务已取消', updated_at = CURRENT_TIMESTAMP
+                WHERE id = ? AND status IN ('PENDING', 'DISPATCHED', 'RUNNING')
+                """, taskId);
+        jdbc.update("""
+                UPDATE rag_ingestion_outbox
+                SET status = 'CANCELLED', last_error = '任务已取消', updated_at = CURRENT_TIMESTAMP
+                WHERE task_id = ? AND status IN ('PENDING', 'SENDING', 'SENT')
+                """, taskId);
+        log.info("RAG ingestion task cancellation requested: taskId={}, updated={}", taskId, updated);
     }
 
     private long create(String name) {
@@ -206,6 +224,7 @@ public class RagIngestionTaskService implements RagIngestionUseCase {
     }
 
     private void retryOrFail(long taskId, String error) {
+        if (isCancelled(taskId)) return;
         Integer attempts = jdbc.query("SELECT attempts FROM rag_ingestion_outbox WHERE task_id = ?",
                 rs -> rs.next() ? rs.getInt(1) : null, taskId);
         if (attempts == null || attempts >= MAX_ATTEMPTS) {
@@ -226,6 +245,11 @@ public class RagIngestionTaskService implements RagIngestionUseCase {
         updateTaskStatus(taskId, "PENDING", error);
     }
 
+    private boolean isCancelled(long taskId) {
+        return Boolean.TRUE.equals(jdbc.query("SELECT status = 'CANCELLED' FROM rag_ingestion_task WHERE id = ?",
+                rs -> rs.next() && rs.getBoolean(1), taskId));
+    }
+
     private void recoverStaleTasks() {
         List<Long> taskIds = jdbc.query("""
                 SELECT id FROM rag_ingestion_task
@@ -240,7 +264,7 @@ public class RagIngestionTaskService implements RagIngestionUseCase {
     }
 
     private void updateStatus(long id, String status, String error, int chunks, int written) {
-        jdbc.update("UPDATE rag_ingestion_task SET status=?,error_message=?,chunk_count=?,written_count=?,updated_at=CURRENT_TIMESTAMP WHERE id=?", status, error, chunks, written, id);
+        jdbc.update("UPDATE rag_ingestion_task SET status=?,error_message=?,chunk_count=?,written_count=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND status <> 'CANCELLED'", status, error, chunks, written, id);
     }
 
     private record OutboxRow(long id, long taskId, String topic, String messageKey, String payload, int attempts) { }

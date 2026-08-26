@@ -15,7 +15,10 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.multipart.MultipartFile;
 
 @RestController
@@ -42,5 +45,13 @@ public class RagIngestionController {
     @ApiResponse(responseCode = "200", description = "查询成功")
     public List<RagIngestionTaskResponse> importTasks() {
         return taskService.list();
+    }
+
+    @PostMapping("/import/tasks/{taskId}/cancel")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(summary = "取消导入任务", description = "取消尚未完成的知识库文档导入任务")
+    @ApiResponse(responseCode = "204", description = "任务已取消")
+    public void cancelTask(@PathVariable long taskId) {
+        taskService.cancel(taskId);
     }
 }
