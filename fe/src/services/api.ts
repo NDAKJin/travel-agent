@@ -11,6 +11,10 @@ import type {
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
 const DEBUG_LOGGING = import.meta.env.DEV || import.meta.env.VITE_DEBUG_LOGGING === "true";
+const SESSION_KEY = "travel-agent-session";
+export const AUTH_EXPIRED_EVENT = "travel-agent-auth-expired";
+export const AUTH_UPDATED_EVENT = "travel-agent-auth-updated";
+let refreshPromise: Promise<AuthSession> | null = null;
 
 const createRequestId = () => {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -23,6 +27,7 @@ type RequestOptions = {
   method?: string;
   body?: unknown;
   accessToken?: string;
+  allowRefresh?: boolean;
 };
 
 type AdminLoginPayload = {
@@ -50,6 +55,45 @@ export class ApiError extends Error {
 
 const resolveUrl = (path: string) => `${API_BASE_URL}${path}`;
 
+const emitAuthExpired = () => {
+  localStorage.removeItem(SESSION_KEY);
+  window.dispatchEvent(new Event(AUTH_EXPIRED_EVENT));
+};
+
+const refreshStoredSession = async (): Promise<AuthSession> => {
+  let session: AuthSession | null = null;
+  try {
+    const raw = localStorage.getItem(SESSION_KEY);
+    session = raw ? JSON.parse(raw) as AuthSession : null;
+  } catch {
+    session = null;
+  }
+  if (!session?.token.refreshToken) {
+    emitAuthExpired();
+    throw new ApiError("登录已过期，请重新登录", 401);
+  }
+  try {
+    const next = await request<AuthSession>("/api/auth/refresh", {
+      method: "POST",
+      body: { refreshToken: session.token.refreshToken },
+      allowRefresh: false
+    });
+    localStorage.setItem(SESSION_KEY, JSON.stringify(next));
+    window.dispatchEvent(new Event(AUTH_UPDATED_EVENT));
+    return next;
+  } catch (error) {
+    emitAuthExpired();
+    throw error;
+  }
+};
+
+const refreshSession = () => {
+  if (!refreshPromise) {
+    refreshPromise = refreshStoredSession().finally(() => { refreshPromise = null; });
+  }
+  return refreshPromise;
+};
+
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const method = options.method ?? "GET";
   const requestId = createRequestId();
@@ -63,7 +107,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
         ...(options.body instanceof FormData ? {} : { "Content-Type": "application/json" }),
         ...(options.accessToken ? { Authorization: `Bearer ${options.accessToken}` } : {})
       },
-      body: options.body == null ? undefined : JSON.stringify(options.body)
+      body: options.body instanceof FormData ? options.body : options.body == null ? undefined : JSON.stringify(options.body)
     });
   } catch (error) {
     if (DEBUG_LOGGING) console.error("[api] network failure", { requestId, method, path, durationMs: Math.round(performance.now() - startedAt), error });
@@ -91,6 +135,10 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
       }
     }
     if (DEBUG_LOGGING) console.warn("[api] request failed", { requestId, status: response.status, code, message });
+    if (response.status === 401 && options.accessToken && options.allowRefresh !== false) {
+      const next = await refreshSession();
+      return request<T>(path, { ...options, accessToken: next.token.accessToken, allowRefresh: false });
+    }
     throw new ApiError(message, response.status, code);
   }
 

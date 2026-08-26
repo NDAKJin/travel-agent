@@ -1,6 +1,11 @@
 package com.travelagent.travelagent.application.rag.admin;
 
 import com.travelagent.travelagent.application.rag.port.in.RagCatalogUseCase;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -15,36 +20,59 @@ import org.springframework.http.ResponseEntity;
 @RestController
 @RequestMapping("/api/admin/rag")
 @RequiredArgsConstructor
+@Tag(name = "知识库管理", description = "旅行知识文档和分块的查询与启停管理")
 public class RagAdminController {
 
     private final RagCatalogUseCase ragAdminService;
 
     @GetMapping("/documents")
-    public List<RagDocumentResponse> documents(@RequestParam(required = false) String keyword) {
+    @Operation(summary = "查询知识库文档", description = "按文件名、标题或文档关键词筛选已导入文档")
+    @ApiResponse(responseCode = "200", description = "查询成功")
+    public List<RagDocumentResponse> documents(
+            @Parameter(description = "文件名、标题或关键词") @RequestParam(required = false) String keyword) {
         return ragAdminService.documents(keyword);
     }
 
     @GetMapping("/chunks")
-    public List<RagChunkResponse> chunks(@RequestParam(required = false) Long documentId,
-                                         @RequestParam(required = false) String keyword,
-                                         @RequestParam(required = false) Integer enabled) {
+    @Operation(summary = "查询知识库分块", description = "按文档、关键词和启用状态筛选分块内容")
+    @ApiResponse(responseCode = "200", description = "查询成功")
+    public List<RagChunkResponse> chunks(
+            @Parameter(description = "文档标识") @RequestParam(required = false) Long documentId,
+            @Parameter(description = "分块内容或元数据关键词") @RequestParam(required = false) String keyword,
+            @Parameter(description = "启用状态：1 启用，0 禁用") @RequestParam(required = false) Integer enabled) {
         return ragAdminService.chunks(documentId, keyword, enabled);
     }
 
     @PatchMapping("/documents/{documentId}/enable")
-    public ResponseEntity<Void> toggleDocument(@PathVariable long documentId, @RequestParam boolean enabled) {
+    @Operation(summary = "启用或禁用文档")
+    @ApiResponse(responseCode = "204", description = "更新成功")
+    public ResponseEntity<Void> toggleDocument(
+            @Parameter(description = "文档标识", required = true, example = "1") @PathVariable long documentId,
+            @Parameter(description = "是否启用", required = true, example = "true") @RequestParam boolean enabled) {
         ragAdminService.toggleDocument(documentId, enabled);
         return ResponseEntity.noContent().build();
     }
 
     @PatchMapping("/chunks/{chunkId}/enable")
-    public ResponseEntity<Void> toggleChunk(@PathVariable long chunkId, @RequestParam boolean enabled) {
+    @Operation(summary = "启用或禁用分块")
+    @ApiResponse(responseCode = "204", description = "更新成功")
+    public ResponseEntity<Void> toggleChunk(
+            @Parameter(description = "分块标识", required = true, example = "1") @PathVariable long chunkId,
+            @Parameter(description = "是否启用", required = true, example = "true") @RequestParam boolean enabled) {
         ragAdminService.toggleChunk(chunkId, enabled);
         return ResponseEntity.noContent().build();
     }
 
     @PatchMapping("/chunks/batch-enable")
-    public ResponseEntity<Void> batchToggleChunks(@RequestParam boolean enabled, @RequestBody List<Long> chunkIds) {
+    @Operation(summary = "批量启用或禁用分块")
+    @ApiResponse(responseCode = "204", description = "更新成功")
+    public ResponseEntity<Void> batchToggleChunks(
+            @Parameter(description = "是否启用", required = true, example = "true") @RequestParam boolean enabled,
+            @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    description = "待更新的分块标识列表", required = true,
+                    content = @io.swagger.v3.oas.annotations.media.Content(
+                            schema = @Schema(type = "array", implementation = Long.class)))
+            @RequestBody List<Long> chunkIds) {
         ragAdminService.batchToggleChunks(chunkIds, enabled);
         return ResponseEntity.noContent().build();
     }

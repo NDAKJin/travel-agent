@@ -48,24 +48,28 @@ public class AgentController {
 
     @PostMapping("/sessions")
     @Operation(summary = "创建会话", description = "为当前用户创建空会话")
+    @ApiResponse(responseCode = "200", description = "创建成功")
     public AgentSessionSummaryResponse createSession(Authentication authentication) {
         return reactAgentService.createSession(currentUser(authentication));
     }
 
     @GetMapping("/sessions")
     @Operation(summary = "查询会话列表", description = "查询当前用户的历史会话")
+    @ApiResponse(responseCode = "200", description = "查询成功")
     public List<AgentSessionSummaryResponse> listSessions(Authentication authentication) {
         return reactAgentService.listSessions(currentUser(authentication));
     }
 
     @GetMapping("/sessions/{sessionId}")
     @Operation(summary = "查询会话详情", description = "查询当前用户的一段历史会话")
+    @ApiResponse(responseCode = "200", description = "查询成功")
     public AgentSessionDetailResponse getSession(@Parameter(description = "会话标识") @PathVariable String sessionId, Authentication authentication) {
         return reactAgentService.getSession(currentUser(authentication), sessionId);
     }
 
     @DeleteMapping("/sessions/{sessionId}")
     @Operation(summary = "删除会话", description = "删除当前用户的一段会话")
+    @ApiResponse(responseCode = "200", description = "删除成功")
     public void deleteSession(@Parameter(description = "会话标识") @PathVariable String sessionId, Authentication authentication) {
         reactAgentService.deleteSession(currentUser(authentication), sessionId);
     }
