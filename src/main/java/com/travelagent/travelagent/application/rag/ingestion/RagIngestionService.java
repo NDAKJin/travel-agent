@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
+import java.util.function.BooleanSupplier;
 import org.apache.tika.metadata.Metadata;
 import org.apache.tika.parser.AutoDetectParser;
 import org.apache.tika.sax.BodyContentHandler;
@@ -67,7 +68,14 @@ public class RagIngestionService {
 
     public RagIngestionResult process(String fileName, String contentType, byte[] bytes,
                                       BiConsumer<String, RagIngestionContext> stageListener) {
+        return process(fileName, contentType, bytes, stageListener, () -> false);
+    }
+
+    public RagIngestionResult process(String fileName, String contentType, byte[] bytes,
+                                      BiConsumer<String, RagIngestionContext> stageListener,
+                                      BooleanSupplier cancellationCheck) {
         RagIngestionContext context = new RagIngestionContext(fileName, contentType, bytes);
+        context.cancellationCheck(cancellationCheck);
         String stage = "INITIALIZING";
         log.info("RAG ingestion started: fileName={}, contentType={}, bytes={}", fileName, contentType, bytes.length);
         try {
@@ -121,6 +129,7 @@ public class RagIngestionService {
         public void execute(RagIngestionContext context) {
             List<EmbeddingChunk> chunks = context.chunks();
             for (int i = 0; i < chunks.size(); i++) {
+                if (context.cancelled()) throw new IllegalStateException("任务已取消");
                 EmbeddingChunk chunk = chunks.get(i);
                 log.info("RAG chunk metadata started: fileName={}, chunk={}/{}, index={}, chars={}",
                         context.fileName(), i + 1, chunks.size(), chunk.index(), chunk.content().length());

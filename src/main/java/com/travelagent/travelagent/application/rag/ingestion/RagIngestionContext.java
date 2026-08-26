@@ -4,6 +4,7 @@ import com.travelagent.travelagent.domain.rag.model.DocumentMetadata;
 import com.travelagent.travelagent.domain.rag.model.EmbeddingChunk;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.BooleanSupplier;
 
 final class RagIngestionContext {
     private final String fileName;
@@ -14,6 +15,7 @@ final class RagIngestionContext {
     private DocumentMetadata documentMetadata;
     private List<EmbeddingChunk> chunks = new ArrayList<>();
     private int writtenCount;
+    private BooleanSupplier cancellationCheck = () -> false;
 
     RagIngestionContext(String fileName, String contentType, byte[] bytes) {
         this.fileName = fileName;
@@ -34,4 +36,6 @@ final class RagIngestionContext {
     void chunks(List<EmbeddingChunk> value) { this.chunks = value; }
     int writtenCount() { return writtenCount; }
     void writtenCount(int value) { this.writtenCount = value; }
+    void cancellationCheck(BooleanSupplier value) { this.cancellationCheck = value; }
+    boolean cancelled() { return cancellationCheck.getAsBoolean(); }
 }

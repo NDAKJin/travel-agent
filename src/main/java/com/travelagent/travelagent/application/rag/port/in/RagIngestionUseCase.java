@@ -11,5 +11,7 @@ public interface RagIngestionUseCase {
 
     List<RagIngestionTaskResponse> list();
 
+    void cancel(long taskId);
+
     void process(RagIngestionMessage message);
 }

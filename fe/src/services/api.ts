@@ -226,6 +226,9 @@ export const api = {
   listRagIngestionTasks(accessToken: string) {
     return request<import("../types").RagIngestionTask[]>("/api/admin/rag/documents/import/tasks", { accessToken });
   },
+  cancelRagIngestionTask(accessToken: string, taskId: number) {
+    return request<void>(`/api/admin/rag/documents/import/tasks/${taskId}/cancel`, { method: "POST", accessToken });
+  },
   listRagDocuments(accessToken: string, keyword = "") {
     const query = keyword ? `?keyword=${encodeURIComponent(keyword)}` : "";
     return request<import("../types").RagDocument[]>(`/api/admin/rag/documents${query}`, { accessToken });
