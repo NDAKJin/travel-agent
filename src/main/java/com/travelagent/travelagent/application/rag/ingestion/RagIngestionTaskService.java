@@ -46,6 +46,7 @@ public class RagIngestionTaskService implements RagIngestionUseCase {
     @Transactional
     @Override
     public List<RagIngestionTaskResponse> submit(List<MultipartFile> files) {
+        log.info("RAG ingestion upload received: fileCount={}", files.size());
         List<RagIngestionTaskResponse> result = new ArrayList<>();
         for (MultipartFile file : files) {
             String name = file.getOriginalFilename() == null ? "unknown" : Path.of(file.getOriginalFilename()).getFileName().toString();
@@ -54,14 +55,20 @@ public class RagIngestionTaskService implements RagIngestionUseCase {
                 if (file.isEmpty()) throw new IllegalArgumentException("文件为空");
                 taskId = create(name);
                 Path dir = root.resolve(Long.toString(taskId));
+                log.info("Preparing RAG ingestion storage: taskId={}, root={}, dir={}", taskId, root, dir);
                 Files.createDirectories(dir);
                 Path path = dir.resolve(name);
                 Files.write(path, file.getBytes());
+                log.info("RAG ingestion file stored: taskId={}, path={}, bytes={}", taskId, path, file.getSize());
                 String payload = JSON.toJSONString(new RagIngestionMessage(taskId, path.toString(), file.getContentType(), name));
                 enqueue(taskId, payload);
+                log.info("RAG ingestion task queued: taskId={}, fileName={}, bytes={}, contentType={}",
+                        taskId, name, file.getSize(), file.getContentType());
                 result.add(response(taskId, name));
             } catch (Exception e) {
                 if (taskId != null) fail(taskId, e.getMessage());
+                log.error("RAG ingestion task submission failed: taskId={}, fileName={}, errorType={}, message={}",
+                        taskId, name, e.getClass().getName(), e.getMessage(), e);
                 result.add(new RagIngestionTaskResponse(null, name, "FAILED", 0, 0, e.getMessage(), Instant.now(), Instant.now()));
             }
         }
@@ -125,27 +132,39 @@ public class RagIngestionTaskService implements RagIngestionUseCase {
 
     @Override
     public void process(RagIngestionMessage message) {
+        log.info("RAG ingestion task processing started: taskId={}, fileName={}, path={}",
+                message.taskId(), message.fileName(), message.path());
         int claimed = jdbc.update("""
                 UPDATE rag_ingestion_task SET status = 'RUNNING', error_message = NULL,
                     updated_at = CURRENT_TIMESTAMP
                 WHERE id = ? AND status NOT IN ('RUNNING', 'SUCCESS')
                 """, message.taskId());
         if (claimed != 1) {
-            log.info("RAG ingestion task is already handled: taskId={}", message.taskId());
+            log.info("RAG ingestion task skipped because it is already handled: taskId={}", message.taskId());
             return;
         }
         RagIngestionResult outcome;
         try {
             byte[] bytes = Files.readAllBytes(Path.of(message.path()));
             outcome = ingestionService.process(message.fileName(), message.contentType(), bytes,
-                    stage -> updateStatus(message.taskId(), stage, null, 0, 0));
+                    stage -> {
+                        log.info("RAG ingestion task stage updated: taskId={}, fileName={}, stage={}",
+                                message.taskId(), message.fileName(), stage);
+                        updateStatus(message.taskId(), stage, null, 0, 0);
+                    });
             if ("SUCCESS".equals(outcome.status())) {
                 updateStatus(message.taskId(), outcome.status(), outcome.error(), outcome.chunkCount(), outcome.writtenCount());
                 Files.deleteIfExists(Path.of(message.path()));
+                log.info("RAG ingestion task processing succeeded: taskId={}, fileName={}, chunks={}, written={}",
+                        message.taskId(), message.fileName(), outcome.chunkCount(), outcome.writtenCount());
             } else {
+                log.error("RAG ingestion task processing failed: taskId={}, fileName={}, error={}",
+                        message.taskId(), message.fileName(), outcome.error());
                 retryOrFail(message.taskId(), outcome.error());
             }
         } catch (Exception e) {
+            log.error("RAG ingestion task processing crashed: taskId={}, fileName={}, errorType={}, message={}",
+                    message.taskId(), message.fileName(), e.getClass().getName(), e.getMessage(), e);
             retryOrFail(message.taskId(), e.getMessage());
         }
     }
@@ -190,12 +209,15 @@ public class RagIngestionTaskService implements RagIngestionUseCase {
         Integer attempts = jdbc.query("SELECT attempts FROM rag_ingestion_outbox WHERE task_id = ?",
                 rs -> rs.next() ? rs.getInt(1) : null, taskId);
         if (attempts == null || attempts >= MAX_ATTEMPTS) {
+            log.error("RAG ingestion task permanently failed: taskId={}, attempts={}, error={}", taskId, attempts, error);
             updateTaskStatus(taskId, "FAILED", error);
             jdbc.update("UPDATE rag_ingestion_outbox SET status = 'FAILED', last_error = ?, updated_at = CURRENT_TIMESTAMP WHERE task_id = ?",
                     error, taskId);
             return;
         }
         Instant nextAttempt = Instant.now().plusSeconds(backoffSeconds(attempts));
+        log.warn("RAG ingestion task scheduled for retry: taskId={}, attempts={}, nextAttempt={}, error={}",
+                taskId, attempts, nextAttempt, error);
         jdbc.update("""
                 UPDATE rag_ingestion_outbox
                 SET status = 'PENDING', next_attempt_at = ?, last_error = ?, updated_at = CURRENT_TIMESTAMP
