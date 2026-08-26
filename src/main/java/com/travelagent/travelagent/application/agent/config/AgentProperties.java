@@ -8,7 +8,6 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @Getter
 public class AgentProperties {
     private final ProfileProperties profile = new ProfileProperties();
-    private final ToolProperties tool = new ToolProperties();
 
     @Setter private int maxMessageChars = 4000;
     @Setter private int maxSessionIdChars = 64;
@@ -19,8 +18,4 @@ public class AgentProperties {
         private String name = "Travel Buddy";
     }
 
-    @Getter @Setter
-    public static class ToolProperties {
-        private boolean enabled;
-    }
 }

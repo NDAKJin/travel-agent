@@ -39,7 +39,7 @@ class AgentControllerTest {
 
     @Test
     void chatReturnsAgentResponse() throws Exception {
-        when(reactAgentService.chat(any(), any())).thenReturn(new AgentChatResponse("session-1", "Start with West Lake", "Travel Buddy", "qwen-plus", false));
+        when(reactAgentService.chat(any(), any())).thenReturn(new AgentChatResponse("session-1", "Start with West Lake", "Travel Buddy", "qwen-plus"));
 
         mockMvc.perform(post("/api/agent/chat")
                         .principal(AUTHENTICATION)
@@ -53,8 +53,7 @@ class AgentControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.sessionId").value("session-1"))
                 .andExpect(jsonPath("$.reply").value("Start with West Lake"))
-                .andExpect(jsonPath("$.model").value("qwen-plus"))
-                .andExpect(jsonPath("$.toolEnabled").value(false));
+                .andExpect(jsonPath("$.model").value("qwen-plus"));
     }
 
     @Test

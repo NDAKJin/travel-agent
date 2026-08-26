@@ -56,10 +56,9 @@ public class DefaultReactAgentService implements AgentConversationUseCase {
             throw new IllegalArgumentException("sessionId exceeds the configured maximum length");
         }
         String sessionId = normalizeSessionId(request.sessionId());
-        log.info("Starting react-agent chat: sessionId={}, requestedSessionId={}, toolEnabled={}",
+        log.info("Starting react-agent chat: sessionId={}, requestedSessionId={}",
                 sessionId,
-                request.sessionId(),
-                agentProperties.getTool().isEnabled());
+                request.sessionId());
             AgentSessionContext existingSession = conversationStore.load(user.userId(), sessionId).orElse(null);
             List<AgentMessage> history = new ArrayList<>(boundedHistory(
                     existingSession == null ? List.of() : existingSession.messages()));
@@ -90,8 +89,7 @@ public class DefaultReactAgentService implements AgentConversationUseCase {
                     sessionId,
                     userReply,
                     agentProperties.getProfile().getName(),
-                    model,
-                    agentProperties.getTool().isEnabled());
+                    model);
     }
 
     @Override
@@ -137,10 +135,9 @@ public class DefaultReactAgentService implements AgentConversationUseCase {
 
     private String callModel(List<AgentMessage> history, String conversationId,
                              AgentObservationContext observation, AgentChatRequest.Location location) {
-        log.debug("Calling chat model: model={}, sessionMessageCount={}, toolEnabled={}",
+        log.debug("Calling chat model: model={}, sessionMessageCount={}",
                 model,
-                history.size(),
-                agentProperties.getTool().isEnabled());
+                history.size());
         String locationJson = locationJson(location);
         return locationJson == null
                 ? agentGraph.run(history, conversationId, observation)

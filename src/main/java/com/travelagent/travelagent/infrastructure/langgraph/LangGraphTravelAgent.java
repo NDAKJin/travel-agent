@@ -25,7 +25,6 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
-import java.util.concurrent.ForkJoinPool;
 import org.bsc.langgraph4j.CompiledGraph;
 import org.bsc.langgraph4j.CompileConfig;
 import org.bsc.langgraph4j.GraphInput;
@@ -38,7 +37,6 @@ import org.bsc.langgraph4j.state.AgentState;
 import org.bsc.langgraph4j.state.Channel;
 import org.bsc.langgraph4j.state.Channels;
 import org.bsc.langgraph4j.checkpoint.BaseCheckpointSaver;
-import org.bsc.langgraph4j.checkpoint.MemorySaver;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.messages.Message;
@@ -84,28 +82,6 @@ public class LangGraphTravelAgent implements TravelWorkflowPort {
     private final CompileConfig compileConfig;
     private final StateGraph<WorkflowState> workflow;
     private final CompiledGraph<WorkflowState> graph;
-
-    public LangGraphTravelAgent(@Qualifier("orchestrationChatClient") ChatClient orchestrationChatClient,
-                                @Qualifier("routePlannerChatClient") ChatClient routePlannerChatClient,
-                                @Qualifier("normalServiceChatClient") ChatClient normalServiceChatClient,
-                                @Qualifier("finalizerChatClient") ChatClient finalizerChatClient,
-                                PromptResourceLoader promptResourceLoader) {
-        this(orchestrationChatClient, routePlannerChatClient, normalServiceChatClient, finalizerChatClient,
-                promptResourceLoader, new MemorySaver(), null, null, null, null, ForkJoinPool.commonPool());
-    }
-
-    public LangGraphTravelAgent(@Qualifier("orchestrationChatClient") ChatClient orchestrationChatClient,
-                                @Qualifier("routePlannerChatClient") ChatClient routePlannerChatClient,
-                                @Qualifier("normalServiceChatClient") ChatClient normalServiceChatClient,
-                                @Qualifier("finalizerChatClient") ChatClient finalizerChatClient,
-                                PromptResourceLoader promptResourceLoader,
-                                BaseCheckpointSaver checkpointSaver,
-                                KnowledgePlanningAgent knowledgeAgent,
-                                RoutePlanningAgent routeAgent,
-                                BudgetAgent budgetAgent) {
-        this(orchestrationChatClient, routePlannerChatClient, normalServiceChatClient, finalizerChatClient,
-                promptResourceLoader, checkpointSaver, knowledgeAgent, routeAgent, budgetAgent, null, ForkJoinPool.commonPool());
-    }
 
     @org.springframework.beans.factory.annotation.Autowired
     public LangGraphTravelAgent(@Qualifier("orchestrationChatClient") ChatClient orchestrationChatClient,
@@ -153,7 +129,6 @@ public class LangGraphTravelAgent implements TravelWorkflowPort {
                       AgentObservationContext observation, String currentUserLocation) {
         RunnableConfig config = RunnableConfig.builder()
                 .threadId(conversationId)
-                .putMetadata(AgentObservationContext.METADATA_KEY, observation)
                 .build();
         Map<String, Object> input = new HashMap<>();
         input.put("history", history);
@@ -168,8 +143,6 @@ public class LangGraphTravelAgent implements TravelWorkflowPort {
                     .orElseThrow(() -> new IllegalStateException("Travel agent graph produced no response"));
             releaseCompletedThread(config, state);
             return state.reply();
-        } finally {
-            observation.close();
         }
     }
 
@@ -423,7 +396,7 @@ public class LangGraphTravelAgent implements TravelWorkflowPort {
         JSONObject input = new JSONObject();
         input.put("conversation", state.history());
         input.put("currentUserLocation", jsonOrText(state.currentUserLocation()));
-        return JSON.toJSONString(input, JSONWriter.Feature.WriteMapNullValue);
+        return json(input);
     }
 
     private String routePlanningInput(WorkflowState state) {
@@ -433,21 +406,21 @@ public class LangGraphTravelAgent implements TravelWorkflowPort {
         input.put("requirements", jsonOrText(requirementData(state.requirements())));
         input.put("review", state.review().isBlank() ? null : jsonOrText(state.review()));
         input.put("expertResults", jsonOrText(state.expertResults()));
-        return JSON.toJSONString(input, JSONWriter.Feature.WriteMapNullValue);
+        return json(input);
     }
 
     private String routeReviewInput(WorkflowState state) {
         JSONObject input = new JSONObject();
         input.put("requirements", jsonOrText(requirementData(state.requirements())));
         input.put("routePlan", jsonOrText(state.routePlan()));
-        return JSON.toJSONString(input, JSONWriter.Feature.WriteMapNullValue);
+        return json(input);
     }
 
     private String finalRequirementInput(String requirements) {
         JSONObject input = new JSONObject();
         input.put("taskType", "REQUIREMENT_QUESTION");
         input.put("requirementDecision", jsonOrText(requirements));
-        return JSON.toJSONString(input, JSONWriter.Feature.WriteMapNullValue);
+        return json(input);
     }
 
     private String finalResponseInput(WorkflowState state) {
@@ -459,7 +432,7 @@ public class LangGraphTravelAgent implements TravelWorkflowPort {
         } else {
             input.put("normalService", state.normalReply());
         }
-        return JSON.toJSONString(input, JSONWriter.Feature.WriteMapNullValue);
+        return json(input);
     }
 
     private String normalServiceInput(WorkflowState state) {
@@ -467,12 +440,16 @@ public class LangGraphTravelAgent implements TravelWorkflowPort {
         input.put("phase", "ANSWER");
         input.put("currentUserLocation", jsonOrText(state.currentUserLocation()));
         input.put("conversation", state.history());
-        return JSON.toJSONString(input, JSONWriter.Feature.WriteMapNullValue);
+        return json(input);
     }
 
     private Object jsonOrText(String value) {
         JSONObject json = WorkflowOutputParser.parseJson(value);
         return json == null ? value : json;
+    }
+
+    private String json(Object value) {
+        return JSON.toJSONString(value, JSONWriter.Feature.WriteMapNullValue);
     }
 
     private String normalAnswer(String output) {
@@ -489,11 +466,6 @@ public class LangGraphTravelAgent implements TravelWorkflowPort {
 
     private String prompt(String name) {
         return promptResourceLoader.load(name);
-    }
-
-    private AgentObservationContext observation(RunnableConfig config) {
-        Object value = config.metadata(AgentObservationContext.METADATA_KEY).orElse(null);
-        return value instanceof AgentObservationContext context ? context : AgentObservationContext.disabled();
     }
 
     private String call(String agent, String input, ChatClient.CallResponseSpec request,

@@ -22,7 +22,10 @@ class KnowledgeRagServiceTest {
         when(vectorStore.similaritySearch(any(SearchRequest.class)))
                 .thenReturn(List.of(new Document("Nanjing Fuzi Temple")));
 
-        String enriched = new KnowledgeRagService(vectorStore, 5, 0.65)
+        RerankService rerank = (query, candidates) -> candidates.stream()
+                .map(candidate -> new RerankResult(candidate.id(), 0, candidates.indexOf(candidate) + 1))
+                .toList();
+        String enriched = new KnowledgeRagService(vectorStore, 5, 0.65, 20, rerank)
                 .enrich("{\"destination\":\"Nanjing\"}");
 
         assertThat(JSON.parseObject(enriched).getJSONArray("knowledgeContext")).hasSize(1);

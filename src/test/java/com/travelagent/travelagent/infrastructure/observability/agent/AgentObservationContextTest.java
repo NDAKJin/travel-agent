@@ -18,7 +18,6 @@ class AgentObservationContextTest {
         AgentObservationContext context = new AgentObservationContext(42L, events::add);
 
         context.publish("supervisor", "before", "running", Instant.now(), null, null, null, null);
-        context.close();
 
         assertThat(events).singleElement().satisfies(event -> {
             assertThat(event.messageId()).isEqualTo(42L);

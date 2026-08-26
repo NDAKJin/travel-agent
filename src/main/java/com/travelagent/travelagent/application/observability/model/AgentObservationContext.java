@@ -1,42 +1,33 @@
 package com.travelagent.travelagent.application.observability.model;
 
 import com.travelagent.travelagent.application.observability.port.out.AgentObservationPort;
-import java.io.Serial;
-import java.io.Serializable;
 import java.time.Instant;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.springframework.ai.chat.metadata.Usage;
 import org.springframework.ai.chat.model.ChatResponse;
 
-public final class AgentObservationContext implements Serializable {
-    @Serial private static final long serialVersionUID = 1L;
-    public static final String METADATA_KEY = "agentObservation";
-    private static final ConcurrentHashMap<String, AgentObservationPort> PUBLISHERS = new ConcurrentHashMap<>();
-    private static final ConcurrentHashMap<String, AtomicInteger> SEQUENCES = new ConcurrentHashMap<>();
+public final class AgentObservationContext {
     private final long messageId;
     private final String traceId;
+    private final AgentObservationPort publisher;
+    private final AtomicInteger sequence = new AtomicInteger();
 
     public AgentObservationContext(long messageId, AgentObservationPort publisher) {
         this.messageId = messageId;
         this.traceId = UUID.randomUUID().toString();
-        PUBLISHERS.put(traceId, publisher);
-        SEQUENCES.put(traceId, new AtomicInteger());
+        this.publisher = publisher;
     }
 
     public String traceId() { return traceId; }
     public static AgentObservationContext disabled() { return new AgentObservationContext(0L, event -> { }); }
-    public void close() { PUBLISHERS.remove(traceId); SEQUENCES.remove(traceId); }
 
     public void publish(String agentName, String phase, String status, Instant startedAt,
                         String llmInput, String llmOutput, ChatResponse response,
                         String nextDecision, Throwable error) {
         Usage usage = response == null || response.getMetadata() == null ? null : response.getMetadata().getUsage();
         String model = response == null || response.getMetadata() == null ? null : response.getMetadata().getModel();
-        AgentObservationPort publisher = PUBLISHERS.get(traceId);
-        if (publisher == null) return;
-        int sequenceNo = SEQUENCES.computeIfAbsent(traceId, ignored -> new AtomicInteger()).incrementAndGet();
+        int sequenceNo = sequence.incrementAndGet();
         publisher.publish(new AgentObservationEvent(UUID.randomUUID().toString(), messageId, traceId, sequenceNo,
                 agentName, phase, status, model, llmInput, llmOutput,
                 usage == null ? null : usage.getPromptTokens(),

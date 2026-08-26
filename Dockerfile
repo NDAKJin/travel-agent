@@ -12,10 +12,6 @@ WORKDIR /workspace
 COPY fe/package.json fe/package-lock.json ./
 RUN npm ci
 COPY fe ./
-ARG VITE_AMAP_KEY
-ARG VITE_AMAP_SECURITY_JS_CODE
-ENV VITE_AMAP_KEY=$VITE_AMAP_KEY \
-    VITE_AMAP_SECURITY_JS_CODE=$VITE_AMAP_SECURITY_JS_CODE
 RUN npm run build
 
 FROM docker.m.daocloud.io/library/eclipse-temurin:21-jre AS api

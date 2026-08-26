@@ -12,7 +12,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
@@ -29,15 +28,6 @@ public class KnowledgeRagService implements KnowledgeRetriever {
     private final int recallTopK;
     private final RerankService rerankService;
 
-    public KnowledgeRagService(VectorStore vectorStore,
-                               int topK, double similarityThreshold) {
-        this(vectorStore, topK, similarityThreshold, topK * 4,
-                (query, candidates) -> candidates.stream()
-                        .map((candidate) -> new RerankResult(candidate.id(), 0, candidates.indexOf(candidate) + 1))
-                        .toList());
-    }
-
-    @Autowired
     public KnowledgeRagService(VectorStore vectorStore,
                                @Value("${travel-agent.rag.top-k:5}") int topK,
                                @Value("${travel-agent.rag.similarity-threshold:0.65}") double similarityThreshold,
@@ -87,7 +77,6 @@ public class KnowledgeRagService implements KnowledgeRetriever {
         Map<String, Object> context = new LinkedHashMap<>();
         context.put("content", document.getMetadata().getOrDefault("content", document.getText()));
         context.put("metadata", document.getMetadata());
-        context.put("score", ranked.result().score());
         context.put("rerankScore", ranked.result().score());
         context.put("rerankRank", ranked.result().rank());
         context.put("vectorScore", document.getScore());

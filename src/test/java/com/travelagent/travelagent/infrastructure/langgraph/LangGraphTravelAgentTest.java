@@ -17,6 +17,7 @@ import java.util.ArrayDeque;
 import java.util.List;
 import java.util.Queue;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.TimeUnit;
 import org.bsc.langgraph4j.checkpoint.MemorySaver;
 import org.junit.jupiter.api.Test;
@@ -30,9 +31,9 @@ class LangGraphTravelAgentTest {
     @Test
     void asksForMissingRouteRequirementsWithoutPlanning() {
         ChatClient planner = client();
-        LangGraphTravelAgent graph = new LangGraphTravelAgent(
+        LangGraphTravelAgent graph = graph(
                 client(route(), question("Where would you like to go?")), planner, client(),
-                client(finalReply("Where would you like to go?")), new PromptResourceLoader());
+                client(finalReply("Where would you like to go?")));
 
         assertThat(graph.run(List.of(new AgentMessage("user", "Plan a trip"))))
                 .isEqualTo("Where would you like to go?");
@@ -41,9 +42,9 @@ class LangGraphTravelAgentTest {
 
     @Test
     void approvedRouteIsPlannedReviewedAndFinalized() {
-        LangGraphTravelAgent graph = new LangGraphTravelAgent(
+        LangGraphTravelAgent graph = graph(
                 client(route(), confirmed(), approved()), client(plan()), client(),
-                client(finalReply("Final itinerary")), new PromptResourceLoader());
+                client(finalReply("Final itinerary")));
 
         assertThat(graph.run(List.of(new AgentMessage("user", "Plan a one-day trip"))))
                 .isEqualTo("Final itinerary");
@@ -52,9 +53,9 @@ class LangGraphTravelAgentTest {
     @Test
     void invalidControlResponsesDoNotAdvanceRoutePlanning() {
         ChatClient planner = client();
-        LangGraphTravelAgent graph = new LangGraphTravelAgent(
+        LangGraphTravelAgent graph = graph(
                 client(route(), "{\"status\":\"CONFIRMED\",\"requirements\":{}}"), planner, client(),
-                client(finalReply("Please provide the required details.")), new PromptResourceLoader());
+                client(finalReply("Please provide the required details.")));
 
         assertThat(graph.run(List.of(new AgentMessage("user", "Plan a trip"))))
                 .isEqualTo("Please provide the required details.");
@@ -63,12 +64,12 @@ class LangGraphTravelAgentTest {
 
     @Test
     void structuredOutputsMayContainUnknownFields() {
-        LangGraphTravelAgent graph = new LangGraphTravelAgent(
+        LangGraphTravelAgent graph = graph(
                 client(route(), "{\"status\":\"CONFIRMED\",\"question\":null,\"source\":\"llm\","
                         + "\"requirements\":{\"origin\":\"Nanjing Station\",\"destination\":\"Nanjing South Station\","
                         + "\"date\":null,\"days\":\"1\",\"people\":\"2\",\"budget\":\"1000\","
                         + "\"interests\":null,\"constraints\":null,\"extra\":\"ignored\"}}", approved()),
-                client(plan()), client(), client(finalReply("Final itinerary")), new PromptResourceLoader());
+                client(plan()), client(), client(finalReply("Final itinerary")));
 
         assertThat(graph.run(List.of(new AgentMessage("user", "Plan a one-day trip"))))
                 .isEqualTo("Final itinerary");
@@ -77,9 +78,9 @@ class LangGraphTravelAgentTest {
     @Test
     void invalidIntentFallsBackToNormalService() {
         ChatClient planner = client();
-        LangGraphTravelAgent graph = new LangGraphTravelAgent(
+        LangGraphTravelAgent graph = graph(
                 client("not-json"), planner, client(normalAnswer("Nearby places")),
-                client(finalReply("Nearby places")), new PromptResourceLoader());
+                client(finalReply("Nearby places")));
 
         assertThat(graph.run(List.of(new AgentMessage("user", "What is nearby?"))))
                 .isEqualTo("Nearby places");
@@ -88,9 +89,9 @@ class LangGraphTravelAgentTest {
 
     @Test
     void requirementFollowUpResumesAtRequirementsNode() {
-        LangGraphTravelAgent graph = new LangGraphTravelAgent(
+        LangGraphTravelAgent graph = graph(
                 client(route(), question("Where do you start?"), confirmed(), approved()), client(plan()), client(),
-                client(finalReply("Where do you start?"), finalReply("Final itinerary")), new PromptResourceLoader());
+                client(finalReply("Where do you start?"), finalReply("Final itinerary")));
         String question = graph.run(List.of(new AgentMessage("user", "Plan a day trip")),
                 "1:session-1", AgentObservationContext.disabled());
 
@@ -105,9 +106,9 @@ class LangGraphTravelAgentTest {
     @Test
     void rejectedRouteReturnsToPlannerBeforeFinalizing() {
         ChatClient planner = client(plan(), plan());
-        LangGraphTravelAgent graph = new LangGraphTravelAgent(
+        LangGraphTravelAgent graph = graph(
                 client(route(), confirmed(), revise(), approved()), planner, client(),
-                client(finalReply("Final itinerary")), new PromptResourceLoader());
+                client(finalReply("Final itinerary")));
 
         assertThat(graph.run(List.of(new AgentMessage("user", "Plan a one-day trip"))))
                 .isEqualTo("Final itinerary");
@@ -125,7 +126,7 @@ class LangGraphTravelAgentTest {
                 client(route(), confirmed(), approved()),
                 client(delegate("KNOWLEDGE", "BUDGET"), plan()), client(), client(finalReply("Final itinerary")),
                 new PromptResourceLoader(), new MemorySaver(), knowledge,
-                mock(RoutePlanningAgent.class), budget);
+                mock(RoutePlanningAgent.class), budget, null, ForkJoinPool.commonPool());
 
         assertThat(graph.run(List.of(new AgentMessage("user", "Plan a one-day trip"))))
                 .isEqualTo("Final itinerary");
@@ -141,7 +142,7 @@ class LangGraphTravelAgentTest {
                 client(route(), confirmed(), approved()),
                 client(delegate("KNOWLEDGE", "KNOWLEDGE"), plan()), client(), client(finalReply("Final itinerary")),
                 new PromptResourceLoader(), new MemorySaver(), knowledge,
-                mock(RoutePlanningAgent.class), mock(BudgetAgent.class));
+                mock(RoutePlanningAgent.class), mock(BudgetAgent.class), null, ForkJoinPool.commonPool());
 
         assertThat(graph.run(List.of(new AgentMessage("user", "Plan a one-day trip"))))
                 .isEqualTo("Final itinerary");
@@ -156,7 +157,7 @@ class LangGraphTravelAgentTest {
                 client(route(), confirmed(), approved()),
                 client(delegate("KNOWLEDGE"), delegate("KNOWLEDGE"), plan()), client(),
                 client(finalReply("Final itinerary")), new PromptResourceLoader(), new MemorySaver(), knowledge,
-                mock(RoutePlanningAgent.class), mock(BudgetAgent.class));
+                mock(RoutePlanningAgent.class), mock(BudgetAgent.class), null, ForkJoinPool.commonPool());
 
         assertThat(graph.run(List.of(new AgentMessage("user", "Plan a one-day trip"))))
                 .isEqualTo("Final itinerary");
@@ -165,12 +166,19 @@ class LangGraphTravelAgentTest {
 
     @Test
     void normalRequestUsesNormalServiceThenFinalizer() {
-        LangGraphTravelAgent graph = new LangGraphTravelAgent(
+        LangGraphTravelAgent graph = graph(
                 client(normal()), client(), client(normalAnswer("Service answer")),
-                client(finalReply("Final answer")), new PromptResourceLoader());
+                client(finalReply("Final answer")));
 
         assertThat(graph.run(List.of(new AgentMessage("user", "What is nearby?"))))
                 .isEqualTo("Final answer");
+    }
+
+    private LangGraphTravelAgent graph(ChatClient supervisor, ChatClient planner,
+                                       ChatClient normalService, ChatClient finalizer) {
+        return new LangGraphTravelAgent(supervisor, planner, normalService, finalizer,
+                new PromptResourceLoader(), new MemorySaver(), mock(KnowledgePlanningAgent.class),
+                mock(RoutePlanningAgent.class), mock(BudgetAgent.class), null, ForkJoinPool.commonPool());
     }
 
     private static String route() {
