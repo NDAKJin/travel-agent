@@ -11,7 +11,7 @@ public record RagIngestionResult(
         return new RagIngestionResult(fileName, "SUCCESS", chunkCount, writtenCount, null);
     }
 
-    public static RagIngestionResult failure(String fileName, String error) {
-        return new RagIngestionResult(fileName, "FAILED", 0, 0, error);
+    public static RagIngestionResult failure(String fileName, String error, int chunkCount, int writtenCount) {
+        return new RagIngestionResult(fileName, "FAILED", chunkCount, writtenCount, error);
     }
 }

@@ -147,10 +147,10 @@ public class RagIngestionTaskService implements RagIngestionUseCase {
         try {
             byte[] bytes = Files.readAllBytes(Path.of(message.path()));
             outcome = ingestionService.process(message.fileName(), message.contentType(), bytes,
-                    stage -> {
+                    (stage, context) -> {
                         log.info("RAG ingestion task stage updated: taskId={}, fileName={}, stage={}",
                                 message.taskId(), message.fileName(), stage);
-                        updateStatus(message.taskId(), stage, null, 0, 0);
+                        updateStatus(message.taskId(), stage, null, context.chunks().size(), context.writtenCount());
                     });
             if ("SUCCESS".equals(outcome.status())) {
                 updateStatus(message.taskId(), outcome.status(), outcome.error(), outcome.chunkCount(), outcome.writtenCount());
