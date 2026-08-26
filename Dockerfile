@@ -16,7 +16,10 @@ RUN npm run build
 
 FROM docker.m.daocloud.io/library/eclipse-temurin:21-jre AS api
 WORKDIR /app
-RUN useradd --system --uid 10001 app && mkdir logs && chown -R app:app /app
+RUN useradd --system --uid 10001 app \
+    && mkdir -p logs /tmp/travel-agent-rag \
+    && chown -R app:app /app /tmp/travel-agent-rag \
+    && chmod 775 /tmp/travel-agent-rag
 COPY --from=backend-build /workspace/target/*.jar app.jar
 USER app
 EXPOSE 8080

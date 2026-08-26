@@ -28,7 +28,9 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.apache.tika.parser.ParseContext;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Service
 public class RagIngestionService {
 
@@ -61,13 +63,23 @@ public class RagIngestionService {
     public RagIngestionResult process(String fileName, String contentType, byte[] bytes,
                                       Consumer<String> stageListener) {
         RagIngestionContext context = new RagIngestionContext(fileName, contentType, bytes);
+        String stage = "INITIALIZING";
+        log.info("RAG ingestion started: fileName={}, contentType={}, bytes={}", fileName, contentType, bytes.length);
         try {
             for (RagIngestionNode node : nodes) {
+                stage = node.stage();
+                log.info("RAG ingestion stage started: fileName={}, stage={}", fileName, stage);
                 stageListener.accept(node.stage());
                 node.execute(context);
+                log.info("RAG ingestion stage completed: fileName={}, stage={}, chunks={}, written={}",
+                        fileName, stage, context.chunks().size(), context.writtenCount());
             }
+            log.info("RAG ingestion succeeded: fileName={}, chunks={}, written={}",
+                    fileName, context.chunks().size(), context.writtenCount());
             return RagIngestionResult.success(fileName, context.chunks().size(), context.writtenCount());
         } catch (Exception exception) {
+            log.error("RAG ingestion failed: fileName={}, stage={}, errorType={}, message={}",
+                    fileName, stage, exception.getClass().getName(), exception.getMessage(), exception);
             return RagIngestionResult.failure(fileName,
                     StringUtils.hasText(exception.getMessage()) ? exception.getMessage() : exception.getClass().getSimpleName());
         }
@@ -154,14 +166,32 @@ public class RagIngestionService {
     }
 
     private JSONObject callJson(String promptName, String input) {
-        String output = chatClient.prompt()
-                .system(promptResourceLoader.load(promptName))
-                .user(input)
-                .call()
-                .content();
+        log.info("RAG metadata model call started: prompt={}, inputChars={}", promptName, input.length());
+        String output;
+        try {
+            output = chatClient.prompt()
+                    .system(promptResourceLoader.load(promptName))
+                    .user(input)
+                    .call()
+                    .content();
+        } catch (Exception exception) {
+            log.error("RAG metadata model call failed: prompt={}, inputChars={}, errorType={}, message={}",
+                    promptName, input.length(), exception.getClass().getName(), exception.getMessage(), exception);
+            throw new IllegalStateException("RAG 元数据模型调用失败", exception);
+        }
+        log.info("RAG metadata model call completed: prompt={}, outputChars={}",
+                promptName, output == null ? 0 : output.length());
         String normalized = stripCodeFence(output);
-        JSONObject json = JSON.parseObject(normalized);
+        JSONObject json;
+        try {
+            json = JSON.parseObject(normalized);
+        } catch (Exception exception) {
+            log.error("RAG metadata JSON parse failed: prompt={}, outputChars={}, outputPrefix={}",
+                    promptName, normalized.length(), normalized.substring(0, Math.min(200, normalized.length())), exception);
+            throw new IllegalStateException("RAG 元数据 JSON 解析失败", exception);
+        }
         if (json == null) {
+            log.error("RAG metadata JSON is empty: prompt={}, outputChars={}", promptName, normalized.length());
             throw new IllegalStateException("LLM 返回的 JSON 无效");
         }
         return json;
@@ -169,8 +199,10 @@ public class RagIngestionService {
 
     private int write(String fileName, String mediaType, byte[] bytes, List<EmbeddingChunk> chunks) {
         if (chunks.isEmpty()) {
+            log.warn("RAG vectorization skipped because no chunks were produced: fileName={}", fileName);
             return 0;
         }
+        log.info("RAG vectorization started: fileName={}, mediaType={}, chunks={}", fileName, mediaType, chunks.size());
         String fileHash = sha256(bytes);
         List<Document> documents = chunks.stream().map(chunk -> {
             String id = fileHash + "-" + chunk.index();
@@ -193,14 +225,17 @@ public class RagIngestionService {
             return Document.builder().id(id).text(chunk.embeddingText()).metadata(metadata).build();
         }).toList();
         vectorStore.add(documents);
+        log.info("RAG vectorization completed: fileName={}, vectors={}", fileName, documents.size());
         return documents.size();
     }
 
     private void persist(String fileName, String mediaType, String content, byte[] bytes,
                          DocumentMetadata document, List<EmbeddingChunk> chunks) {
         if (jdbcTemplate == null) {
+            log.warn("RAG database persistence skipped because JdbcTemplate is unavailable: fileName={}", fileName);
             return;
         }
+        log.info("RAG database persistence started: fileName={}, chunks={}", fileName, chunks.size());
         String documentKey = sha256(bytes);
         jdbcTemplate.update("DELETE FROM rag_document WHERE document_key = ?", documentKey);
         jdbcTemplate.update("""
@@ -225,6 +260,8 @@ public class RagIngestionService {
                     chunk.endOffset(), chunk.content(), JSON.toJSONString(metadata.keywords()), metadata.summary(),
                     JSON.toJSONString(metadata.questions()));
         }
+        log.info("RAG database persistence completed: fileName={}, documentId={}, chunks={}",
+                fileName, documentId, chunks.size());
     }
 
     private List<String> strings(JSONArray values, int limit) {
