@@ -29,13 +29,14 @@ public final class RagTextChunker {
         while (start < text.length()) {
             int maxEnd = Math.min(text.length(), start + chunkSize);
             int end = bestSplitPosition(text, start, maxEnd);
-            if (end <= start) end = maxEnd;
+            if (end <= start || end - start <= overlap) end = maxEnd;
             String content = text.substring(start, end).trim();
             if (!content.isEmpty()) {
                 chunks.add(new EmbeddingChunk(index++, start, end, content, documentMetadata, null));
             }
             if (end >= text.length()) break;
-            start = Math.max(start + 1, end - overlap);
+            int nextStart = end - overlap;
+            start = nextStart > start ? nextStart : end;
         }
         return chunks;
     }
