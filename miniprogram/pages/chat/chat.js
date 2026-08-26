@@ -121,12 +121,7 @@ Page({
     location: null,
     quickActionRows: [
       [
-        { label: "规划行程", prompt: "请帮我规划一次旅行行程。" },
-        { label: "查询附近景点", prompt: "查询我附近的景点。" }
-      ],
-      [
-        { label: "查询附近饭店", prompt: "查询我附近的饭店。" },
-        { label: "查询附近酒店", prompt: "查询我附近的酒店。" }
+        { label: "规划行程", prompt: "请帮我规划一次旅行行程。" }
       ]
     ]
   },
