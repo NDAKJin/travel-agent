@@ -32,6 +32,7 @@ public class SecurityConfiguration {
                         .requestMatchers(
                                 "/api/auth/wx/login",
                                 "/api/auth/admin/login",
+                                "/api/auth/email/**",
                                 "/api/auth/refresh",
                                 "/api/auth/logout").permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
