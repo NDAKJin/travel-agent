@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import styles from "../App.module.css";
 import { api } from "../services/api";
 import type { AuthSession, RagChunk, RagDocument } from "../types";
 
-export default function RagManagementPage({ session, onBack }: { session: AuthSession; onBack: () => void }) {
+export default function RagManagementPage({ session, onBack, onNavigate }: { session: AuthSession; onBack: () => void; onNavigate?: (page: "dashboard" | "rag") => void }) {
   const [documents, setDocuments] = useState<RagDocument[]>([]), [chunks, setChunks] = useState<RagChunk[]>([]);
   const [selectedDocument, setSelectedDocument] = useState<number | null>(null), [tab, setTab] = useState<"documents" | "chunks">("documents");
   const [keyword, setKeyword] = useState(""), [enabledFilter, setEnabledFilter] = useState("all"), [message, setMessage] = useState("");

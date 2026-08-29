@@ -134,6 +134,9 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
         message = raw;
       }
     }
+    if (/^refresh token is not active$/i.test(message.trim())) {
+      message = "登录已过期，请重新登录";
+    }
     if (DEBUG_LOGGING) console.warn("[api] request failed", { requestId, status: response.status, code, message });
     if (response.status === 401 && options.accessToken && options.allowRefresh !== false) {
       const next = await refreshSession();
@@ -150,6 +153,12 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
 }
 
 export const api = {
+  sendEmailCode(email: string) {
+    return request<void>("/api/auth/email/send-code", { method: "POST", body: { email } });
+  },
+  verifyEmailCode(email: string, code: string) {
+    return request<{ valid: boolean }>("/api/auth/email/verify-code", { method: "POST", body: { email, code } });
+  },
   loginAdmin(payload: AdminLoginPayload) {
     return request<AuthSession>("/api/auth/admin/login", {
       method: "POST",

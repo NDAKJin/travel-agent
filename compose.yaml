@@ -137,6 +137,18 @@ services:
     mem_limit: 128m
     mem_reservation: 64m
 
+  agent-web:
+    build:
+      context: .
+      target: agent-web
+    ports:
+      - "127.0.0.1:8082:80"
+    depends_on:
+      - api
+    restart: unless-stopped
+    mem_limit: 128m
+    mem_reservation: 64m
+
 volumes:
   mysql-data:
   qdrant-data:
