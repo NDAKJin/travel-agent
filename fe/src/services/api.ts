@@ -250,6 +250,9 @@ export const api = {
       method: "PATCH", accessToken
     });
   },
+  updateRagChunk(accessToken: string, chunkId: number, content: string) {
+    return request<void>(`/api/admin/rag/chunks/${chunkId}`, { method: "PATCH", body: { content }, accessToken });
+  },
   batchToggleRagChunks(accessToken: string, chunkIds: number[], enabled: boolean) {
     return request<void>(`/api/admin/rag/chunks/batch-enable?enabled=${enabled}`, {
       method: "PATCH", body: chunkIds, accessToken

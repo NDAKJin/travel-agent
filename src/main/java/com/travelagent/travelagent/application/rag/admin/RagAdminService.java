@@ -98,6 +98,26 @@ public class RagAdminService implements RagCatalogUseCase {
         chunkIds.stream().distinct().forEach(id -> toggleChunk(id, enabled));
     }
 
+    @Transactional
+    @Override
+    public void updateChunkContent(long chunkId, String content) {
+        if (!StringUtils.hasText(content)) throw new IllegalArgumentException("Chunk 鍐呭涓嶈兘涓虹┖");
+        ChunkWithDocument row = chunkWithDocument(chunkId);
+        String nextContent = content.trim();
+        if (nextContent.equals(row.chunk().content())) return;
+        if (row.chunk().enabled() == 1) {
+            vectorStore.delete(List.of(row.chunk().chunkKey()));
+        }
+        jdbcTemplate.update("UPDATE rag_chunk SET content = ?, end_offset = start_offset + CHAR_LENGTH(?) WHERE id = ?",
+                nextContent, nextContent, chunkId);
+        if (row.chunk().enabled() == 1) {
+            ChunkRow updated = new ChunkRow(row.chunk().id(), row.chunk().chunkKey(), row.chunk().chunkIndex(),
+                    row.chunk().startOffset(), row.chunk().startOffset() + nextContent.length(), nextContent,
+                    row.chunk().keywords(), row.chunk().summary(), row.chunk().questions(), row.chunk().enabled());
+            vectorStore.add(List.of(toVectorDocument(row.document(), updated)));
+        }
+    }
+
     private DocumentRow document(long id) {
         List<DocumentRow> rows = jdbcTemplate.query("""
                 SELECT id, document_key, file_name, media_type, title, author, keywords, summary, questions, enabled
