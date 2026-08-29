@@ -124,16 +124,3 @@ travel-agent:
   observability:
     kafka-topic: ${TRAVEL_AGENT_OBSERVABILITY_KAFKA_TOPIC:agent-observation}
     consumer-group: ${TRAVEL_AGENT_OBSERVABILITY_CONSUMER_GROUP:travel-agent-observation-writer}
-spring:
-  mail:
-    host: smtp.163.com
-    port: 465
-    username: ""
-    password: ""
-    properties:
-      mail.smtp.auth: true
-      mail.smtp.ssl.enable: true
-
-travel-agent:
-  auth:
-    email-code-ttl: PT10M
