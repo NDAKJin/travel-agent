@@ -14,6 +14,13 @@ RUN npm ci
 COPY fe ./
 RUN npm run build
 
+FROM docker.m.daocloud.io/library/node:22-alpine AS agent-web-build
+WORKDIR /workspace
+COPY agent-web/package.json ./
+RUN npm install
+COPY agent-web ./
+RUN npm run build
+
 FROM docker.m.daocloud.io/library/eclipse-temurin:21-jre AS api
 WORKDIR /app
 RUN useradd --system --uid 10001 app \
@@ -28,4 +35,9 @@ ENTRYPOINT ["java", "-jar", "app.jar"]
 FROM docker.m.daocloud.io/library/nginx:1.27-alpine AS web
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=frontend-build /workspace/dist /usr/share/nginx/html
+EXPOSE 80
+
+FROM docker.m.daocloud.io/library/nginx:1.27-alpine AS agent-web
+COPY agent-web/nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=agent-web-build /workspace/dist /usr/share/nginx/html
 EXPOSE 80

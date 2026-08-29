@@ -153,6 +153,12 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
 }
 
 export const api = {
+  sendEmailCode(email: string) {
+    return request<void>("/api/auth/email/send-code", { method: "POST", body: { email } });
+  },
+  verifyEmailCode(email: string, code: string) {
+    return request<{ valid: boolean }>("/api/auth/email/verify-code", { method: "POST", body: { email, code } });
+  },
   loginAdmin(payload: AdminLoginPayload) {
     return request<AuthSession>("/api/auth/admin/login", {
       method: "POST",
