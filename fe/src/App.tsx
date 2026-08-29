@@ -133,7 +133,7 @@ export default function App() {
     );
   }
 
-  if (String(page) === "rag") return <RagManagementPage session={session} onBack={() => setPage("dashboard")} />;
+  if (String(page) === "rag") return <RagManagementPage session={session} onBack={() => setPage("dashboard")} onNavigate={setPage} />;
 
   return (
     <main className={styles.appPage}>

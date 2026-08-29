@@ -3,7 +3,6 @@ package com.travelagent.travelagent.infrastructure.cache;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
 import com.travelagent.travelagent.application.planning.port.out.RoutePlanSemanticCache;
-import io.lettuce.core.api.StatefulRedisConnection;
 import io.lettuce.core.api.sync.RedisCommands;
 import io.lettuce.core.search.SearchReply;
 import io.lettuce.core.search.arguments.CreateArgs;
@@ -156,11 +155,16 @@ public class RedisRoutePlanSemanticCache implements RoutePlanSemanticCache {
         }
     }
 
-    @SuppressWarnings("unchecked")
     private <T> T withCommands(Function<RedisCommands<byte[], byte[]>, T> callback) {
         try (var connection = connectionFactory.getConnection()) {
             Object nativeConnection = connection.getNativeConnection();
-            return callback.apply(((StatefulRedisConnection<byte[], byte[]>) nativeConnection).sync());
+            if (!(nativeConnection instanceof RedisCommands<?, ?>)) {
+                throw new IllegalStateException("Redis native connection does not expose synchronous commands: "
+                        + nativeConnection.getClass().getName());
+            }
+            @SuppressWarnings("unchecked")
+            RedisCommands<byte[], byte[]> commands = (RedisCommands<byte[], byte[]>) nativeConnection;
+            return callback.apply(commands);
         }
     }
 

@@ -134,6 +134,9 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
         message = raw;
       }
     }
+    if (/^refresh token is not active$/i.test(message.trim())) {
+      message = "登录已过期，请重新登录";
+    }
     if (DEBUG_LOGGING) console.warn("[api] request failed", { requestId, status: response.status, code, message });
     if (response.status === 401 && options.accessToken && options.allowRefresh !== false) {
       const next = await refreshSession();
