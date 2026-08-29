@@ -1,127 +1,21 @@
-import { type ChangeEvent, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import styles from "../App.module.css";
 import { api } from "../services/api";
-import type { AuthSession, RagChunk, RagDocument, RagIngestionTask } from "../types";
+import type { AuthSession, RagChunk, RagDocument } from "../types";
 
 export default function RagManagementPage({ session, onBack }: { session: AuthSession; onBack: () => void }) {
-  const [documents, setDocuments] = useState<RagDocument[]>([]);
-  const [chunks, setChunks] = useState<RagChunk[]>([]);
-  const [tasks, setTasks] = useState<RagIngestionTask[]>([]);
-  const [selectedDocument, setSelectedDocument] = useState<number | null>(null);
-  const [tab, setTab] = useState<"documents" | "chunks">("documents");
-  const [keyword, setKeyword] = useState("");
-  const [enabledFilter, setEnabledFilter] = useState<"all" | "enabled" | "disabled">("all");
-  const [files, setFiles] = useState<File[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState("");
-  const [statusVisible, setStatusVisible] = useState(true);
-  const [statusExpanded, setStatusExpanded] = useState(true);
-
-  const load = async () => {
-    setLoading(true);
-    try {
-      const enabled = enabledFilter === "all" ? undefined : enabledFilter === "enabled";
-      const [nextDocuments, nextChunks, nextTasks] = await Promise.all([
-        api.listRagDocuments(session.token.accessToken, keyword),
-        api.listRagChunks(session.token.accessToken, { documentId: selectedDocument ?? undefined, keyword, enabled }),
-        api.listRagIngestionTasks(session.token.accessToken)
-      ]);
-      setDocuments(nextDocuments);
-      setChunks(nextChunks);
-      setTasks(nextTasks);
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "RAG 数据加载失败");
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  const [documents, setDocuments] = useState<RagDocument[]>([]), [chunks, setChunks] = useState<RagChunk[]>([]);
+  const [selectedDocument, setSelectedDocument] = useState<number | null>(null), [tab, setTab] = useState<"documents" | "chunks">("documents");
+  const [keyword, setKeyword] = useState(""), [enabledFilter, setEnabledFilter] = useState("all"), [message, setMessage] = useState("");
+  const [page, setPage] = useState(1), [editing, setEditing] = useState<RagChunk | null>(null), [content, setContent] = useState("");
+  const [loading, setLoading] = useState(false), pageSize = 10;
+  const load = async () => { setLoading(true); try { const enabled = enabledFilter === "all" ? undefined : enabledFilter === "enabled"; const [d, c] = await Promise.all([api.listRagDocuments(session.token.accessToken, keyword), api.listRagChunks(session.token.accessToken, { documentId: selectedDocument ?? undefined, keyword, enabled })]); setDocuments(d); setChunks(c); } catch (e) { setMessage(e instanceof Error ? e.message : "加载失败"); } finally { setLoading(false); } };
   useEffect(() => { void load(); }, [selectedDocument, enabledFilter]);
-  useEffect(() => {
-    if (!tasks.some(task => task.status === "PENDING" || task.status === "RUNNING")) return;
-    const timer = window.setInterval(() => void load(), 2000);
-    return () => window.clearInterval(timer);
-  }, [tasks]);
-
-  const importFiles = async () => {
-    if (!files.length) return;
-    setLoading(true);
-    setMessage("");
-    try {
-      const results = await api.importRagDocuments(session.token.accessToken, files);
-      const failed: RagIngestionTask[] = [];
-      setStatusVisible(true);
-      setStatusExpanded(true);
-      setMessage(failed.length ? `完成 ${results.length - failed.length} 个，失败 ${failed.length} 个` : `已导入 ${results.length} 个文件`);
-      setMessage(`已提交 ${results.length} 个文件，后台正在解析和向量化，可在下方查看进度`);
-      setFiles([]);
-      await load();
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "导入失败");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const cancelTask = async (task: RagIngestionTask) => {
-    try {
-      await api.cancelRagIngestionTask(session.token.accessToken, task.id);
-      setMessage(`已取消导入任务：${task.fileName}`);
-      await load();
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "取消任务失败");
-    }
-  };
-
-  const toggleDocument = async (document: RagDocument) => {
-    setLoading(true);
-    try {
-      await api.toggleRagDocument(session.token.accessToken, document.id, !document.enabled);
-      setMessage(`${document.enabled ? "已禁用" : "已启用"}文档及其 Chunk`);
-      await load();
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "修改文档状态失败");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const toggleChunk = async (chunk: RagChunk) => {
-    setLoading(true);
-    try {
-      await api.toggleRagChunk(session.token.accessToken, chunk.id, !chunk.enabled);
-      setMessage(chunk.enabled ? "Chunk 已禁用" : "Chunk 已启用");
-      await load();
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "修改 Chunk 状态失败");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const visibleChunks = useMemo(
-    () => selectedDocument == null ? chunks : chunks.filter(item => item.documentId === selectedDocument),
-    [chunks, selectedDocument]
-  );
-  const taskStages = ["解析", "文档信息", "分块", "Chunk 信息", "向量化"];
-  const taskStage = (task: RagIngestionTask) => task.status === "SUCCESS" ? taskStages.length : ["PARSING", "DOC_ENRICHING", "CHUNKING", "CHUNK_ENRICHING", "VECTORIZING"].indexOf(task.status);
-  const activeTasks = tasks.filter(task => !["SUCCESS", "FAILED", "CANCELLED"].includes(task.status));
-  const taskStatus = (task: RagIngestionTask) => task.status === "SUCCESS" ? "已完成" : task.status === "FAILED" ? "失败" : task.status === "CANCELLED" ? "已取消" : task.status === "RUNNING" ? "处理中" : task.status;
-
-  return <main className={styles.appPage}>
-    <aside className={styles.sidebar}>
-      <div className={styles.logo}><span>✦</span><div>TRAVEL<br /><small>AGENT OPS</small></div></div>
-      <div className={styles.sidebarLabel}>WORKSPACE</div>
-      <button className={styles.navButton} type="button" onClick={onBack}>▦ <span>运营看板</span></button>
-      <button className={styles.navActive} type="button">⌁ <span>旅行知识库</span></button>
-    </aside>
-    <section className={styles.mainPanel}><div className={styles.detailPage}>
-    <header className={styles.detailHeader}><div><button type="button" className={styles.backButton} onClick={onBack}>← 返回看板</button><div className={styles.kicker}>RAG KNOWLEDGE BASE</div><h1>旅行知识库</h1><p className={styles.muted}>管理文章、分块和向量化结果</p></div></header>
-    <section className={styles.ragToolbar}><label className={styles.uploadButton}>选择文件<input type="file" multiple onChange={(event: ChangeEvent<HTMLInputElement>) => setFiles(Array.from(event.target.files ?? []))} /></label><span className={styles.muted}>{files.length ? `已选择 ${files.length} 个文件` : "支持 PDF、Word、Markdown、TXT 等格式"}</span><button type="button" className={styles.primarySmallButton} disabled={!files.length || loading} onClick={() => void importFiles()}>{loading ? "处理中..." : "开始导入"}</button><button type="button" className={styles.refreshButton} onClick={() => void load()}>刷新</button></section>
-    {message ? <div className={styles.successBanner}>{message}</div> : null}
-    {activeTasks.length && statusVisible ? <section className={styles.statusTracker}><div className={styles.statusTrackerHeader}><div><strong>导入状态追踪</strong><small>任务处理中，页面会自动刷新</small></div><div className={styles.statusTrackerActions}><button type="button" className={styles.statusAction} onClick={() => setStatusExpanded(value => !value)}>{statusExpanded ? "收起" : "展开"}</button><button type="button" className={styles.statusClose} aria-label="关闭导入状态栏" onClick={() => setStatusVisible(false)}>×</button></div></div>{statusExpanded ? <div className={styles.statusTrackerList}>{activeTasks.slice(0, 8).map(task => <div className={styles.statusTrackerItem} key={task.id}><span className={styles.statusFile}>{task.fileName}</span><div className={styles.taskSteps}>{taskStages.map((stage, index) => <span key={stage} className={index < taskStage(task) ? styles.taskStepDone : index === taskStage(task) ? styles.taskStepCurrent : styles.taskStep}>{index < taskStage(task) ? "✓" : index + 1} {stage}</span>)}</div><span className={styles.taskState}>{taskStatus(task)}</span><button type="button" className={styles.statusAction} onClick={() => void cancelTask(task)}>取消</button></div>)}</div> : null}</section> : null}
-    <section className={styles.ragTabs}><button className={tab === "documents" ? styles.tabActive : styles.tabButton} type="button" onClick={() => setTab("documents")}>按文章管理 <b>{documents.length}</b></button><button className={tab === "chunks" ? styles.tabActive : styles.tabButton} type="button" onClick={() => setTab("chunks")}>按 Chunk 管理 <b>{visibleChunks.length}</b></button><select value={enabledFilter} onChange={event => setEnabledFilter(event.target.value as typeof enabledFilter)}><option value="all">全部状态</option><option value="enabled">仅启用</option><option value="disabled">仅禁用</option></select><div className={styles.ragSearch}><input placeholder="搜索文件名、标题或关键词" value={keyword} onChange={event => setKeyword(event.target.value)} onKeyDown={event => { if (event.key === "Enter") void load(); }} /><button type="button" onClick={() => void load()}>搜索</button></div></section>
-    {tab === "documents" ? <section className={styles.ragGrid}>{documents.map(document => <article className={styles.ragDocumentCard} key={document.id}><div className={styles.ragDocumentTop}><span className={styles.fileBadge}>DOC</span><span className={styles.countPill}>{document.chunkCount} chunks · {document.enabled ? "启用" : "禁用"}</span></div><h2>{document.title || document.fileName}</h2><p className={styles.muted}>{document.fileName} · {document.author || "未知作者"}</p><p>{document.summary || "暂无摘要"}</p><div className={styles.ragMeta}>{document.keywords || "暂无关键词"}</div><button type="button" className={styles.textButton} disabled={loading} onClick={() => void toggleDocument(document)}>{document.enabled ? "禁用文档" : "启用文档"}</button><button type="button" className={styles.textButton} onClick={() => { setSelectedDocument(document.id); setTab("chunks"); }}>查看分块 →</button></article>)}{!documents.length ? <div className={styles.empty}>暂无知识文章，请先导入文件</div> : null}</section> : <section className={styles.chunkList}>{visibleChunks.map(chunk => <article className={styles.chunkCard} key={chunk.id}><div className={styles.chunkHeader}><strong>{chunk.fileName} · Chunk {chunk.chunkIndex}</strong><span>{chunk.startOffset} - {chunk.endOffset} · {chunk.enabled ? "启用" : "禁用"}</span></div><p>{chunk.content}</p><small>{chunk.summary || "暂无摘要"} {chunk.keywords ? ` · ${chunk.keywords}` : ""}</small><button type="button" className={styles.textButton} disabled={loading} onClick={() => void toggleChunk(chunk)}>{chunk.enabled ? "禁用 Chunk" : "启用 Chunk"}</button></article>)}{!visibleChunks.length ? <div className={styles.empty}>暂无 Chunk 数据</div> : null}</section>}
-    </div></section>
-  </main>;
+  const visible = useMemo(() => selectedDocument == null ? chunks : chunks.filter(c => c.documentId === selectedDocument), [chunks, selectedDocument]);
+  const pages = Math.max(1, Math.ceil(visible.length / pageSize)); const shown = visible.slice((page - 1) * pageSize, page * pageSize);
+  useEffect(() => { setPage(1); }, [selectedDocument, enabledFilter, keyword]);
+  const toggleDocument = async (d: RagDocument) => { await api.toggleRagDocument(session.token.accessToken, d.id, !d.enabled); await load(); };
+  const toggleChunk = async (c: RagChunk) => { await api.toggleRagChunk(session.token.accessToken, c.id, !c.enabled); await load(); };
+  const save = async () => { if (!editing || !content.trim()) return; setLoading(true); try { await api.updateRagChunk(session.token.accessToken, editing.id, content); setEditing(null); setMessage("Chunk 已更新"); await load(); } catch (e) { setMessage(e instanceof Error ? e.message : "更新失败"); } finally { setLoading(false); } };
+  return <main className={styles.appPage}><aside className={styles.sidebar}><div className={styles.logo}>TRAVEL<br /><small>AGENT OPS</small></div><button className={styles.navButton} onClick={onBack}>返回运营面板</button><button className={styles.navActive}>旅行知识库</button></aside><section className={styles.mainPanel}><div className={styles.detailPage}><header className={styles.detailHeader}><button className={styles.backButton} onClick={onBack}>← 返回</button><div className={styles.kicker}>RAG KNOWLEDGE BASE</div><h1>旅行知识库</h1></header>{message && <div className={styles.successBanner}>{message}</div>}<section className={styles.ragTabs}><button className={tab === "documents" ? styles.tabActive : styles.tabButton} onClick={() => setTab("documents")}>文档 <b>{documents.length}</b></button><button className={tab === "chunks" ? styles.tabActive : styles.tabButton} onClick={() => setTab("chunks")}>Chunk <b>{visible.length}</b></button><select value={enabledFilter} onChange={e => setEnabledFilter(e.target.value)}><option value="all">全部状态</option><option value="enabled">仅启用</option><option value="disabled">仅禁用</option></select><div className={styles.ragSearch}><input placeholder="搜索文件名或关键词" value={keyword} onChange={e => setKeyword(e.target.value)} onKeyDown={e => e.key === "Enter" && void load()} /><button onClick={() => void load()}>搜索</button></div></section>{tab === "documents" ? <section className={styles.ragGrid}>{documents.map(d => <article className={styles.ragDocumentCard} key={d.id}><div className={styles.ragDocumentTop}><span className={styles.fileBadge}>DOC</span><span>{d.chunkCount} chunks · {d.enabled ? "启用" : "禁用"}</span></div><h2>{d.title || d.fileName}</h2><p className={styles.muted}>{d.fileName}</p><p>{d.summary || "暂无摘要"}</p><button className={styles.textButton} onClick={() => void toggleDocument(d)}>{d.enabled ? "禁用文档" : "启用文档"}</button><button className={styles.textButton} onClick={() => { setSelectedDocument(d.id); setTab("chunks"); }}>查看分块 →</button></article>)}</section> : <><section className={styles.chunkList}>{shown.map(c => <article className={styles.chunkCard} key={c.id}><div className={styles.chunkHeader}><strong>{c.fileName} · Chunk {c.chunkIndex}</strong><span>{c.enabled ? "启用" : "禁用"}</span></div><div className={styles.chunkPreview} title={c.content}>{c.content}</div><small>{c.summary || "暂无摘要"}</small><div className={styles.chunkActions}><button className={styles.textButton} onClick={() => { setEditing(c); setContent(c.content); }}>编辑</button><button className={styles.textButton} disabled={loading} onClick={() => void toggleChunk(c)}>{c.enabled ? "禁用" : "启用"}</button></div></article>)}</section><div className={styles.pagination}>{Array.from({ length: pages }, (_, i) => i + 1).map(p => <button key={p} className={p === page ? styles.pageActive : styles.pageButton} onClick={() => setPage(p)}>{p}</button>)}</div></>}</div></section>{editing && <div className={styles.modalBackdrop}><div className={styles.editModal}><h2>编辑 Chunk</h2><p className={styles.muted}>{editing.fileName} · Chunk {editing.chunkIndex}</p><textarea rows={18} value={content} onChange={e => setContent(e.target.value)} /><div className={styles.modalActions}><button className={styles.refreshButton} onClick={() => setEditing(null)}>取消</button><button className={styles.primarySmallButton} disabled={loading || !content.trim()} onClick={() => void save()}>保存</button></div></div></div>}</main>;
 }

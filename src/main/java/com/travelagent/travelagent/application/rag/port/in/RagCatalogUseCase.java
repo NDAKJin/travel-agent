@@ -15,4 +15,6 @@ public interface RagCatalogUseCase {
     void toggleChunk(long chunkId, boolean enabled);
 
     void batchToggleChunks(List<Long> chunkIds, boolean enabled);
+
+    void updateChunkContent(long chunkId, String content);
 }

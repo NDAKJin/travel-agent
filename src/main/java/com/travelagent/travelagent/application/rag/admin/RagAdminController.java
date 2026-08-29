@@ -63,6 +63,16 @@ public class RagAdminController {
         return ResponseEntity.noContent().build();
     }
 
+    @PatchMapping("/chunks/{chunkId}")
+    @Operation(summary = "鏇存柊 Chunk 鍐呭")
+    @ApiResponse(responseCode = "204", description = "鏇存柊鎴愬姛")
+    public ResponseEntity<Void> updateChunk(
+            @PathVariable long chunkId,
+            @RequestBody RagChunkUpdateRequest request) {
+        ragAdminService.updateChunkContent(chunkId, request.content());
+        return ResponseEntity.noContent().build();
+    }
+
     @PatchMapping("/chunks/batch-enable")
     @Operation(summary = "批量启用或禁用分块")
     @ApiResponse(responseCode = "204", description = "更新成功")
