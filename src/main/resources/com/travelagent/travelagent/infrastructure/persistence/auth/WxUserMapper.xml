@@ -4,6 +4,8 @@
     <resultMap id="WxUserMap" type="com.travelagent.travelagent.domain.auth.model.WxUser">
         <id column="id" property="id"/>
         <result column="open_id" property="openId"/>
+        <result column="phone" property="phone"/>
+        <result column="email" property="email"/>
         <result column="nickname" property="nickname"/>
         <result column="avatar_url" property="avatarUrl"/>
         <result column="enabled" property="enabled"/>
@@ -12,7 +14,7 @@
     </resultMap>
 
     <select id="findById" resultMap="WxUserMap">
-        SELECT id, open_id, nickname, avatar_url, enabled, created_at, updated_at
+        SELECT id, open_id, phone, email, nickname, avatar_url, enabled, created_at, updated_at
         FROM wx_user
         WHERE id = #{id}
     </select>
@@ -22,6 +24,8 @@
         FROM wx_user
         WHERE open_id = #{openId}
     </select>
+    <select id="findByEmail" resultMap="WxUserMap">SELECT id, open_id, phone, email, nickname, avatar_url, enabled, created_at, updated_at FROM wx_user WHERE email = #{email}</select>
+    <select id="findByPhone" resultMap="WxUserMap">SELECT id, open_id, phone, email, nickname, avatar_url, enabled, created_at, updated_at FROM wx_user WHERE phone = #{phone}</select>
 
     <select id="searchByKeywordPage" resultMap="WxUserMap">
         SELECT id, open_id, nickname, avatar_url, enabled, created_at, updated_at
@@ -54,8 +58,8 @@
     </select>
 
     <insert id="insert" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO wx_user (open_id, nickname, avatar_url, enabled, created_at, updated_at)
-        VALUES (#{openId}, #{nickname}, #{avatarUrl}, #{enabled}, #{createdAt}, #{updatedAt})
+        INSERT INTO wx_user (open_id, phone, email, nickname, avatar_url, enabled, created_at, updated_at)
+        VALUES (#{openId}, #{phone}, #{email}, #{nickname}, #{avatarUrl}, #{enabled}, #{createdAt}, #{updatedAt})
     </insert>
 
     <update id="update">

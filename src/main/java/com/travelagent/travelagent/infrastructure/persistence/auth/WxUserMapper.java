@@ -12,6 +12,8 @@ public interface WxUserMapper extends WxUserRepository {
     WxUser findById(long id);
 
     WxUser findByOpenId(String openId);
+    WxUser findByEmail(String email);
+    WxUser findByPhone(String phone);
 
     List<WxUser> searchByKeywordPage(@Param("keyword") String keyword,
                                      @Param("offset") int offset,

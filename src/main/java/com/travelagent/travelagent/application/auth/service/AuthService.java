@@ -8,6 +8,7 @@ import com.travelagent.travelagent.application.auth.dto.AuthUserResponse;
 import com.travelagent.travelagent.application.auth.dto.LogoutRequest;
 import com.travelagent.travelagent.application.auth.dto.RefreshTokenRequest;
 import com.travelagent.travelagent.application.auth.dto.WxLoginRequest;
+import com.travelagent.travelagent.application.auth.dto.EmailAuthRequest;
 import com.travelagent.travelagent.application.auth.exception.AuthException;
 import com.travelagent.travelagent.application.auth.port.out.AdminUserRepository;
 import com.travelagent.travelagent.application.auth.port.out.WxUserRepository;
@@ -41,6 +42,26 @@ public class AuthService implements AuthUseCase {
     private final PasswordEncoder passwordEncoder;
     private final WxMiniProgramIdentityResolver wxMiniProgramIdentityResolver;
     private final Clock clock;
+    private final EmailVerificationService emailVerificationService;
+
+    @Override
+    public AuthResponse loginEmail(EmailAuthRequest request) {
+        if (!emailVerificationService.verify(request.email(), request.code())) throw new AuthException("Invalid email code");
+        WxUser user = Optional.ofNullable(wxUserMapper.findByEmail(request.email().trim().toLowerCase())).orElseThrow(() -> new AuthException("Email is not registered"));
+        if (!user.isEnabled()) throw new AuthException("Wx user is disabled");
+        return issueTokenResponse(toWxAccount(user));
+    }
+
+    @Override
+    public AuthResponse registerEmail(EmailAuthRequest request) {
+        if (!emailVerificationService.verify(request.email(), request.code())) throw new AuthException("Invalid email code");
+        if (request.phone() == null || !request.phone().matches("1[3-9]\\d{9}")) throw new AuthException("Valid phone is required");
+        String email = request.email().trim().toLowerCase();
+        if (wxUserMapper.findByEmail(email) != null) throw new AuthException("Email is already registered");
+        if (wxUserMapper.findByPhone(request.phone()) != null) throw new AuthException("Phone is already registered");
+        WxUser user = new WxUser(); user.setOpenId("web:" + email); user.setEmail(email); user.setPhone(request.phone()); user.setNickname("旅行用户"); user.setEnabled(true); user.setCreatedAt(clock.instant()); user.setUpdatedAt(clock.instant()); wxUserMapper.insert(user);
+        return issueTokenResponse(toWxAccount(user));
+    }
 
     @Override
     public AuthResponse loginWx(WxLoginRequest request) {
