@@ -1,10 +1,9 @@
 package com.travelagent.travelagent.infrastructure.security.auth;
 
-import com.travelagent.travelagent.application.auth.config.AuthProperties;
-import com.travelagent.travelagent.application.auth.port.out.TokenService;
+import com.travelagent.travelagent.infrastructure.config.AuthProperties;
 import com.travelagent.travelagent.domain.auth.model.DecodedToken;
 import com.travelagent.travelagent.domain.auth.model.TokenPair;
-import com.travelagent.travelagent.application.auth.exception.AuthException;
+import com.travelagent.travelagent.domain.auth.exception.AuthException;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.LinkedHashMap;
@@ -26,7 +25,7 @@ import org.springframework.util.Assert;
 @Service
 @Slf4j
 @RequiredArgsConstructor
-public class JwtTokenService implements TokenService {
+public class JwtTokenService {
     private static final String CLAIM_USER_ID = "uid";
     private static final String CLAIM_USER_TYPE = "userType";
     private static final String CLAIM_DISPLAY_NAME = "displayName";

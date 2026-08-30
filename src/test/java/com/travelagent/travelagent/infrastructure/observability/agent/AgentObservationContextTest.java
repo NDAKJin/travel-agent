@@ -1,7 +1,7 @@
 package com.travelagent.travelagent.infrastructure.observability.agent;
 
-import com.travelagent.travelagent.application.observability.model.AgentObservationContext;
-import com.travelagent.travelagent.application.observability.model.AgentObservationEvent;
+import com.travelagent.travelagent.domain.observability.model.AgentObservationContext;
+import com.travelagent.travelagent.domain.observability.model.AgentObservationEvent;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

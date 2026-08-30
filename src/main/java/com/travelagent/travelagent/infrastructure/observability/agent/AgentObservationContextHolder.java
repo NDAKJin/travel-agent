@@ -1,6 +1,6 @@
 package com.travelagent.travelagent.infrastructure.observability.agent;
 
-import com.travelagent.travelagent.application.observability.model.AgentObservationContext;
+import com.travelagent.travelagent.domain.observability.model.AgentObservationContext;
 
 public final class AgentObservationContextHolder {
     private static final ThreadLocal<AgentObservationContext> CURRENT = new ThreadLocal<>();

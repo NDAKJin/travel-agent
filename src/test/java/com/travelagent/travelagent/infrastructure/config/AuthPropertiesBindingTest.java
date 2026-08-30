@@ -1,6 +1,6 @@
 package com.travelagent.travelagent.infrastructure.config;
 
-import com.travelagent.travelagent.application.auth.config.AuthProperties;
+import com.travelagent.travelagent.infrastructure.config.AuthProperties;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

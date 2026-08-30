@@ -2,7 +2,7 @@ package com.travelagent.travelagent.infrastructure.config;
 
 import com.travelagent.travelagent.domain.auth.model.AdminUser;
 import com.travelagent.travelagent.infrastructure.persistence.auth.AdminUserMapper;
-import com.travelagent.travelagent.application.auth.config.AuthProperties;
+import com.travelagent.travelagent.infrastructure.config.AuthProperties;
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
 import java.time.Clock;
 import java.time.Instant;

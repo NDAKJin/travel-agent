@@ -1,8 +1,8 @@
 package com.travelagent.travelagent.infrastructure.ai.agent;
 
-import com.travelagent.travelagent.application.observability.model.AgentObservationContext;
+import com.travelagent.travelagent.domain.observability.model.AgentObservationContext;
 import com.travelagent.travelagent.infrastructure.observability.agent.AgentObservationContextHolder;
-import com.travelagent.travelagent.application.rag.port.in.KnowledgeRetriever;
+import com.travelagent.travelagent.domain.rag.service.KnowledgeRagService;
 import java.time.Instant;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.stereotype.Component;
@@ -10,9 +10,9 @@ import org.springframework.stereotype.Component;
 @Component
 public class KnowledgePlanningAgent {
 
-    private final KnowledgeRetriever ragService;
+    private final KnowledgeRagService ragService;
 
-    public KnowledgePlanningAgent(KnowledgeRetriever ragService) {
+    public KnowledgePlanningAgent(KnowledgeRagService ragService) {
         this.ragService = ragService;
     }
 

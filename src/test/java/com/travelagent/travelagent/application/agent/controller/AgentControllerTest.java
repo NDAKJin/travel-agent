@@ -8,12 +8,12 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.travelagent.travelagent.application.agent.dto.AgentChatResponse;
-import com.travelagent.travelagent.application.agent.dto.AgentConversationMessageResponse;
-import com.travelagent.travelagent.application.agent.dto.AgentSessionDetailResponse;
-import com.travelagent.travelagent.application.agent.dto.AgentSessionSummaryResponse;
-import com.travelagent.travelagent.application.agent.service.DefaultReactAgentService;
-import com.travelagent.travelagent.application.auth.model.AuthenticatedUser;
+import com.travelagent.travelagent.application.agent.AgentApplication;
+import com.travelagent.travelagent.domain.agent.dto.AgentChatResponse;
+import com.travelagent.travelagent.domain.agent.dto.AgentConversationMessageResponse;
+import com.travelagent.travelagent.domain.agent.dto.AgentSessionDetailResponse;
+import com.travelagent.travelagent.domain.agent.dto.AgentSessionSummaryResponse;
+import com.travelagent.travelagent.domain.auth.model.AuthenticatedUser;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -28,18 +28,18 @@ class AgentControllerTest {
             new UsernamePasswordAuthenticationToken(new AuthenticatedUser(1L, "admin", "admin", "ops-admin"), "token");
 
     private MockMvc mockMvc;
-    private DefaultReactAgentService reactAgentService;
+    private AgentApplication agentApplication;
 
     @BeforeEach
     void setUp() {
-        reactAgentService = mock(DefaultReactAgentService.class);
-        AgentController agentController = new AgentController(reactAgentService);
+        agentApplication = mock(AgentApplication.class);
+        AgentController agentController = new AgentController(agentApplication);
         mockMvc = MockMvcBuilders.standaloneSetup(agentController).build();
     }
 
     @Test
     void chatReturnsAgentResponse() throws Exception {
-        when(reactAgentService.chat(any(), any())).thenReturn(new AgentChatResponse("session-1", "Start with West Lake", "Travel Buddy", "qwen-plus"));
+        when(agentApplication.chat(any(), any())).thenReturn(new AgentChatResponse("session-1", "Start with West Lake", "Travel Buddy", "qwen-plus"));
 
         mockMvc.perform(post("/api/agent/chat")
                         .principal(AUTHENTICATION)
@@ -72,7 +72,7 @@ class AgentControllerTest {
 
     @Test
     void listSessionsReturnsCurrentUsersHistory() throws Exception {
-        when(reactAgentService.listSessions(any())).thenReturn(List.of(
+        when(agentApplication.listSessions(any())).thenReturn(List.of(
                 new AgentSessionSummaryResponse("session-1", "Hangzhou trip", "Then visit Lingyin Temple", 4, null)));
 
         mockMvc.perform(get("/api/agent/sessions").principal(AUTHENTICATION))
@@ -84,19 +84,19 @@ class AgentControllerTest {
 
     @Test
     void createSessionReturnsCreatedSession() throws Exception {
-        when(reactAgentService.createSession(any())).thenReturn(
-                new AgentSessionSummaryResponse("session-1", "新对话", "", 0, null));
+        when(agentApplication.createSession(any())).thenReturn(
+                new AgentSessionSummaryResponse("session-1", "new-chat", "", 0, null));
 
         mockMvc.perform(post("/api/agent/sessions").principal(AUTHENTICATION))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.sessionId").value("session-1"))
-                .andExpect(jsonPath("$.title").value("新对话"))
+                .andExpect(jsonPath("$.title").value("new-chat"))
                 .andExpect(jsonPath("$.messageCount").value(0));
     }
 
     @Test
     void getSessionReturnsConversationDetail() throws Exception {
-        when(reactAgentService.getSession(any(), any())).thenReturn(new AgentSessionDetailResponse(
+        when(agentApplication.getSession(any(), any())).thenReturn(new AgentSessionDetailResponse(
                 "session-1",
                 "Hangzhou trip",
                 List.of(

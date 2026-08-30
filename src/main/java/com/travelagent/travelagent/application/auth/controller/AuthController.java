@@ -1,12 +1,12 @@
 package com.travelagent.travelagent.application.auth.controller;
 
-import com.travelagent.travelagent.application.auth.dto.AdminLoginRequest;
-import com.travelagent.travelagent.application.auth.dto.AuthResponse;
-import com.travelagent.travelagent.application.auth.dto.LogoutRequest;
-import com.travelagent.travelagent.application.auth.dto.RefreshTokenRequest;
-import com.travelagent.travelagent.application.auth.dto.WxLoginRequest;
-import com.travelagent.travelagent.application.auth.dto.EmailAuthRequest;
-import com.travelagent.travelagent.application.auth.port.in.AuthUseCase;
+import com.travelagent.travelagent.domain.auth.dto.AdminLoginRequest;
+import com.travelagent.travelagent.domain.auth.dto.AuthResponse;
+import com.travelagent.travelagent.domain.auth.dto.LogoutRequest;
+import com.travelagent.travelagent.domain.auth.dto.RefreshTokenRequest;
+import com.travelagent.travelagent.domain.auth.dto.WxLoginRequest;
+import com.travelagent.travelagent.domain.auth.dto.EmailAuthRequest;
+import com.travelagent.travelagent.application.auth.AuthApplication;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -25,7 +25,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class AuthController {
 
-    private final AuthUseCase authService;
+    private final AuthApplication authApplication;
 
     @PostMapping("/wx/login")
     @Operation(summary = "微信小程序登录", description = "使用微信临时凭证换取系统访问令牌")
@@ -34,7 +34,7 @@ public class AuthController {
         log.info("WX login request received: codePresent={}, nicknamePresent={}",
                 request.code() != null && !request.code().isBlank(),
                 request.nickname() != null && !request.nickname().isBlank());
-        return authService.loginWx(request);
+        return authApplication.loginWx(request);
     }
 
     @PostMapping("/admin/login")
@@ -42,21 +42,21 @@ public class AuthController {
     @ApiResponse(responseCode = "200", description = "登录成功")
     public AuthResponse adminLogin(@Valid @RequestBody AdminLoginRequest request) {
         log.info("Admin login request received: username={}", request.username());
-        return authService.loginAdmin(request);
+        return authApplication.loginAdmin(request);
     }
 
     @PostMapping("/email/login")
-    public AuthResponse emailLogin(@Valid @RequestBody EmailAuthRequest request) { return authService.loginEmail(request); }
+    public AuthResponse emailLogin(@Valid @RequestBody EmailAuthRequest request) { return authApplication.loginEmail(request); }
 
     @PostMapping("/email/register")
-    public AuthResponse emailRegister(@Valid @RequestBody EmailAuthRequest request) { return authService.registerEmail(request); }
+    public AuthResponse emailRegister(@Valid @RequestBody EmailAuthRequest request) { return authApplication.registerEmail(request); }
 
     @PostMapping("/refresh")
     @Operation(summary = "刷新访问令牌", description = "使用刷新令牌获取新的访问令牌")
     @ApiResponse(responseCode = "200", description = "刷新成功")
     public AuthResponse refresh(@Valid @RequestBody RefreshTokenRequest request) {
         log.info("Token refresh request received");
-        return authService.refresh(request);
+        return authApplication.refresh(request);
     }
 
     @PostMapping("/logout")
@@ -64,6 +64,6 @@ public class AuthController {
     @ApiResponse(responseCode = "200", description = "退出成功")
     public void logout(@Valid @RequestBody LogoutRequest request) {
         log.info("Logout request received");
-        authService.logout(request);
+        authApplication.logout(request);
     }
 }

@@ -2,7 +2,7 @@ package com.travelagent.travelagent.infrastructure.cache;
 
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
-import com.travelagent.travelagent.application.planning.port.out.RoutePlanSemanticCache;
+import com.travelagent.travelagent.infrastructure.planning.port.RoutePlanSemanticCache;
 import io.lettuce.core.api.sync.RedisCommands;
 import io.lettuce.core.search.SearchReply;
 import io.lettuce.core.search.arguments.CreateArgs;

@@ -5,18 +5,16 @@ import com.alibaba.fastjson2.JSONArray;
 import com.alibaba.fastjson2.JSONObject;
 import com.alibaba.fastjson2.JSONWriter;
 import com.travelagent.travelagent.domain.agent.model.AgentMessage;
-import com.travelagent.travelagent.application.observability.model.AgentObservationContext;
+import com.travelagent.travelagent.domain.observability.model.AgentObservationContext;
 import com.travelagent.travelagent.infrastructure.observability.agent.AgentObservationContextHolder;
 import com.travelagent.travelagent.infrastructure.ai.prompt.PromptResourceLoader;
 import com.travelagent.travelagent.infrastructure.ai.agent.BudgetAgent;
 import com.travelagent.travelagent.infrastructure.ai.agent.KnowledgePlanningAgent;
 import com.travelagent.travelagent.infrastructure.ai.agent.RoutePlanningAgent;
-import com.travelagent.travelagent.application.planning.port.out.RouteExpertGateway;
-import com.travelagent.travelagent.application.planning.port.out.RoutePlanSemanticCache;
-import com.travelagent.travelagent.application.planning.port.out.TravelWorkflowPort;
+import com.travelagent.travelagent.infrastructure.planning.port.RouteExpertGateway;
+import com.travelagent.travelagent.infrastructure.planning.port.RoutePlanSemanticCache;
+import com.travelagent.travelagent.infrastructure.planning.port.TravelWorkflowPort;
 import com.travelagent.travelagent.infrastructure.planning.agent.SpringAiRouteExpertGateway;
-import com.travelagent.travelagent.domain.planning.service.RouteReviewPolicy;
-import com.travelagent.travelagent.domain.planning.service.RequirementPolicy;
 import java.util.List;
 import java.util.Map;
 import java.util.ArrayList;
@@ -52,7 +50,7 @@ import java.util.HashMap;
 public class LangGraphTravelAgent implements TravelWorkflowPort {
 
     private static final Set<String> ROUTE_EXPERTS = Set.of("KNOWLEDGE", "ROUTE", "BUDGET");
-    private final RouteReviewPolicy routeReviewPolicy = RouteReviewPolicy.standard();
+    private static final int MAX_ROUTE_REVISIONS = 2;
     private static final Map<String, Channel<?>> STATE_SCHEMA = Map.ofEntries(
             Map.entry("history", Channels.<List<AgentMessage>>base(() -> List.of())),
             Map.entry("intent", Channels.base(() -> "")),
@@ -287,8 +285,8 @@ public class LangGraphTravelAgent implements TravelWorkflowPort {
         String systemPrompt = prompt("route-reviewer");
         String raw = call("routeReviewer", systemPrompt + "\n\n" + input,
                 orchestrationChatClient.prompt().system(systemPrompt).user(input).call(),
-                state.observation(), output -> routeReviewPolicy.mustFinalize(
-                        WorkflowOutputParser.review(output).approved(), state.reviewAttempts() + 1)
+                state.observation(), output -> WorkflowOutputParser.review(output).approved()
+                        || state.reviewAttempts() + 1 > MAX_ROUTE_REVISIONS
                         ? "finalize" : "routePlanner");
         WorkflowOutputParser.ReviewDecision decision = WorkflowOutputParser.review(raw);
         if (decision.approved() && routePlanSemanticCache != null && !state.routeCacheHit()
@@ -342,7 +340,7 @@ public class LangGraphTravelAgent implements TravelWorkflowPort {
     }
 
     private String afterReview(WorkflowState state) {
-        return routeReviewPolicy.shouldReplan(state.reviewApproved(), state.reviewAttempts())
+        return !state.reviewApproved() && state.reviewAttempts() <= MAX_ROUTE_REVISIONS
                 ? "routePlanner" : StateGraph.END;
     }
 
@@ -500,7 +498,7 @@ public class LangGraphTravelAgent implements TravelWorkflowPort {
         String requirements() { return this.<String>value("requirements").orElse("{}"); }
         boolean requirementsConfirmed() {
             JSONObject result = WorkflowOutputParser.parseJson(requirements());
-            return result != null && RequirementPolicy.isConfirmed(result.getString("status"));
+            return result != null && "confirmed".equalsIgnoreCase(result.getString("status"));
         }
         String routePlan() { return this.<String>value("routePlan").orElse(""); }
         String review() { return this.<String>value("review").orElse(""); }

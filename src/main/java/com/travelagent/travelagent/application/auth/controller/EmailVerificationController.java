@@ -1,6 +1,6 @@
 package com.travelagent.travelagent.application.auth.controller;
 
-import com.travelagent.travelagent.application.auth.service.EmailVerificationService;
+import com.travelagent.travelagent.application.auth.EmailVerificationApplication;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -16,17 +16,17 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/auth/email")
 @RequiredArgsConstructor
 public class EmailVerificationController {
-    private final EmailVerificationService service;
+    private final EmailVerificationApplication application;
 
     @PostMapping("/send-code")
     public ResponseEntity<Void> send(@Valid @RequestBody EmailRequest request) {
-        service.send(request.email());
+        application.send(request.email());
         return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/verify-code")
     public Map<String, Boolean> verify(@Valid @RequestBody VerifyRequest request) {
-        return Map.of("valid", service.verify(request.email(), request.code()));
+        return Map.of("valid", application.verify(request.email(), request.code()));
     }
 
     public record EmailRequest(@Email @NotBlank String email) { }

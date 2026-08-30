@@ -1,8 +1,7 @@
 package com.travelagent.travelagent.infrastructure.rag.rerank;
 
-import com.travelagent.travelagent.application.rag.model.RerankCandidate;
-import com.travelagent.travelagent.application.rag.model.RerankResult;
-import com.travelagent.travelagent.application.rag.port.out.RerankService;
+import com.travelagent.travelagent.domain.rag.model.RerankCandidate;
+import com.travelagent.travelagent.domain.rag.model.RerankResult;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONArray;
 import com.alibaba.fastjson2.JSONObject;
@@ -17,14 +16,14 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClient;
 
 @Service
-public class QwenRerankService implements RerankService {
+public class QwenRerankService {
 
     private final RerankProperties properties;
     private final RestClient restClient;
 
     public QwenRerankService(RerankProperties properties,
-                             @Value("${spring.ai.dashscope.api-key:}") String dashScopeApiKey,
-                             @Qualifier("externalRestClient") RestClient restClient) {
+            @Value("${spring.ai.dashscope.api-key:}") String dashScopeApiKey,
+            @Qualifier("externalRestClient") RestClient restClient) {
         this.properties = properties;
         this.restClient = restClient;
         if (!StringUtils.hasText(properties.getApiKey())) {
@@ -32,7 +31,6 @@ public class QwenRerankService implements RerankService {
         }
     }
 
-    @Override
     public List<RerankResult> rerank(String query, List<RerankCandidate> candidates) {
         if (!StringUtils.hasText(query)) {
             throw new IllegalArgumentException("Rerank query must not be blank");
