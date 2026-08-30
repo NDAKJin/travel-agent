@@ -188,10 +188,45 @@ input {
     height: 100vh;
     margin: auto;
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
     background: #fbfefb;
     box-shadow: 0 0 80px #1d7d4d0d
 }
+
+.chat-main {
+    min-width: 0;
+    flex: 1;
+    display: flex;
+    flex-direction: column
+}
+
+.history {
+    width: 270px;
+    flex: 0 0 270px;
+    padding: 24px 14px;
+    border-right: 1px solid #e3efe6;
+    background: #f2faf3;
+    overflow: auto
+}
+
+.new-chat {
+    width: 100%;
+    height: 42px;
+    border: 1px solid #cde5d2;
+    border-radius: 12px;
+    background: #fff;
+    color: #1d7d4d;
+    font-weight: 700;
+    cursor: pointer
+}
+
+.new-chat:hover { background: #e4f4e7 }
+.history-title { margin: 26px 8px 10px; color: #789080; font-size: 12px; font-weight: 700 }
+.history-list { display: grid; gap: 6px }
+.history-item { display: grid; gap: 5px; width: 100%; padding: 11px 10px; border: 0; border-radius: 11px; background: transparent; color: #42624d; text-align: left; cursor: pointer }
+.history-item:hover, .history-item.active { background: #dfeee2 }
+.history-item strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px }
+.history-item span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #8aa092; font-size: 11px }
 
 .chat header {
     display: flex;
@@ -418,6 +453,8 @@ input {
     .chat header {
         padding: 20px
     }
+
+    .history { width: 210px; flex-basis: 210px; padding: 18px 10px }
 
     .conversation {
         padding: 24px 20px

@@ -4,6 +4,8 @@ import com.travelagent.travelagent.infrastructure.observability.agent.AgentObser
 import java.time.Instant;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.Map;
 import org.springframework.ai.chat.metadata.Usage;
 import org.springframework.ai.chat.model.ChatResponse;
 
@@ -12,6 +14,7 @@ public final class AgentObservationContext {
     private final String traceId;
     private final AgentObservationPort publisher;
     private final AtomicInteger sequence = new AtomicInteger();
+    private final Map<String, String> toolResults = new ConcurrentHashMap<>();
 
     public AgentObservationContext(long messageId, AgentObservationPort publisher) {
         this.messageId = messageId;
@@ -20,6 +23,20 @@ public final class AgentObservationContext {
     }
 
     public String traceId() { return traceId; }
+
+    public String toolResult(String toolName, String input) {
+        return toolResults.get(toolKey(toolName, input));
+    }
+
+    public void rememberToolResult(String toolName, String input, String result) {
+        if (result != null) {
+            toolResults.putIfAbsent(toolKey(toolName, input), result);
+        }
+    }
+
+    private String toolKey(String toolName, String input) {
+        return (toolName == null ? "" : toolName) + "\u0000" + (input == null ? "" : input.trim());
+    }
     public static AgentObservationContext disabled() { return new AgentObservationContext(0L, event -> { }); }
 
     public void publish(String agentName, String phase, String status, Instant startedAt,
