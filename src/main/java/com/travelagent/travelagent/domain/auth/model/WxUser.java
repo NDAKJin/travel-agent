@@ -10,6 +10,8 @@ public class WxUser {
 
     private Long id;
     private String openId;
+    private String phone;
+    private String email;
     private String nickname;
     private String avatarUrl;
     private boolean enabled = true;

@@ -5,6 +5,7 @@ import com.travelagent.travelagent.application.auth.dto.AuthResponse;
 import com.travelagent.travelagent.application.auth.dto.LogoutRequest;
 import com.travelagent.travelagent.application.auth.dto.RefreshTokenRequest;
 import com.travelagent.travelagent.application.auth.dto.WxLoginRequest;
+import com.travelagent.travelagent.application.auth.dto.EmailAuthRequest;
 import com.travelagent.travelagent.application.auth.port.in.AuthUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -43,6 +44,12 @@ public class AuthController {
         log.info("Admin login request received: username={}", request.username());
         return authService.loginAdmin(request);
     }
+
+    @PostMapping("/email/login")
+    public AuthResponse emailLogin(@Valid @RequestBody EmailAuthRequest request) { return authService.loginEmail(request); }
+
+    @PostMapping("/email/register")
+    public AuthResponse emailRegister(@Valid @RequestBody EmailAuthRequest request) { return authService.registerEmail(request); }
 
     @PostMapping("/refresh")
     @Operation(summary = "刷新访问令牌", description = "使用刷新令牌获取新的访问令牌")
