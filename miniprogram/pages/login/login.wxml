@@ -4,6 +4,7 @@
 
   <view class="page-shell">
     <view class="brand-row">
+      <image class="brand-logo-image" src="/assets/travel-agent-icon.png" mode="aspectFit" />
       <view class="brand-mark">
         <view class="brand-mark-dot"></view>
         <view class="brand-mark-line"></view>

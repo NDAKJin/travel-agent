@@ -2,6 +2,7 @@
   <view class="workspace card">
     <view class="sidebar {{sidebarCollapsed ? 'sidebar-collapsed' : ''}}">
       <view class="sidebar-top">
+        <image class="sidebar-logo-image" src="/assets/travel-agent-icon.png" mode="aspectFit" />
         <view class="sidebar-header">
           <button class="ghost-button sidebar-toggle" bindtap="toggleSidebar">
             <view class="sidebar-toggle-icon {{sidebarCollapsed ? 'sidebar-toggle-icon-collapsed' : ''}}">

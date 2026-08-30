@@ -1,6 +1,7 @@
 CREATE TABLE IF NOT EXISTS wx_user (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     open_id VARCHAR(128) NOT NULL UNIQUE,
+    phone VARCHAR(32) UNIQUE,
     nickname VARCHAR(64) NOT NULL,
     avatar_url VARCHAR(255),
     enabled TINYINT(1) NOT NULL,

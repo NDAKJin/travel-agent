@@ -1030,3 +1030,4 @@ page {
   height: 58rpx;
   background: linear-gradient(135deg, #315d43 0%, #6a9d63 100%);
 }
+.sidebar-logo-image{width:88rpx;height:88rpx;border-radius:24rpx;align-self:center;margin-bottom:8rpx}
