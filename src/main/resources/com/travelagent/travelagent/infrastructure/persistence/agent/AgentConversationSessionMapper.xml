@@ -12,7 +12,7 @@
         <result column="updated_at" property="updatedAt"/>
     </resultMap>
 
-    <resultMap id="AdminConversationSessionViewMap" type="com.travelagent.travelagent.application.admin.model.AdminConversationSessionView">
+    <resultMap id="AdminConversationSessionViewMap" type="com.travelagent.travelagent.domain.admin.model.AdminConversationSessionView">
         <id column="id" property="id"/>
         <result column="user_id" property="userId"/>
         <result column="user_type" property="userType"/>
