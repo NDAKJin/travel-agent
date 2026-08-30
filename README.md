@@ -154,7 +154,6 @@ docker compose up -d --build
 ```
 
 数据由 Docker volumes 持久化；不要执行 `docker compose down -v`，否则会删除 MySQL、Kafka、Qdrant 和 Redis 数据。
-应用启动时会自动补充 RAG 状态字段；其他表结构仍由 `schema.sql` 在初始化阶段创建。
 
 ## API 文档
 

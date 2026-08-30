@@ -119,6 +119,37 @@ input {
     flex: 1
 }
 
+.code-row button {
+    flex: 0 0 112px;
+    width: 112px;
+    min-width: 112px;
+    height: 48px;
+    padding: 0 8px;
+    white-space: nowrap;
+    text-align: center
+}
+
+.code-row button:disabled {
+    cursor: not-allowed;
+    background: #edf2ee;
+    color: #91a398
+}
+
+.code-row button:not(:disabled) {
+    transition: background .2s ease, color .2s ease, transform .15s ease, box-shadow .2s ease
+}
+
+.code-row button:hover:not(:disabled) {
+    background: #d4ecd9;
+    color: #14643d;
+    box-shadow: 0 5px 12px #1d7d4d1c;
+    transform: translateY(-1px)
+}
+
+.code-row button:active:not(:disabled) {
+    transform: translateY(1px)
+}
+
 .login button {
     border: 0;
     border-radius: 12px;
@@ -195,6 +226,31 @@ input {
     letter-spacing: -.04em
 }
 
+.logout {
+    flex: 0 0 auto;
+    min-width: 92px;
+    height: 38px;
+    padding: 0 16px;
+    border: 1px solid #cfe4d4;
+    border-radius: 12px;
+    background: #fff;
+    color: #3f7955;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background .2s ease, color .2s ease, border-color .2s ease
+}
+
+.logout:hover {
+    border-color: #1d7d4d;
+    background: #eaf6ed;
+    color: #1d7d4d
+}
+
+.logout:active {
+    transform: translateY(1px)
+}
+
 .online {
     color: #2d9560;
     font-size: 12px
@@ -251,6 +307,40 @@ input {
     box-shadow: 0 8px 24px #1d7d4d0b
 }
 
+.message {
+    display: flex;
+    flex-direction: column;
+    max-width: min(760px, 90%);
+    margin-bottom: 18px
+}
+
+.message.user {
+    align-items: flex-end;
+    margin-left: auto
+}
+
+.message.user .bubble {
+    border-radius: 20px 6px 20px 20px;
+    background: #1d7d4d;
+    color: #fff
+}
+
+.message-label {
+    margin: 0 6px 5px;
+    color: #8aa092;
+    font-size: 11px
+}
+
+.thinking {
+    margin: 0 0 18px;
+    animation: thinking-pulse 1.2s ease-in-out infinite
+}
+
+@keyframes thinking-pulse {
+    0%, 100% { opacity: .45 }
+    50% { opacity: 1 }
+}
+
 .chat footer {
     display: flex;
     gap: 12px;
@@ -269,12 +359,39 @@ input {
 }
 
 .chat footer button {
+    flex: 0 0 88px;
+    min-width: 88px;
+    height: 48px;
     border: 0;
     border-radius: 15px;
     padding: 0 24px;
     background: #1d7d4d;
     color: #fff;
-    font-weight: 700
+    font-weight: 700;
+    cursor: pointer;
+    transition: background .2s ease, transform .15s ease, opacity .2s ease
+}
+
+.chat footer button:hover:not(:disabled) {
+    background: #16643d;
+    transform: translateY(-1px)
+}
+
+.chat footer button:active:not(:disabled) {
+    transform: translateY(1px)
+}
+
+.chat footer button:disabled {
+    cursor: not-allowed;
+    opacity: .55
+}
+
+.chat-tip {
+    margin: 0 42px 14px;
+    color: #b55555;
+    font-size: 13px;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere
 }
 
 @media(max-width:800px) {
