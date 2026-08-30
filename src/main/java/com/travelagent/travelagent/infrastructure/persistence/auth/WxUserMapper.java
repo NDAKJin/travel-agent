@@ -1,13 +1,12 @@
 package com.travelagent.travelagent.infrastructure.persistence.auth;
 
 import com.travelagent.travelagent.domain.auth.model.WxUser;
-import com.travelagent.travelagent.application.auth.port.out.WxUserRepository;
 import java.util.List;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
 @Mapper
-public interface WxUserMapper extends WxUserRepository {
+public interface WxUserMapper {
 
     WxUser findById(long id);
 

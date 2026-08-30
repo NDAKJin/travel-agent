@@ -1,6 +1,5 @@
 package com.travelagent.travelagent.infrastructure.ai.prompt;
 
-import com.travelagent.travelagent.application.rag.port.out.PromptLoader;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import lombok.extern.slf4j.Slf4j;
@@ -10,7 +9,7 @@ import org.springframework.util.StreamUtils;
 
 @Component
 @Slf4j
-public class PromptResourceLoader implements PromptLoader {
+public class PromptResourceLoader {
 
     public String load(String name) {
         try {

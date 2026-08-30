@@ -1,6 +1,6 @@
 package com.travelagent.travelagent.infrastructure.persistence.agent;
 
-import com.travelagent.travelagent.application.planning.port.out.ConversationStorePort;
+import com.travelagent.travelagent.infrastructure.planning.port.ConversationStorePort;
 import com.travelagent.travelagent.domain.agent.model.AgentConversationMessage;
 import com.travelagent.travelagent.domain.agent.model.AgentConversationSession;
 import com.travelagent.travelagent.domain.agent.model.AgentMessage;

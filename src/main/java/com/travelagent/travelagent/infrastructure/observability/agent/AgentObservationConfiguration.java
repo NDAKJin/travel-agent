@@ -1,7 +1,6 @@
 package com.travelagent.travelagent.infrastructure.observability.agent;
 
-import com.travelagent.travelagent.application.observability.model.AgentObservationEvent;
-import com.travelagent.travelagent.application.observability.port.out.AgentObservationPort;
+import com.travelagent.travelagent.domain.observability.model.AgentObservationEvent;
 
 import com.alibaba.fastjson2.JSON;
 import lombok.extern.slf4j.Slf4j;

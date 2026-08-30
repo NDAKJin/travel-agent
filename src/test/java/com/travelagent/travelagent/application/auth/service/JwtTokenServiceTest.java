@@ -3,7 +3,7 @@ package com.travelagent.travelagent.application.auth.service;
 import com.travelagent.travelagent.infrastructure.security.auth.JwtTokenService;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.travelagent.travelagent.application.auth.config.AuthProperties;
+import com.travelagent.travelagent.infrastructure.config.AuthProperties;
 import com.travelagent.travelagent.domain.auth.model.DecodedToken;
 import com.travelagent.travelagent.domain.auth.model.TokenPair;
 import com.nimbusds.jose.jwk.source.ImmutableSecret;

@@ -9,11 +9,11 @@ class SpecialistAgentRunnerTest {
     @Test
     void preservesMarkdownSpecialistOutput() {
         String result = SpecialistAgentRunner.normalize("""
-                结论：已找到路线
-                - 路线：故宫 → 景山公园
+                缁撹锛氬凡鎵惧埌璺嚎
+                - 璺嚎锛氭晠瀹?鈫?鏅北鍏洯
                 """);
 
-        assertThat(result).isEqualTo("结论：已找到路线\n- 路线：故宫 → 景山公园");
+        assertThat(result).isEqualTo("缁撹锛氬凡鎵惧埌璺嚎\n- 璺嚎锛氭晠瀹?鈫?鏅北鍏洯");
     }
 
     @Test

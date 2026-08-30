@@ -4,7 +4,6 @@ import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONArray;
 import com.alibaba.fastjson2.JSONObject;
 import com.alibaba.fastjson2.JSONWriter;
-import com.travelagent.travelagent.domain.planning.service.RequirementPolicy;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
@@ -30,7 +29,7 @@ final class WorkflowOutputParser {
         JSONObject json = parseJson(output);
         if (json != null && validRequirements(json)) {
             return new RequirementDecision(
-                    RequirementPolicy.isConfirmed(json.getString("status")),
+                    "confirmed".equalsIgnoreCase(json.getString("status")),
                     JSON.toJSONString(json, JSONWriter.Feature.WriteMapNullValue));
         }
         JSONObject fallback = new JSONObject();

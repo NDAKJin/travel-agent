@@ -2,7 +2,7 @@ package com.travelagent.travelagent.infrastructure.ai;
 
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONWriter;
-import com.travelagent.travelagent.application.observability.model.AgentObservationContext;
+import com.travelagent.travelagent.domain.observability.model.AgentObservationContext;
 import com.travelagent.travelagent.infrastructure.observability.agent.AgentObservationContextHolder;
 import java.time.Instant;
 import java.util.Map;

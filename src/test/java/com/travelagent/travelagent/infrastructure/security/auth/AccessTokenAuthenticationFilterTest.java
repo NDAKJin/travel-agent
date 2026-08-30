@@ -6,7 +6,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
-import com.travelagent.travelagent.application.auth.config.AuthProperties;
+import com.travelagent.travelagent.infrastructure.config.AuthProperties;
 import jakarta.servlet.FilterChain;
 import java.time.Clock;
 import java.time.Duration;

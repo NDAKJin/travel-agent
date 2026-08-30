@@ -2,7 +2,7 @@ package com.travelagent.travelagent.infrastructure.persistence.agent;
 
 import com.travelagent.travelagent.domain.agent.model.AgentConversationSession;
 import com.travelagent.travelagent.domain.agent.model.AgentConversationMessage;
-import com.travelagent.travelagent.application.admin.model.AdminConversationSessionView;
+import com.travelagent.travelagent.domain.admin.model.AdminConversationSessionView;
 import java.util.List;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;

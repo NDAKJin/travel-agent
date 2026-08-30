@@ -3,7 +3,7 @@ package com.travelagent.travelagent.infrastructure.planning.agent;
 import com.travelagent.travelagent.infrastructure.ai.agent.BudgetAgent;
 import com.travelagent.travelagent.infrastructure.ai.agent.KnowledgePlanningAgent;
 import com.travelagent.travelagent.infrastructure.ai.agent.RoutePlanningAgent;
-import com.travelagent.travelagent.application.planning.port.out.RouteExpertGateway;
+import com.travelagent.travelagent.infrastructure.planning.port.RouteExpertGateway;
 
 /** 将 Spring AI 专家 Bean 适配为规划应用层端口。 */
 public final class SpringAiRouteExpertGateway implements RouteExpertGateway {

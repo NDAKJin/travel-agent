@@ -1,9 +1,9 @@
 package com.travelagent.travelagent.infrastructure.security.auth;
 
 import com.alibaba.fastjson2.JSON;
-import com.travelagent.travelagent.application.auth.exception.AuthException;
+import com.travelagent.travelagent.domain.auth.exception.AuthException;
 import com.travelagent.travelagent.domain.auth.model.DecodedToken;
-import com.travelagent.travelagent.application.auth.model.AuthenticatedUser;
+import com.travelagent.travelagent.domain.auth.model.AuthenticatedUser;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
