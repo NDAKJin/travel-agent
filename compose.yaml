@@ -26,7 +26,12 @@ services:
   redis:
     image: docker.m.daocloud.io/redis/redis-stack:7.4.0-v2
     restart: unless-stopped
-    command: redis-stack-server --maxmemory 256mb --maxmemory-policy allkeys-lru --save "" --appendonly no
+    command: >-
+      redis-stack-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+      --save 900 1 --save 300 10 --save 60 10000
+      --appendonly yes --appendfsync everysec
+    volumes:
+      - redis-data:/data
     mem_limit: 512m
     mem_reservation: 256m
     healthcheck:
@@ -157,6 +162,7 @@ services:
 
 volumes:
   mysql-data:
+  redis-data:
   qdrant-data:
   rag-ingestion-data:
   kafka-data:

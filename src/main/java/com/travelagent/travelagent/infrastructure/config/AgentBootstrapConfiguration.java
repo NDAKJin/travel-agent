@@ -66,6 +66,23 @@ public class AgentBootstrapConfiguration {
         return executor;
     }
 
+    @Bean(name = "routeCacheExecutor")
+    ThreadPoolTaskExecutor routeCacheExecutor(
+            @Value("${travel-agent.route-cache.core-pool-size:1}") int corePoolSize,
+            @Value("${travel-agent.route-cache.max-pool-size:2}") int maxPoolSize,
+            @Value("${travel-agent.route-cache.queue-capacity:128}") int queueCapacity) {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(corePoolSize);
+        executor.setMaxPoolSize(maxPoolSize);
+        executor.setQueueCapacity(queueCapacity);
+        executor.setThreadNamePrefix("route-cache-");
+        executor.setWaitForTasksToCompleteOnShutdown(true);
+        executor.setAwaitTerminationSeconds(10);
+        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.DiscardPolicy());
+        executor.initialize();
+        return executor;
+    }
+
     private RejectedExecutionHandler rejectionHandler(String policy) {
         return switch (policy.trim().toLowerCase(Locale.ROOT)) {
             case "caller-runs" -> new ThreadPoolExecutor.CallerRunsPolicy();

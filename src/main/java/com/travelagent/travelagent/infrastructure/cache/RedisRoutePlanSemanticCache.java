@@ -23,6 +23,10 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Function;
+import java.util.concurrent.Executor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
@@ -31,6 +35,7 @@ import org.springframework.stereotype.Component;
 /** Redis Stack vector cache. TTL is applied to every route entry. */
 @Component
 public class RedisRoutePlanSemanticCache implements RoutePlanSemanticCache {
+    private static final Logger log = LoggerFactory.getLogger(RedisRoutePlanSemanticCache.class);
     private static final byte[] PREFIX = bytes("route:semantic:");
     private static final String INDEX = "route_plan_cache_idx";
     private static final String VECTOR = "vector";
@@ -42,16 +47,19 @@ public class RedisRoutePlanSemanticCache implements RoutePlanSemanticCache {
     private final EmbeddingModel embeddingModel;
     private final Duration ttl;
     private final double threshold;
+    private final Executor writeExecutor;
     private volatile int dimensions;
 
     public RedisRoutePlanSemanticCache(RedisConnectionFactory connectionFactory,
                                        EmbeddingModel embeddingModel,
                                        @Value("${travel-agent.route-cache.ttl:PT24H}") Duration ttl,
-                                       @Value("${travel-agent.route-cache.similarity-threshold:0.92}") double threshold) {
+                                       @Value("${travel-agent.route-cache.similarity-threshold:0.92}") double threshold,
+                                       @Qualifier("routeCacheExecutor") Executor writeExecutor) {
         this.connectionFactory = connectionFactory;
         this.embeddingModel = embeddingModel;
         this.ttl = ttl;
         this.threshold = threshold;
+        this.writeExecutor = writeExecutor;
     }
 
     @Override
@@ -77,14 +85,23 @@ public class RedisRoutePlanSemanticCache implements RoutePlanSemanticCache {
 
     @Override
     public void put(String requirements, String routePlan) {
-        byte[] query = vector(requirements);
-        withCommands(redis -> {
-            ensureIndex(redis, query.length / Float.BYTES);
-            byte[] key = bytes(new String(PREFIX, StandardCharsets.UTF_8) + sha256(canonical(requirements)));
-            redis.hset(key, Map.of(bytes(VECTOR), query, bytes(PLAN), bytes(routePlan), bytes(REQUIREMENTS), bytes(requirements), bytes(EXPIRES_AT), bytes(Long.toString(System.currentTimeMillis() + ttl.toMillis()))));
-            redis.expire(key, ttl);
-            return null;
-        });
+        if (requirements == null || routePlan == null) return;
+        writeExecutor.execute(() -> putSynchronously(requirements, routePlan));
+    }
+
+    private void putSynchronously(String requirements, String routePlan) {
+        try {
+            byte[] query = vector(requirements);
+            withCommands(redis -> {
+                ensureIndex(redis, query.length / Float.BYTES);
+                byte[] key = bytes(new String(PREFIX, StandardCharsets.UTF_8) + sha256(canonical(requirements)));
+                redis.hset(key, Map.of(bytes(VECTOR), query, bytes(PLAN), bytes(routePlan), bytes(REQUIREMENTS), bytes(requirements), bytes(EXPIRES_AT), bytes(Long.toString(System.currentTimeMillis() + ttl.toMillis()))));
+                redis.expire(key, ttl);
+                return null;
+            });
+        } catch (RuntimeException exception) {
+            log.warn("Failed to write route semantic cache asynchronously", exception);
+        }
     }
 
     private byte[] vector(String requirements) {
