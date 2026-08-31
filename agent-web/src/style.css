@@ -505,6 +505,12 @@ input {
     color: #3f3f46;
 }
 .history-item:hover, .history-item.active { background: #e8e8eb; }
+.history-item { position: relative; display: flex; align-items: center; padding: 0; }
+.history-open { min-width: 0; flex: 1; display: grid; gap: 5px; padding: 10px 8px 10px 12px; border: 0; border-radius: 9px; background: transparent; color: inherit; text-align: left; cursor: pointer; }
+.history-open strong, .history-open span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.history-delete { flex: 0 0 28px; width: 28px; height: 28px; margin-right: 6px; border: 0; border-radius: 7px; background: transparent; color: #aaaab0; font-size: 18px; line-height: 1; cursor: pointer; opacity: 0; }
+.history-item:hover .history-delete, .history-item.active .history-delete { opacity: 1; }
+.history-delete:hover { background: #dedee1; color: #55555b; }
 .history-item strong { font-size: 13px; font-weight: 500; }
 .history-item span { color: #96969d; }
 
