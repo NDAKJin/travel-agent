@@ -6,8 +6,38 @@ type Message = { role: "user" | "assistant"; content: string };
 type SessionSummary = { sessionId: string; title: string; preview: string; messageCount: number };
 const API = import.meta.env.VITE_API_BASE_URL ?? "";
 const KEY = "agent-web-session";
-async function request<T>(path: string, body: unknown, token?: string): Promise<T> { const r = await fetch(`${API}${path}`, { method: "POST", headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify(body) }); if (!r.ok) { const text = await r.text(); throw new Error(text || `请求失败（${r.status}）`); } if (r.status === 204) return undefined as T; return r.json(); }
-async function getRequest<T>(path: string, token: string): Promise<T> { const r = await fetch(`${API}${path}`, { headers: { Authorization: `Bearer ${token}` } }); if (!r.ok) { const text = await r.text(); throw new Error(text || `请求失败（${r.status}）`); } return r.json(); }
+class ApiError extends Error { constructor(public status: number, message: string) { super(message); } }
+function clearSessionAndRedirect(): never { localStorage.removeItem(KEY); window.location.assign(window.location.pathname); throw new ApiError(401, "SESSION_EXPIRED"); }
+let refreshPromise: Promise<string> | null = null;
+async function refreshAccessToken(): Promise<string> {
+  if (refreshPromise) return refreshPromise;
+  refreshPromise = refreshAccessTokenOnce();
+  try { return await refreshPromise; } finally { refreshPromise = null; }
+}
+async function refreshAccessTokenOnce(): Promise<string> {
+  let current: Session | null = null;
+  try { current = JSON.parse(localStorage.getItem(KEY) ?? "null"); } catch { current = null; }
+  if (!current?.token.refreshToken) return clearSessionAndRedirect();
+  const response = await fetch(`${API}/api/auth/refresh`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ refreshToken: current.token.refreshToken }) });
+  if (!response.ok) return clearSessionAndRedirect();
+  const payload = await response.json() as { token?: Session["token"] };
+  if (!payload.token?.accessToken) return clearSessionAndRedirect();
+  const token = payload.token;
+  const next = { ...current, token };
+  localStorage.setItem(KEY, JSON.stringify(next));
+  return token.accessToken;
+}
+async function authorizedFetch(path: string, init: RequestInit, token?: string): Promise<Response> {
+  const headers = new Headers(init.headers); if (token) headers.set("Authorization", `Bearer ${token}`);
+  let response = await fetch(`${API}${path}`, { ...init, headers });
+  if (response.status === 401 && token) {
+    const accessToken = await refreshAccessToken(); headers.set("Authorization", `Bearer ${accessToken}`);
+    response = await fetch(`${API}${path}`, { ...init, headers });
+  }
+  return response;
+}
+async function request<T>(path: string, body: unknown, token?: string): Promise<T> { const r = await authorizedFetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }, token); if (!r.ok) { const text = await r.text(); throw new ApiError(r.status, text || `请求失败（${r.status}）`); } if (r.status === 204) return undefined as T; return r.json(); }
+async function getRequest<T>(path: string, token: string): Promise<T> { const r = await authorizedFetch(path, {}, token); if (!r.ok) { const text = await r.text(); throw new ApiError(r.status, text || `请求失败（${r.status}）`); } return r.json(); }
 function App() {
   const [session, setSession] = useState<Session | null>(() => { try { return JSON.parse(localStorage.getItem(KEY) ?? "null"); } catch { return null; } });
   const [mode, setMode] = useState<"login" | "register">("login"); const [phone, setPhone] = useState(""); const [email, setEmail] = useState(""); const [code, setCode] = useState(""); const [cooldown, setCooldown] = useState(0); const [tip, setTip] = useState(""); const [input, setInput] = useState(""); const [messages, setMessages] = useState<Message[]>([]); const [sessions, setSessions] = useState<SessionSummary[]>([]); const [sessionId, setSessionId] = useState<string | null>(null); const [sending, setSending] = useState(false); const sendingRef = useRef(false);

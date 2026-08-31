@@ -27,7 +27,7 @@ public class EmailVerificationService {
         redisTemplate.opsForValue().set("auth:email:code:" + normalized, code, ttl);
         if (sender == null || sender.isBlank()) return; // allow local development without SMTP
         SimpleMailMessage message = new SimpleMailMessage();
-        message.setFrom(sender); message.setTo(normalized); message.setSubject("Travel Agent 注册验证码");
+        message.setFrom(sender); message.setTo(normalized); message.setSubject("Travel Agent 邮箱验证码");
         message.setText("您的验证码是：" + code + "，10 分钟内有效。");
         mailSender.send(message);
     }
