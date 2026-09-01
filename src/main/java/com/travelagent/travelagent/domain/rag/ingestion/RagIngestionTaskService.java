@@ -16,8 +16,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.jdbc.support.KeyHolder;
-import org.springframework.kafka.core.KafkaTemplate;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -28,16 +26,14 @@ public class RagIngestionTaskService {
     private static final int MAX_ATTEMPTS = 5;
     private final RagIngestionService ingestionService;
     private final JdbcTemplate jdbc;
-    private final KafkaTemplate<String, String> kafka;
     private final String topic;
     private final Path root;
 
-    public RagIngestionTaskService(RagIngestionService ingestionService, JdbcTemplate jdbc, KafkaTemplate<String, String> kafka,
+    public RagIngestionTaskService(RagIngestionService ingestionService, JdbcTemplate jdbc,
                                    @Value("${travel-agent.rag.ingestion-topic:rag-ingestion}") String topic,
                                    @Value("${travel-agent.rag.ingestion-storage-dir:${java.io.tmpdir}/travel-agent-rag}") String storageDir) {
         this.ingestionService = ingestionService;
         this.jdbc = jdbc;
-        this.kafka = kafka;
         this.topic = topic;
         this.root = Paths.get(storageDir);
     }
@@ -71,61 +67,6 @@ public class RagIngestionTaskService {
             }
         }
         return result;
-    }
-
-    @Scheduled(fixedDelayString = "${travel-agent.rag.outbox-dispatch-interval-ms:1000}")
-    public void dispatchOutbox() {
-        recoverStaleTasks();
-        List<OutboxRow> rows = jdbc.query("""
-                SELECT id, task_id, topic, message_key, payload, attempts
-                FROM rag_ingestion_outbox
-                WHERE next_attempt_at <= CURRENT_TIMESTAMP
-                  AND (status = 'PENDING'
-                       OR (status = 'SENDING' AND updated_at < DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 1 MINUTE)))
-                ORDER BY id
-                LIMIT 50
-                """, (rs, rowNum) -> new OutboxRow(rs.getLong("id"), rs.getLong("task_id"),
-                rs.getString("topic"), rs.getString("message_key"), rs.getString("payload"), rs.getInt("attempts")));
-        for (OutboxRow row : rows) {
-            if (jdbc.update("""
-                    UPDATE rag_ingestion_outbox
-                    SET status = 'SENDING', attempts = attempts + 1, updated_at = CURRENT_TIMESTAMP
-                    WHERE id = ? AND (status = 'PENDING'
-                        OR (status = 'SENDING' AND updated_at < DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 1 MINUTE)))
-                    """, row.id()) != 1) continue;
-            kafka.send(row.topic(), row.messageKey(), row.payload()).whenComplete((ignored, error) -> {
-                if (error == null) {
-                    jdbc.update("""
-                            UPDATE rag_ingestion_outbox
-                            SET status = 'SENT', sent_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
-                            WHERE id = ?
-                            """, row.id());
-                    jdbc.update("""
-                            UPDATE rag_ingestion_task SET status = 'DISPATCHED', error_message = NULL,
-                                updated_at = CURRENT_TIMESTAMP
-                            WHERE id = ? AND status = 'PENDING'
-                            """, row.taskId());
-                    log.info("RAG ingestion message sent: taskId={}, outboxId={}, topic={}",
-                            row.taskId(), row.id(), row.topic());
-                    return;
-                }
-                int attempt = row.attempts() + 1;
-                if (attempt >= MAX_ATTEMPTS) {
-                    jdbc.update("UPDATE rag_ingestion_outbox SET status = 'FAILED', last_error = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-                            error.getMessage(), row.id());
-                    updateTaskStatus(row.taskId(), "FAILED", error.getMessage());
-                    log.error("RAG ingestion message reached retry limit: taskId={}, outboxId={}", row.taskId(), row.id(), error);
-                    return;
-                }
-                Instant nextAttempt = Instant.now().plusSeconds(backoffSeconds(row.attempts() + 1));
-                jdbc.update("""
-                        UPDATE rag_ingestion_outbox
-                        SET status = 'PENDING', next_attempt_at = ?, last_error = ?, updated_at = CURRENT_TIMESTAMP
-                        WHERE id = ?
-                        """, nextAttempt, error.getMessage(), row.id());
-                log.error("RAG ingestion message failed: taskId={}, outboxId={}", row.taskId(), row.id(), error);
-            });
-        }
     }
 
     public void process(RagIngestionMessage message) {
@@ -220,23 +161,25 @@ public class RagIngestionTaskService {
 
     private void retryOrFail(long taskId, String error) {
         if (isCancelled(taskId)) return;
-        Integer attempts = jdbc.query("SELECT attempts FROM rag_ingestion_outbox WHERE task_id = ?",
+        Integer attempts = jdbc.query("SELECT MAX(attempts) FROM rag_ingestion_outbox WHERE task_id = ?",
                 rs -> rs.next() ? rs.getInt(1) : null, taskId);
         if (attempts == null || attempts >= MAX_ATTEMPTS) {
             log.error("RAG ingestion task permanently failed: taskId={}, attempts={}, error={}", taskId, attempts, error);
             updateTaskStatus(taskId, "FAILED", error);
-            jdbc.update("UPDATE rag_ingestion_outbox SET status = 'FAILED', last_error = ?, updated_at = CURRENT_TIMESTAMP WHERE task_id = ?",
-                    error, taskId);
             return;
         }
         Instant nextAttempt = Instant.now().plusSeconds(backoffSeconds(attempts));
         log.warn("RAG ingestion task scheduled for retry: taskId={}, attempts={}, nextAttempt={}, error={}",
                 taskId, attempts, nextAttempt, error);
+        // The Canal path is append-only. Retrying therefore inserts a new
+        // event instead of updating the previously emitted row.
         jdbc.update("""
-                UPDATE rag_ingestion_outbox
-                SET status = 'PENDING', next_attempt_at = ?, last_error = ?, updated_at = CURRENT_TIMESTAMP
-                WHERE task_id = ? AND status = 'SENT'
-                """, nextAttempt, error, taskId);
+                INSERT INTO rag_ingestion_outbox
+                    (task_id, topic, message_key, payload, status, attempts, next_attempt_at, created_at, updated_at)
+                SELECT task_id, topic, message_key, payload, 'PENDING', attempts + 1, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+                FROM rag_ingestion_outbox
+                WHERE task_id = ? ORDER BY id DESC LIMIT 1
+                """, nextAttempt, taskId);
         updateTaskStatus(taskId, "PENDING", error);
     }
 

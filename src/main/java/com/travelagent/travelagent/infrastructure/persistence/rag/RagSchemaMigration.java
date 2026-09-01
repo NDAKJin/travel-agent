@@ -48,6 +48,22 @@ public class RagSchemaMigration implements ApplicationRunner {
                     INDEX idx_rag_ingestion_outbox_dispatch (status, next_attempt_at, updated_at)
                 )
                 """);
+        jdbcTemplate.execute("""
+                CREATE TABLE IF NOT EXISTS rag_vector_outbox (
+                    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+                    chunk_key VARCHAR(255) NOT NULL,
+                    operation VARCHAR(16) NOT NULL,
+                    payload MEDIUMTEXT,
+                    status VARCHAR(16) NOT NULL DEFAULT 'PENDING',
+                    attempts INT NOT NULL DEFAULT 0,
+                    next_attempt_at TIMESTAMP NOT NULL,
+                    last_error TEXT,
+                    created_at TIMESTAMP NOT NULL,
+                    updated_at TIMESTAMP NOT NULL,
+                    processed_at TIMESTAMP NULL,
+                    INDEX idx_rag_vector_outbox_dispatch (status, next_attempt_at, updated_at)
+                )
+                """);
     }
 
     private void ensureEnabledColumn(String table) {

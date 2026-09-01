@@ -12,41 +12,41 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.springframework.ai.document.Document;
-import org.springframework.ai.vectorstore.SearchRequest;
-import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
+import com.travelagent.travelagent.infrastructure.rag.qdrant.QdrantHybridClient;
+import org.springframework.beans.factory.annotation.Autowired;
 
 @Service
 public class KnowledgeRagService {
 
-    private final VectorStore vectorStore;
     private final int topK;
     private final double similarityThreshold;
     private final int recallTopK;
     private final QwenRerankService rerankService;
+    private final QdrantHybridClient hybridClient;
 
-    public KnowledgeRagService(VectorStore vectorStore,
+    @Autowired
+    public KnowledgeRagService(
             @Value("${travel-agent.rag.top-k:5}") int topK,
             @Value("${travel-agent.rag.similarity-threshold:0.65}") double similarityThreshold,
             @Value("${travel-agent.rag.recall-top-k:20}") int recallTopK,
-            QwenRerankService rerankService) {
-        this.vectorStore = vectorStore;
+            QwenRerankService rerankService,
+            QdrantHybridClient hybridClient) {
         this.topK = topK;
         this.similarityThreshold = similarityThreshold;
         this.recallTopK = Math.max(topK, recallTopK);
         this.rerankService = rerankService;
+        this.hybridClient = hybridClient;
     }
 
     public String enrich(String task) {
         if (!StringUtils.hasText(task))
             return task;
-        List<Document> documents = vectorStore.similaritySearch(SearchRequest.builder()
-                .query(task)
-                .topK(recallTopK)
-                .similarityThreshold(similarityThreshold)
-                .build());
+        List<Document> dense;
+        dense = hybridClient.query(task);
+        List<Document> documents = dense;
         List<RankedDocument> rerankedDocuments = rerank(task, documents);
         JSONObject input = new JSONObject();
         input.put("task", parseOrText(task));

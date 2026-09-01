@@ -9,7 +9,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.ai.document.Document;
-import org.springframework.ai.vectorstore.VectorStore;
+import com.travelagent.travelagent.infrastructure.rag.qdrant.RagVectorOutboxService;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,7 +22,7 @@ public class RagAdminService {
     private static final int MAX_BATCH_SIZE = 500;
 
     private final JdbcTemplate jdbcTemplate;
-    private final VectorStore vectorStore;
+    private final RagVectorOutboxService vectorOutbox;
 
     public List<RagDocumentResponse> documents(String keyword) {
         String value = keyword == null ? "" : keyword.trim();
@@ -84,8 +84,10 @@ public class RagAdminService {
         int target = enabled ? 1 : 0;
         if (row.chunk().enabled() == target) return;
         if (enabled && row.document().enabled() != 1) throw new IllegalArgumentException("文档未启用，请先启用文档");
-        if (enabled) vectorStore.add(List.of(toVectorDocument(row.document(), row.chunk())));
-        else vectorStore.delete(List.of(row.chunk().chunkKey()));
+        if (enabled) {
+            Document document = toVectorDocument(row.document(), row.chunk());
+            vectorOutbox.enqueueUpsert(document);
+        } else vectorOutbox.enqueueDelete(row.chunk().chunkKey());
         jdbcTemplate.update("UPDATE rag_chunk SET enabled = ? WHERE id = ?", target, chunkId);
     }
 
@@ -102,7 +104,7 @@ public class RagAdminService {
         String nextContent = content.trim();
         if (nextContent.equals(row.chunk().content())) return;
         if (row.chunk().enabled() == 1) {
-            vectorStore.delete(List.of(row.chunk().chunkKey()));
+            vectorOutbox.enqueueDelete(row.chunk().chunkKey());
         }
         jdbcTemplate.update("UPDATE rag_chunk SET content = ?, end_offset = start_offset + CHAR_LENGTH(?) WHERE id = ?",
                 nextContent, nextContent, chunkId);
@@ -110,7 +112,8 @@ public class RagAdminService {
             ChunkRow updated = new ChunkRow(row.chunk().id(), row.chunk().chunkKey(), row.chunk().chunkIndex(),
                     row.chunk().startOffset(), row.chunk().startOffset() + nextContent.length(), nextContent,
                     row.chunk().keywords(), row.chunk().summary(), row.chunk().questions(), row.chunk().enabled());
-            vectorStore.add(List.of(toVectorDocument(row.document(), updated)));
+            Document document = toVectorDocument(row.document(), updated);
+            vectorOutbox.enqueueUpsert(document);
         }
     }
 
@@ -156,12 +159,15 @@ public class RagAdminService {
     }
 
     private void addVectors(DocumentRow document, List<ChunkRow> chunks) {
-        if (!chunks.isEmpty()) vectorStore.add(chunks.stream().map(chunk -> toVectorDocument(document, chunk)).toList());
+        for (ChunkRow chunk : chunks) {
+            Document vector = toVectorDocument(document, chunk);
+            vectorOutbox.enqueueUpsert(vector);
+        }
     }
 
     private void deleteVectors(List<ChunkRow> chunks) {
         List<String> ids = chunks.stream().map(ChunkRow::chunkKey).filter(StringUtils::hasText).toList();
-        if (!ids.isEmpty()) vectorStore.delete(ids);
+        ids.forEach(vectorOutbox::enqueueDelete);
     }
 
     private Document toVectorDocument(DocumentRow document, ChunkRow chunk) {

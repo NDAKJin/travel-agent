@@ -9,6 +9,7 @@ import com.travelagent.travelagent.domain.rag.model.ChunkMetadata;
 import com.travelagent.travelagent.domain.rag.model.DocumentMetadata;
 import com.travelagent.travelagent.domain.rag.model.EmbeddingChunk;
 import com.travelagent.travelagent.domain.rag.service.RagTextChunker;
+import com.travelagent.travelagent.infrastructure.rag.qdrant.QdrantHybridClient;
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -26,7 +27,6 @@ import org.apache.tika.parser.AutoDetectParser;
 import org.apache.tika.sax.BodyContentHandler;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.document.Document;
-import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -40,7 +40,7 @@ public class RagIngestionService {
 
     private static final int MAX_LLM_INPUT_CHARS = 20_000;
 
-    private final VectorStore vectorStore;
+    private final QdrantHybridClient hybridClient;
     private final ChatClient chatClient;
     private final PromptResourceLoader promptResourceLoader;
     private final JdbcTemplate jdbcTemplate;
@@ -48,14 +48,14 @@ public class RagIngestionService {
     private final RagTextChunker chunker = new RagTextChunker(
             800, 100, List.of("\n\n", "\n", "。", "！", "？", "；", "，"));
 
-    public RagIngestionService(VectorStore vectorStore,
-                               @Qualifier("finalizerChatClient") ChatClient chatClient,
+    public RagIngestionService(@Qualifier("finalizerChatClient") ChatClient chatClient,
                                PromptResourceLoader promptResourceLoader,
-                               JdbcTemplate jdbcTemplate) {
-        this.vectorStore = vectorStore;
+                               JdbcTemplate jdbcTemplate,
+                               QdrantHybridClient hybridClient) {
         this.chatClient = chatClient;
         this.promptResourceLoader = promptResourceLoader;
         this.jdbcTemplate = jdbcTemplate;
+        this.hybridClient = hybridClient;
         this.nodes = List.of(new ParseNode(), new DocumentMetadataNode(), new ChunkNode(),
                 new ChunkMetadataNode(), new PersistNode());
     }
@@ -252,7 +252,7 @@ public class RagIngestionService {
             metadata.put("chunk_questions", chunk.chunkMetadata().questions());
             return Document.builder().id(id).text(chunk.embeddingText()).metadata(metadata).build();
         }).toList();
-        vectorStore.add(documents);
+        hybridClient.upsert(documents);
         log.info("RAG vectorization completed: fileName={}, vectors={}", fileName, documents.size());
         return documents.size();
     }

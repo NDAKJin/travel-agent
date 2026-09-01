@@ -9,13 +9,10 @@ spring:
       embedding:
         text: dashscope
     vectorstore:
-      type: qdrant
       qdrant:
         host: ${SPRING_AI_VECTORSTORE_QDRANT_HOST:localhost}
-        port: ${SPRING_AI_VECTORSTORE_QDRANT_PORT:6334}
+        port: ${SPRING_AI_VECTORSTORE_QDRANT_PORT:6333}
         api-key: ${SPRING_AI_VECTORSTORE_QDRANT_API_KEY:}
-        collection-name: ${SPRING_AI_VECTORSTORE_QDRANT_COLLECTION_NAME:travel_knowledge}
-        initialize-schema: true
     dashscope:
       api-key: ${SPRING_AI_DASHSCOPE_API_KEY:}
       embedding:
@@ -48,6 +45,8 @@ spring:
       password: ${SPRING_DATA_REDIS_PASSWORD:}
   kafka:
     bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS}
+    listener:
+      ack-mode: record
     consumer:
       properties:
         "[max.poll.interval.ms]": ${SPRING_KAFKA_MAX_POLL_INTERVAL_MS:1800000}
@@ -89,7 +88,26 @@ travel-agent:
     await-termination-seconds: ${TRAVEL_AGENT_ROUTE_EXPERT_AWAIT_TERMINATION_SECONDS:30}
     rejection-policy: ${TRAVEL_AGENT_ROUTE_EXPERT_REJECTION_POLICY:caller-runs}
   rag:
-    outbox-dispatch-interval-ms: ${TRAVEL_AGENT_RAG_OUTBOX_DISPATCH_INTERVAL_MS:1000}
+    collection-name: ${TRAVEL_AGENT_RAG_COLLECTION_NAME:travel_knowledge_hybrid}
+    hybrid:
+      enabled: ${TRAVEL_AGENT_RAG_HYBRID_ENABLED:true}
+      dense-weight: ${TRAVEL_AGENT_RAG_DENSE_WEIGHT:0.7}
+      sparse-weight: ${TRAVEL_AGENT_RAG_SPARSE_WEIGHT:0.3}
+    cache:
+      ttl: ${TRAVEL_AGENT_RAG_CACHE_TTL:PT10M}
+      version: ${TRAVEL_AGENT_RAG_CACHE_VERSION:v1}
+    vector-topic: ${TRAVEL_AGENT_RAG_VECTOR_TOPIC:rag-vector-sync}
+    vector-consumer-group: ${TRAVEL_AGENT_RAG_VECTOR_CONSUMER_GROUP:travel-agent-rag-vector-sync}
+    canal:
+      enabled: ${TRAVEL_AGENT_RAG_CANAL_ENABLED:false}
+      host: ${TRAVEL_AGENT_RAG_CANAL_HOST:localhost}
+      port: ${TRAVEL_AGENT_RAG_CANAL_PORT:11111}
+      destination: ${TRAVEL_AGENT_RAG_CANAL_DESTINATION:example}
+      username: ${TRAVEL_AGENT_RAG_CANAL_USERNAME:}
+      password: ${TRAVEL_AGENT_RAG_CANAL_PASSWORD:}
+      filter: ${TRAVEL_AGENT_RAG_CANAL_FILTER:travelagent.rag_vector_outbox}
+      ingestion-filter: ${TRAVEL_AGENT_RAG_CANAL_INGESTION_FILTER:travelagent.rag_ingestion_outbox}
+      poll-interval-ms: ${TRAVEL_AGENT_RAG_CANAL_POLL_INTERVAL_MS:1000}
     top-k: ${TRAVEL_AGENT_RAG_TOP_K:5}
     recall-top-k: ${TRAVEL_AGENT_RAG_RECALL_TOP_K:20}
     similarity-threshold: ${TRAVEL_AGENT_RAG_SIMILARITY_THRESHOLD:0.65}
