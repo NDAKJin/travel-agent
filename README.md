@@ -35,6 +35,17 @@
 - **旅行规划与审核回流**：路线规划师根据确认后的需求生成行程，路线审核师从需求匹配度、行程完整性和可执行性等维度输出结构化审核结果；审核不通过时将问题回流至规划师重新生成，领域规则限制最多两轮修订，形成受控的“规划—审核—修订”闭环。
 - **RAG 检索与重排**：基于 Apache Tika 完成多格式文档解析、元数据提取和文本分块，使用 Qdrant 按相似度阈值召回候选 Chunk，再由 Qwen Rerank 对候选内容进行二次排序和截断；最终上下文同时保留正文、文档与 Chunk 元数据以及向量分数和重排分数，提升景点、城市和路线知识的召回准确性与可追溯性。
 - **动态上下文注入与并发协作**：根据当前流程阶段组装需求、规划、审核等结构化上下文，避免每轮重复传递完整历史；路线规划师按需生成多个专家任务，对同一专家去重后通过 `CompletableFuture.allOf` 和自定义线程池并发调用旅行知识、路线和预算专家，再统一汇总结果，降低整体规划耗时。
+- **分层上下文压缩设计**：MySQL 永久保存完整会话原文，模型侧按 token 预算加载历史摘要和最近对话；上下文接近预算时触发增量摘要，保留已确认需求、用户偏好、关键决策和待办问题，避免长会话无限膨胀。
+
+### 上下文压缩管理
+
+会话上下文规划采用“完整原文 + 增量摘要 + 最近消息”的分层策略（当前代码已落地 token 预算裁剪，摘要持久化链路待继续接入）：
+
+![上下文压缩管理](assets/context-compression.svg)
+
+摘要仅压缩发送给模型的上下文，不删除数据库中的原始消息，并为系统提示词、工具调用、RAG 结果和模型输出预留空间。
+
+不同工作流节点按需接收上下文：监督和需求收集使用摘要与近期对话，路线规划和审核主要使用结构化需求、路线方案及审核结果，从源头减少重复传递。
 
 ## 系统架构
 
@@ -115,6 +126,59 @@ Redis 语义缓存与 Qdrant RAG 分工明确：Redis 只保存已审核的路�
 采用“向量召回 + 语义重排”的两阶段设计，可以先利用 Qdrant 快速筛出较大的候选集合，再由 Qwen Rerank 对候选内容进行精细相关性判断。这样既保留了向量检索的速度和扩展性，又能减少仅依赖向量距离带来的误召回，提升最终注入上下文的准确性。
 
 召回和重排职责分离，便于独立替换存储或模型，也能根据数据规模和调用成本调整检索策略。结果同时保留正文、文档元数据、Chunk 元数据以及两阶段评分，方便生成答案和后续问题定位。
+
+### 混合检索架构
+
+项目使用 Qdrant 原生的双路混合检索，将语义检索和词法检索结合起来：
+
+```mermaid
+flowchart LR
+    query[用户查询]
+    query --> dense[Dense Embedding]
+    query --> tokenize[Jieba 分词]
+    tokenize --> sparse[Sparse 权重]
+    dense --> denseRecall[Dense Prefetch]
+    sparse --> sparseRecall[Sparse Prefetch]
+    denseRecall --> rrf[Qdrant RRF 融合]
+    sparseRecall --> rrf
+    rrf --> filter[enabled 过滤]
+    filter --> rerank[Qwen Rerank]
+    rerank --> threshold[相似度阈值过滤]
+    threshold --> context[知识上下文]
+```
+
+#### Dense 检索
+
+Dense 路使用 DashScope Embedding 模型将查询和知识库 Chunk 转换为稠密向量，并在 Qdrant 的 `dense` 向量空间中进行 Cosine 相似度召回。它擅长识别同义表达和语义相关内容，例如“带孩子去南京玩两天”和“南京亲子两日游”。
+
+#### Sparse 检索
+
+Sparse 路使用 Jieba 对中文文本进行分词，并根据词频计算 BM25 风格的 TF 权重，再写入 Qdrant 的 `sparse` 向量空间。Qdrant collection 为 sparse 向量配置了 `idf` modifier，用于结合索引中的词项分布计算 IDF。
+
+当前 sparse encoder 使用稳定的 token hash 作为稀疏维度，属于轻量的中文词法检索实现；后续如果更换 tokenizer、词典或维度映射，需要对已有 Chunk 重新生成 sparse 向量并重新索引。
+
+#### Qdrant `prefetch + RRF`
+
+查询时分别执行 dense 和 sparse 两路 `prefetch`，每路先召回 `recall-top-k` 个候选，然后由 Qdrant 使用 Reciprocal Rank Fusion（RRF）按候选排名进行融合。RRF 不直接比较两种向量分数的绝对值，因此能够避免 dense 和 sparse 分数尺度不同带来的权重偏差。
+
+两路召回都会应用 `enabled = true` 过滤条件，已禁用的文档或 Chunk 不会进入候选集。融合后的结果保留 Qdrant 返回的 RRF score，供后续观测和问题定位使用。
+
+#### Rerank 与最终阈值
+
+RRF 结果只负责高效召回候选，最终相关性由 Qwen Rerank 对查询和候选 Chunk 进行二次判断。系统先按 rerank 结果排序，再使用 `similarity-threshold` 过滤，最后截取 `top-k` 条内容注入 Agent 上下文。
+
+因此，当前的分数含义如下：
+
+| 分数 | 含义 | 用途 |
+| --- | --- | --- |
+| Dense score | 稠密向量相似度 | 单路召回 |
+| Sparse score | 词法稀疏向量相似度 | 单路召回 |
+| RRF score | 两路候选排名融合分数 | 混合排序 |
+| Rerank score | Qwen 对查询和 Chunk 的相关性判断 | 最终过滤 |
+
+`similarity-threshold` 作用于 Rerank score，而不是 Qdrant 的 RRF score。这样可以先扩大召回范围，再由重排模型控制最终注入上下文的质量。
+
+RAG 工具结果使用 Redis 做精确查询缓存，默认 TTL 为 2 分钟（可通过 `TRAVEL_AGENT_RAG_CACHE_TTL` 调整）。知识库或 Chunk 变更时不主动删除缓存，允许在 TTL 窗口内短暂返回旧结果，以减少批量变更时的缓存扫描和删除开销。
 
 ### RAG 文档导入流水线
 

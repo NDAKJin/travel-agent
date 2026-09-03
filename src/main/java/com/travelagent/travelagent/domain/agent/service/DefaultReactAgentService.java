@@ -162,12 +162,37 @@ public class DefaultReactAgentService {
                 ? trimmed.substring("questions:".length()).trim() : reply;
     }
 
+    /**
+     * Keeps the newest messages that fit the history token budget. The database
+     * still contains the complete conversation; this only controls what is sent
+     * to the model. A lightweight character estimate avoids adding a tokenizer
+     * dependency and is intentionally conservative for mixed Chinese/English.
+     */
     private List<AgentMessage> boundedHistory(List<AgentMessage> messages) {
-        int max = Math.max(2, agentProperties.getMaxHistoryMessages());
-        if (messages.size() <= max) {
-            return List.copyOf(messages);
+        int budget = Math.max(256, agentProperties.getMaxHistoryTokens());
+        int used = 0;
+        java.util.LinkedList<AgentMessage> result = new java.util.LinkedList<>();
+        for (int index = messages.size() - 1; index >= 0; index--) {
+            AgentMessage message = messages.get(index);
+            int messageTokens = estimateTokens(message);
+            if (used + messageTokens <= budget) {
+                result.addFirst(message);
+                used += messageTokens;
+                continue;
+            }
+            int remaining = budget - used - 4;
+            if (remaining > 16 && message.content() != null) {
+                int chars = Math.min(message.content().length(), remaining * 2);
+                result.addFirst(new AgentMessage(message.role(), message.content().substring(0, chars) + "…"));
+            }
+            break;
         }
-        return List.copyOf(messages.subList(messages.size() - max, messages.size()));
+        return List.copyOf(result);
+    }
+
+    private int estimateTokens(AgentMessage message) {
+        if (message == null || message.content() == null) return 4;
+        return Math.max(1, (message.content().length() + 1) / 2) + 4;
     }
 
     private String buildTitle(List<AgentMessage> messages) {

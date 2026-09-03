@@ -4,58 +4,49 @@ import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONArray;
 import com.alibaba.fastjson2.JSONObject;
 import com.alibaba.fastjson2.JSONWriter;
-import com.travelagent.travelagent.infrastructure.ai.prompt.PromptResourceLoader;
 import com.travelagent.travelagent.domain.rag.model.ChunkMetadata;
 import com.travelagent.travelagent.domain.rag.model.DocumentMetadata;
 import com.travelagent.travelagent.domain.rag.model.EmbeddingChunk;
+import com.travelagent.travelagent.infrastructure.ai.prompt.PromptResourceLoader;
 import com.travelagent.travelagent.domain.rag.service.RagTextChunker;
-import com.travelagent.travelagent.infrastructure.rag.qdrant.QdrantHybridClient;
 import java.io.ByteArrayInputStream;
-import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import java.util.function.BiConsumer;
-import java.util.function.Consumer;
 import java.util.function.BooleanSupplier;
+import java.util.function.Consumer;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.tika.metadata.Metadata;
 import org.apache.tika.parser.AutoDetectParser;
+import org.apache.tika.parser.ParseContext;
 import org.apache.tika.sax.BodyContentHandler;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.document.Document;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
-import org.apache.tika.parser.ParseContext;
-import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @Service
 public class RagIngestionService {
-
     private static final int MAX_LLM_INPUT_CHARS = 20_000;
 
-    private final QdrantHybridClient hybridClient;
     private final ChatClient chatClient;
     private final PromptResourceLoader promptResourceLoader;
-    private final JdbcTemplate jdbcTemplate;
+    private final RagKnowledgePersistenceService persistence;
     private final List<RagIngestionNode> nodes;
     private final RagTextChunker chunker = new RagTextChunker(
-            800, 100, List.of("\n\n", "\n", "。", "！", "？", "；", "，"));
+            800, 100, List.of("\n\n", "\n", ".", ",", "!", "?", "。", "，", "！", "？"));
 
     public RagIngestionService(@Qualifier("finalizerChatClient") ChatClient chatClient,
-                               PromptResourceLoader promptResourceLoader,
-                               JdbcTemplate jdbcTemplate,
-                               QdrantHybridClient hybridClient) {
+            PromptResourceLoader promptResourceLoader, RagKnowledgePersistenceService persistence) {
         this.chatClient = chatClient;
         this.promptResourceLoader = promptResourceLoader;
-        this.jdbcTemplate = jdbcTemplate;
-        this.hybridClient = hybridClient;
+        this.persistence = persistence;
         this.nodes = List.of(new ParseNode(), new DocumentMetadataNode(), new ChunkNode(),
                 new ChunkMetadataNode(), new PersistNode());
     }
@@ -64,18 +55,18 @@ public class RagIngestionService {
         return process(fileName, contentType, bytes, (ignored, context) -> { });
     }
 
-    public RagIngestionResult process(String fileName, String contentType, byte[] bytes, Consumer<String> stageListener) {
+    public RagIngestionResult process(String fileName, String contentType, byte[] bytes,
+            Consumer<String> stageListener) {
         return process(fileName, contentType, bytes, (stage, ignored) -> stageListener.accept(stage));
     }
 
     public RagIngestionResult process(String fileName, String contentType, byte[] bytes,
-                                      BiConsumer<String, RagIngestionContext> stageListener) {
+            BiConsumer<String, RagIngestionContext> stageListener) {
         return process(fileName, contentType, bytes, stageListener, () -> false);
     }
 
     public RagIngestionResult process(String fileName, String contentType, byte[] bytes,
-                                      BiConsumer<String, RagIngestionContext> stageListener,
-                                      BooleanSupplier cancellationCheck) {
+            BiConsumer<String, RagIngestionContext> stageListener, BooleanSupplier cancellationCheck) {
         RagIngestionContext context = new RagIngestionContext(fileName, contentType, bytes);
         context.cancellationCheck(cancellationCheck);
         String stage = "INITIALIZING";
@@ -83,19 +74,13 @@ public class RagIngestionService {
         try {
             for (RagIngestionNode node : nodes) {
                 stage = node.stage();
-                log.info("RAG ingestion stage started: fileName={}, stage={}", fileName, stage);
-                stageListener.accept(node.stage(), context);
+                stageListener.accept(stage, context);
                 node.execute(context);
-                stageListener.accept(node.stage(), context);
-                log.info("RAG ingestion stage completed: fileName={}, stage={}, chunks={}, written={}",
-                        fileName, stage, context.chunks().size(), context.writtenCount());
+                stageListener.accept(stage, context);
             }
-            log.info("RAG ingestion succeeded: fileName={}, chunks={}, written={}",
-                    fileName, context.chunks().size(), context.writtenCount());
             return RagIngestionResult.success(fileName, context.chunks().size(), context.writtenCount());
         } catch (Exception exception) {
-            log.error("RAG ingestion failed: fileName={}, stage={}, errorType={}, message={}",
-                    fileName, stage, exception.getClass().getName(), exception.getMessage(), exception);
+            log.error("RAG ingestion failed: fileName={}, stage={}", fileName, stage, exception);
             return RagIngestionResult.failure(fileName,
                     StringUtils.hasText(exception.getMessage()) ? exception.getMessage() : exception.getClass().getSimpleName(),
                     context.chunks().size(), context.writtenCount());
@@ -106,7 +91,7 @@ public class RagIngestionService {
         public String stage() { return "PARSING"; }
         public void execute(RagIngestionContext context) throws Exception {
             ParsedFile parsed = parse(context.bytes(), context.fileName(), context.contentType());
-            if (!StringUtils.hasText(parsed.text())) throw new IllegalStateException("未解析到正文");
+            if (!StringUtils.hasText(parsed.text())) throw new IllegalStateException("No text extracted");
             context.text(parsed.text());
             context.mediaType(parsed.mediaType());
         }
@@ -131,29 +116,21 @@ public class RagIngestionService {
         public void execute(RagIngestionContext context) {
             List<EmbeddingChunk> chunks = context.chunks();
             for (int i = 0; i < chunks.size(); i++) {
-                if (context.cancelled()) throw new IllegalStateException("任务已取消");
+                if (context.cancelled()) throw new IllegalStateException("Task cancelled");
                 EmbeddingChunk chunk = chunks.get(i);
-                log.info("RAG chunk metadata started: fileName={}, chunk={}/{}, index={}, chars={}",
-                        context.fileName(), i + 1, chunks.size(), chunk.index(), chunk.content().length());
-                try {
-                    chunks.set(i, chunk.withChunkMetadata(extractChunkMetadata(context.documentMetadata(), chunk)));
-                    log.info("RAG chunk metadata completed: fileName={}, chunk={}/{}, index={}",
-                            context.fileName(), i + 1, chunks.size(), chunk.index());
-                } catch (Exception exception) {
-                    log.error("RAG chunk metadata failed: fileName={}, chunk={}/{}, index={}",
-                            context.fileName(), i + 1, chunks.size(), chunk.index(), exception);
-                    throw exception;
-                }
+                chunks.set(i, chunk.withChunkMetadata(extractChunkMetadata(context.documentMetadata(), chunk)));
             }
         }
     }
 
     private final class PersistNode implements RagIngestionNode {
-        public String stage() { return "VECTORIZING"; }
+        public String stage() { return "PERSISTING"; }
         public void execute(RagIngestionContext context) {
-            int written = write(context.fileName(), context.mediaType(), context.bytes(), context.chunks());
-            persist(context.fileName(), context.mediaType(), context.text(), context.bytes(),
-                    context.documentMetadata(), context.chunks());
+            String documentKey = sha256(context.bytes());
+            List<Document> vectors = buildVectorDocuments(context.fileName(), context.mediaType(), documentKey,
+                    context.chunks());
+            int written = persistence.persist(context.fileName(), context.mediaType(), context.text(), documentKey,
+                    context.documentMetadata(), context.chunks(), vectors);
             context.writtenCount(written);
         }
     }
@@ -168,72 +145,35 @@ public class RagIngestionService {
     }
 
     private DocumentMetadata extractDocumentMetadata(String text) {
-        String input = JSON.toJSONString(Map.of("text", limit(text)), JSONWriter.Feature.WriteMapNullValue);
-        JSONObject json = callJson("rag-document-metadata", input);
-        return new DocumentMetadata(
-                text(json.getString("title")),
-                text(json.getString("author")),
-                strings(json.getJSONArray("keywords"), 10),
-                text(json.getString("summary")),
+        JSONObject json = callJson("rag-document-metadata",
+                JSON.toJSONString(Map.of("text", limit(text)), JSONWriter.Feature.WriteMapNullValue));
+        return new DocumentMetadata(text(json.getString("title")), text(json.getString("author")),
+                strings(json.getJSONArray("keywords"), 10), text(json.getString("summary")),
                 strings(json.getJSONArray("questions"), 5));
     }
 
     private ChunkMetadata extractChunkMetadata(DocumentMetadata documentMetadata, EmbeddingChunk chunk) {
         Map<String, Object> input = new LinkedHashMap<>();
         input.put("document", documentMetadata);
-        input.put("chunk", Map.of(
-                "index", chunk.index(),
-                "startOffset", chunk.startOffset(),
-                "endOffset", chunk.endOffset(),
-                "content", chunk.content()));
+        input.put("chunk", Map.of("index", chunk.index(), "startOffset", chunk.startOffset(),
+                "endOffset", chunk.endOffset(), "content", chunk.content()));
         JSONObject json = callJson("rag-chunk-metadata", JSON.toJSONString(input, JSONWriter.Feature.WriteMapNullValue));
-        return new ChunkMetadata(
-                strings(json.getJSONArray("keywords"), 10),
-                text(json.getString("summary")),
+        return new ChunkMetadata(strings(json.getJSONArray("keywords"), 10), text(json.getString("summary")),
                 strings(json.getJSONArray("questions"), 5));
     }
 
     private JSONObject callJson(String promptName, String input) {
-        log.info("RAG metadata model call started: prompt={}, inputChars={}", promptName, input.length());
-        String output;
-        try {
-            output = chatClient.prompt()
-                    .system(promptResourceLoader.load(promptName))
-                    .user(input)
-                    .call()
-                    .content();
-        } catch (Exception exception) {
-            log.error("RAG metadata model call failed: prompt={}, inputChars={}, errorType={}, message={}",
-                    promptName, input.length(), exception.getClass().getName(), exception.getMessage(), exception);
-            throw new IllegalStateException("RAG 元数据模型调用失败", exception);
-        }
-        log.info("RAG metadata model call completed: prompt={}, outputChars={}",
-                promptName, output == null ? 0 : output.length());
+        String output = chatClient.prompt().system(promptResourceLoader.load(promptName)).user(input).call().content();
         String normalized = stripCodeFence(output);
-        JSONObject json;
-        try {
-            json = JSON.parseObject(normalized);
-        } catch (Exception exception) {
-            log.error("RAG metadata JSON parse failed: prompt={}, outputChars={}, outputPrefix={}",
-                    promptName, normalized.length(), normalized.substring(0, Math.min(200, normalized.length())), exception);
-            throw new IllegalStateException("RAG 元数据 JSON 解析失败", exception);
-        }
-        if (json == null) {
-            log.error("RAG metadata JSON is empty: prompt={}, outputChars={}", promptName, normalized.length());
-            throw new IllegalStateException("LLM 返回的 JSON 无效");
-        }
+        JSONObject json = JSON.parseObject(normalized);
+        if (json == null) throw new IllegalStateException("Metadata model returned empty JSON");
         return json;
     }
 
-    private int write(String fileName, String mediaType, byte[] bytes, List<EmbeddingChunk> chunks) {
-        if (chunks.isEmpty()) {
-            log.warn("RAG vectorization skipped because no chunks were produced: fileName={}", fileName);
-            return 0;
-        }
-        log.info("RAG vectorization started: fileName={}, mediaType={}, chunks={}", fileName, mediaType, chunks.size());
-        String fileHash = sha256(bytes);
-        List<Document> documents = chunks.stream().map(chunk -> {
-            String id = UUID.nameUUIDFromBytes((fileHash + "-" + chunk.index()).getBytes(StandardCharsets.UTF_8)).toString();
+    private List<Document> buildVectorDocuments(String fileName, String mediaType, String documentKey,
+            List<EmbeddingChunk> chunks) {
+        return chunks.stream().map(chunk -> {
+            String id = documentKey + "-" + chunk.index();
             Map<String, Object> metadata = new LinkedHashMap<>();
             metadata.put("file_name", fileName);
             metadata.put("media_type", mediaType);
@@ -250,69 +190,21 @@ public class RagIngestionService {
             metadata.put("chunk_keywords", chunk.chunkMetadata().keywords());
             metadata.put("chunk_summary", chunk.chunkMetadata().summary());
             metadata.put("chunk_questions", chunk.chunkMetadata().questions());
+            metadata.put("enabled", true);
             return Document.builder().id(id).text(chunk.embeddingText()).metadata(metadata).build();
         }).toList();
-        hybridClient.upsert(documents);
-        log.info("RAG vectorization completed: fileName={}, vectors={}", fileName, documents.size());
-        return documents.size();
-    }
-
-    private void persist(String fileName, String mediaType, String content, byte[] bytes,
-                         DocumentMetadata document, List<EmbeddingChunk> chunks) {
-        if (jdbcTemplate == null) {
-            log.warn("RAG database persistence skipped because JdbcTemplate is unavailable: fileName={}", fileName);
-            return;
-        }
-        log.info("RAG database persistence started: fileName={}, chunks={}", fileName, chunks.size());
-        String documentKey = sha256(bytes);
-        jdbcTemplate.update("DELETE FROM rag_document WHERE document_key = ?", documentKey);
-        jdbcTemplate.update("""
-                INSERT INTO rag_document (document_key, file_name, media_type, title, author, keywords,
-                    summary, questions, enabled, content, chunk_count, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                """, documentKey, fileName, mediaType, document.title(), document.author(),
-                JSON.toJSONString(document.keywords()), document.summary(), JSON.toJSONString(document.questions()),
-                content, chunks.size());
-        Long documentId = jdbcTemplate.queryForObject("SELECT id FROM rag_document WHERE document_key = ?",
-                Long.class, documentKey);
-        if (documentId == null) {
-            throw new IllegalStateException("RAG 文档索引写入失败");
-        }
-        for (EmbeddingChunk chunk : chunks) {
-            ChunkMetadata metadata = chunk.chunkMetadata();
-            jdbcTemplate.update("""
-                    INSERT INTO rag_chunk (document_id, chunk_key, chunk_index, start_offset, end_offset,
-                        content, keywords, summary, questions, enabled, created_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, CURRENT_TIMESTAMP)
-                    """, documentId, documentKey + "-" + chunk.index(), chunk.index(), chunk.startOffset(),
-                    chunk.endOffset(), chunk.content(), JSON.toJSONString(metadata.keywords()), metadata.summary(),
-                    JSON.toJSONString(metadata.questions()));
-        }
-        log.info("RAG database persistence completed: fileName={}, documentId={}, chunks={}",
-                fileName, documentId, chunks.size());
     }
 
     private List<String> strings(JSONArray values, int limit) {
-        if (values == null) {
-            return List.of();
-        }
-        return values.stream()
-                .map(String::valueOf)
-                .map(String::trim)
-                .filter(StringUtils::hasText)
-                .distinct()
-                .limit(limit)
-                .toList();
+        if (values == null) return List.of();
+        return values.stream().map(String::valueOf).map(String::trim).filter(StringUtils::hasText)
+                .distinct().limit(limit).toList();
     }
 
-    private String text(String value) {
-        return value == null ? "" : value.trim();
-    }
+    private String text(String value) { return value == null ? "" : value.trim(); }
 
     private String stripCodeFence(String value) {
-        if (!StringUtils.hasText(value)) {
-            return "{}";
-        }
+        if (!StringUtils.hasText(value)) return "{}";
         String normalized = value.trim();
         if (normalized.startsWith("```") && normalized.endsWith("```")) {
             int firstLineEnd = normalized.indexOf('\n');
@@ -322,9 +214,7 @@ public class RagIngestionService {
     }
 
     private String limit(String value) {
-        if (value == null || value.length() <= MAX_LLM_INPUT_CHARS) {
-            return value == null ? "" : value;
-        }
+        if (value == null || value.length() <= MAX_LLM_INPUT_CHARS) return value == null ? "" : value;
         return value.substring(0, MAX_LLM_INPUT_CHARS);
     }
 
@@ -332,10 +222,9 @@ public class RagIngestionService {
         try {
             return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
         } catch (NoSuchAlgorithmException exception) {
-            throw new IllegalStateException("SHA-256 不可用", exception);
+            throw new IllegalStateException("SHA-256 unavailable", exception);
         }
     }
 
     private record ParsedFile(String text, String mediaType) { }
-
 }

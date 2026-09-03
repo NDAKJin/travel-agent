@@ -7,6 +7,7 @@ services:
       MYSQL_USER: ${MYSQL_USER:?Set MYSQL_USER in .env}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in .env}
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD in .env}
+      MYSQL_ROOT_HOST: "%"
     volumes:
       - mysql-data:/var/lib/mysql
       - ./src/main/resources/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
@@ -15,6 +16,11 @@ services:
       - --max-connections=20
       - --performance-schema=OFF
       - --table-open-cache=200
+      - --server-id=1
+      - --log-bin=mysql-bin
+      - --binlog-format=ROW
+      - --binlog-row-image=FULL
+      - --binlog-expire-logs-seconds=604800
     mem_limit: 512m
     mem_reservation: 256m
     healthcheck:
@@ -85,6 +91,45 @@ services:
       timeout: 10s
       retries: 12
 
+  canal:
+    image: canal/canal-server:v1.1.8
+    restart: unless-stopped
+    environment:
+      canal.destinations: example
+      canal.serverMode: kafka
+      canal.admin.port: "11110"
+      canal.instance.master.address: mysql:3306
+      canal.instance.dbUsername: root
+      canal.instance.dbPassword: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD in .env}
+      canal.instance.connectionCharset: UTF-8
+      canal.instance.tsdb.enable: "false"
+      canal.instance.gtidon: "false"
+      canal.instance.filter.regex: 'travelagent\.(rag_vector_outbox|rag_ingestion_outbox)'
+      canal.instance.filter.dml.insert: "true"
+      canal.instance.filter.dml.update: "false"
+      canal.instance.filter.dml.delete: "false"
+      canal.mq.flatMessage: "true"
+      canal.mq.canalBatchSize: "50"
+      canal.mq.canalGetTimeout: "100"
+      canal.mq.topic: rag-vector-sync
+      canal.mq.dynamicTopic: 'rag-vector-sync:travelagent\.rag_vector_outbox,rag-ingestion:travelagent\.rag_ingestion_outbox'
+      canal.mq.partition: "0"
+      kafka.bootstrap.servers: kafka:9092
+      kafka.acks: all
+      kafka.compression.type: lz4
+      kafka.linger.ms: "5"
+      kafka.batch.size: "65536"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z localhost 11110"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
   api:
     build:
       context: .
@@ -132,6 +177,8 @@ services:
       qdrant:
         condition: service_healthy
       kafka:
+        condition: service_healthy
+      canal:
         condition: service_healthy
     ports:
       - "127.0.0.1:18080:8080"

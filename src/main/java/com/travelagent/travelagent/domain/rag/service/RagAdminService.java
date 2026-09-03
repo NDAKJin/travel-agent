@@ -72,7 +72,7 @@ public class RagAdminService {
                     : chunks;
             addVectors(document, chunksToAdd);
         } else {
-            deleteVectors(chunks);
+            disableVectors(chunks);
         }
         jdbcTemplate.update("UPDATE rag_document SET enabled = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", target, documentId);
         jdbcTemplate.update("UPDATE rag_chunk SET enabled = ? WHERE document_id = ?", target, documentId);
@@ -87,7 +87,7 @@ public class RagAdminService {
         if (enabled) {
             Document document = toVectorDocument(row.document(), row.chunk());
             vectorOutbox.enqueueUpsert(document);
-        } else vectorOutbox.enqueueDelete(row.chunk().chunkKey());
+        } else vectorOutbox.enqueueDisable(row.chunk().chunkKey());
         jdbcTemplate.update("UPDATE rag_chunk SET enabled = ? WHERE id = ?", target, chunkId);
     }
 
@@ -165,9 +165,11 @@ public class RagAdminService {
         }
     }
 
-    private void deleteVectors(List<ChunkRow> chunks) {
-        List<String> ids = chunks.stream().map(ChunkRow::chunkKey).filter(StringUtils::hasText).toList();
-        ids.forEach(vectorOutbox::enqueueDelete);
+    private void disableVectors(List<ChunkRow> chunks) {
+        chunks.stream().map(ChunkRow::chunkKey).filter(StringUtils::hasText).forEach(key -> {
+            vectorOutbox.enqueueDisable(key);
+            vectorOutbox.enqueueDelete(key);
+        });
     }
 
     private Document toVectorDocument(DocumentRow document, ChunkRow chunk) {
@@ -187,6 +189,7 @@ public class RagAdminService {
         metadata.put("chunk_keywords", jsonList(chunk.keywords()));
         metadata.put("chunk_summary", chunk.summary());
         metadata.put("chunk_questions", jsonList(chunk.questions()));
+        metadata.put("enabled", true);
         return Document.builder().id(chunk.chunkKey()).text(embeddingText(document, chunk)).metadata(metadata).build();
     }
 

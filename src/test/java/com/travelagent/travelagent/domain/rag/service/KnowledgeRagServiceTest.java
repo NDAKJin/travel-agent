@@ -23,7 +23,7 @@ class KnowledgeRagServiceTest {
             List<?> candidates = invocation.getArgument(1);
             return candidates.stream().map(candidate -> {
                 var c = (com.travelagent.travelagent.domain.rag.model.RerankCandidate) candidate;
-                return new RerankResult(c.id(), 0, candidates.indexOf(candidate) + 1);
+                return new RerankResult(c.id(), 0.8, candidates.indexOf(candidate) + 1);
             }).toList();
         });
         String enriched = new KnowledgeRagService(5, 0.65, 20, rerank, hybridClient)

@@ -66,6 +66,7 @@ public class KnowledgeRagService {
                 .collect(Collectors.toMap(Document::getId, Function.identity(), (first, ignored) -> first,
                         LinkedHashMap::new));
         return rerankService.rerank(query, candidates).stream()
+                .filter(result -> Double.isFinite(result.score()) && result.score() >= similarityThreshold)
                 .limit(topK)
                 .map(result -> new RankedDocument(documentsById.get(result.id()), result))
                 .filter(ranked -> ranked.document() != null)

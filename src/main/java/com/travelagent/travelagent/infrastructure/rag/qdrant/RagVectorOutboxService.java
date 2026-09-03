@@ -24,8 +24,11 @@ public class RagVectorOutboxService {
     @Transactional
     public void enqueueDelete(String chunkKey) { enqueue(chunkKey, "DELETE", null); }
 
+    @Transactional
+    public void enqueueDisable(String chunkKey) { enqueue(chunkKey, "DISABLE", null); }
+
     private void enqueue(String key, String operation, String payload) {
-        jdbc.update("INSERT INTO rag_vector_outbox (chunk_key,operation,payload,status,attempts,next_attempt_at,created_at,updated_at) VALUES (?,?,?,'PENDING',0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)", key, operation, payload);
+        jdbc.update("INSERT INTO rag_vector_outbox (chunk_key,operation,payload,created_at,updated_at) VALUES (?,?,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)", key, operation, payload);
     }
 
 }

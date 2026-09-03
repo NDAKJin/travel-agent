@@ -21,7 +21,7 @@ public class RedisRagToolCache {
     private final String version;
 
     public RedisRagToolCache(StringRedisTemplate redis,
-            @Value("${travel-agent.rag.cache.ttl:PT10M}") Duration ttl,
+            @Value("${travel-agent.rag.cache.ttl:PT2M}") Duration ttl,
             @Value("${travel-agent.rag.cache.version:v1}") String version) {
         this.redis = redis;
         this.ttl = ttl;

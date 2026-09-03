@@ -75,14 +75,22 @@ public class QdrantHybridClient {
                 .body(Map.of("points", ids, "wait", true)).retrieve().toBodilessEntity();
     }
 
+    public void setEnabled(List<String> ids, boolean enabled) {
+        if (ids == null || ids.isEmpty()) return;
+        client.put().uri("/collections/{collection}/points/payload", collection)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(Map.of("payload", Map.of("enabled", enabled), "points", ids, "wait", true))
+                .retrieve().toBodilessEntity();
+    }
+
     public List<Document> query(String text) {
         List<Float> dense = floats(embeddingModel.embed(text));
         LexicalSparseEncoder.SparseVector sparse = sparseEncoder.encode(text);
         ensureCollection(dense.size());
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("prefetch", List.of(
-                Map.of("query", dense, "using", "dense", "limit", recallTopK),
-                Map.of("query", Map.of("indices", sparse.indices(), "values", sparse.values()), "using", "sparse", "limit", recallTopK)));
+                Map.of("query", dense, "using", "dense", "limit", recallTopK, "filter", enabledFilter()),
+                Map.of("query", Map.of("indices", sparse.indices(), "values", sparse.values()), "using", "sparse", "limit", recallTopK, "filter", enabledFilter())));
         body.put("query", Map.of("fusion", "rrf"));
         body.put("limit", recallTopK);
         body.put("with_payload", true);
@@ -136,5 +144,9 @@ public class QdrantHybridClient {
         List<Float> result = new ArrayList<>(values.length);
         for (float value : values) result.add(value);
         return result;
+    }
+
+    private Map<String, Object> enabledFilter() {
+        return Map.of("must", List.of(Map.of("key", "enabled", "match", Map.of("value", true))));
     }
 }
