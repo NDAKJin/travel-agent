@@ -92,7 +92,7 @@ services:
       retries: 12
 
   canal:
-    image: canal/canal-server:v1.1.8
+    image: docker.m.daocloud.io/canal/canal-server:v1.1.8
     restart: unless-stopped
     environment:
       canal.destinations: example
