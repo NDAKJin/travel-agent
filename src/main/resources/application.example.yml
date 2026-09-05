@@ -9,13 +9,10 @@ spring:
       embedding:
         text: dashscope
     vectorstore:
-      type: qdrant
       qdrant:
         host: ${SPRING_AI_VECTORSTORE_QDRANT_HOST:localhost}
-        port: ${SPRING_AI_VECTORSTORE_QDRANT_PORT:6334}
+        port: ${SPRING_AI_VECTORSTORE_QDRANT_PORT:6333}
         api-key: ${SPRING_AI_VECTORSTORE_QDRANT_API_KEY:}
-        collection-name: ${SPRING_AI_VECTORSTORE_QDRANT_COLLECTION_NAME:travel_knowledge}
-        initialize-schema: true
     dashscope:
       api-key: ${SPRING_AI_DASHSCOPE_API_KEY:}
       embedding:
@@ -48,6 +45,8 @@ spring:
       password: ${SPRING_DATA_REDIS_PASSWORD:}
   kafka:
     bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS}
+    listener:
+      ack-mode: record
     consumer:
       properties:
         "[max.poll.interval.ms]": ${SPRING_KAFKA_MAX_POLL_INTERVAL_MS:1800000}
@@ -79,6 +78,7 @@ travel-agent:
     ttl: ${TRAVEL_AGENT_ROUTE_CACHE_TTL:PT24H}
     similarity-threshold: ${TRAVEL_AGENT_ROUTE_CACHE_SIMILARITY_THRESHOLD:0.92}
   route-expert:
+    timeout-seconds: ${TRAVEL_AGENT_ROUTE_EXPERT_TIMEOUT_SECONDS:20}
     core-pool-size: ${TRAVEL_AGENT_ROUTE_EXPERT_CORE_POOL_SIZE:8}
     max-pool-size: ${TRAVEL_AGENT_ROUTE_EXPERT_MAX_POOL_SIZE:16}
     queue-capacity: ${TRAVEL_AGENT_ROUTE_EXPERT_QUEUE_CAPACITY:32}
@@ -89,7 +89,16 @@ travel-agent:
     await-termination-seconds: ${TRAVEL_AGENT_ROUTE_EXPERT_AWAIT_TERMINATION_SECONDS:30}
     rejection-policy: ${TRAVEL_AGENT_ROUTE_EXPERT_REJECTION_POLICY:caller-runs}
   rag:
-    outbox-dispatch-interval-ms: ${TRAVEL_AGENT_RAG_OUTBOX_DISPATCH_INTERVAL_MS:1000}
+    collection-name: ${TRAVEL_AGENT_RAG_COLLECTION_NAME:travel_knowledge_hybrid}
+    hybrid:
+      enabled: ${TRAVEL_AGENT_RAG_HYBRID_ENABLED:true}
+      dense-weight: ${TRAVEL_AGENT_RAG_DENSE_WEIGHT:0.7}
+      sparse-weight: ${TRAVEL_AGENT_RAG_SPARSE_WEIGHT:0.3}
+    cache:
+      ttl: ${TRAVEL_AGENT_RAG_CACHE_TTL:PT2M}
+      version: ${TRAVEL_AGENT_RAG_CACHE_VERSION:v1}
+    vector-topic: ${TRAVEL_AGENT_RAG_VECTOR_TOPIC:rag-vector-sync}
+    vector-consumer-group: ${TRAVEL_AGENT_RAG_VECTOR_CONSUMER_GROUP:travel-agent-rag-vector-sync}
     top-k: ${TRAVEL_AGENT_RAG_TOP_K:5}
     recall-top-k: ${TRAVEL_AGENT_RAG_RECALL_TOP_K:20}
     similarity-threshold: ${TRAVEL_AGENT_RAG_SIMILARITY_THRESHOLD:0.65}
@@ -118,7 +127,10 @@ travel-agent:
   agent:
     max-message-chars: ${TRAVEL_AGENT_AGENT_MAX_MESSAGE_CHARS:4000}
     max-session-id-chars: ${TRAVEL_AGENT_AGENT_MAX_SESSION_ID_CHARS:64}
-    max-history-messages: ${TRAVEL_AGENT_AGENT_MAX_HISTORY_MESSAGES:40}
+    max-history-tokens: ${TRAVEL_AGENT_AGENT_MAX_HISTORY_TOKENS:420000}
+    summary-trigger-ratio: ${TRAVEL_AGENT_AGENT_SUMMARY_TRIGGER_RATIO:0.70}
+    summary-target-tokens: ${TRAVEL_AGENT_AGENT_SUMMARY_TARGET_TOKENS:12000}
+    recent-message-tokens: ${TRAVEL_AGENT_AGENT_RECENT_MESSAGE_TOKENS:30000}
     profile:
       name: ${TRAVEL_AGENT_AGENT_PROFILE_NAME:Travel Buddy}
   observability:

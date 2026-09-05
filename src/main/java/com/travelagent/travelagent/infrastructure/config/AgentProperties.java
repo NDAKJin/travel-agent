@@ -11,7 +11,11 @@ public class AgentProperties {
 
     @Setter private int maxMessageChars = 4000;
     @Setter private int maxSessionIdChars = 64;
-    @Setter private int maxHistoryMessages = 40;
+    /** Maximum estimated input tokens allocated to conversation history. */
+    @Setter private int maxHistoryTokens = 420000;
+    @Setter private double summaryTriggerRatio = 0.70d;
+    @Setter private int summaryTargetTokens = 12000;
+    @Setter private int recentMessageTokens = 30000;
 
     @Getter @Setter
     public static class ProfileProperties {

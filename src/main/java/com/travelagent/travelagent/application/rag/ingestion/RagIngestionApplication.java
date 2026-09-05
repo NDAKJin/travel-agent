@@ -16,4 +16,5 @@ public class RagIngestionApplication {
     }
     public List<RagIngestionTaskResponse> list() { return service.list(); }
     public void cancel(long taskId) { service.cancel(taskId); }
+    public void retry(long taskId) { service.retry(taskId); }
 }

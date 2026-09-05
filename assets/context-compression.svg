@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="520" viewBox="0 0 1200 520">
+<defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0 0L0 6L9 3z" fill="#4969a8"/></marker></defs>
+<rect width="1200" height="520" fill="#fff"/>
+<text x="80" y="70" font-family="Arial,'Microsoft YaHei',sans-serif" font-size="30" font-weight="700" fill="#172033">上下文压缩管理</text>
+<text x="80" y="102" font-family="Arial,'Microsoft YaHei',sans-serif" font-size="16" fill="#7a879d">保留完整历史，按需压缩发送给模型的上下文</text>
+
+<rect x="80" y="180" width="250" height="100" rx="12" fill="#f5f7fb" stroke="#dce3ef" stroke-width="2"/><text x="205" y="222" text-anchor="middle" font-family="Arial,'Microsoft YaHei',sans-serif" font-size="19" font-weight="700" fill="#172033">加载会话历史</text><text x="205" y="252" text-anchor="middle" font-family="Arial,'Microsoft YaHei',sans-serif" font-size="15" fill="#6c7890">MySQL 完整消息</text>
+<path d="M330 230H390" stroke="#4969a8" stroke-width="3" marker-end="url(#arrow)"/>
+<rect x="390" y="145" width="320" height="170" rx="12" fill="#f8faff" stroke="#8ca7dc" stroke-width="2"/><text x="550" y="183" text-anchor="middle" font-family="Arial,'Microsoft YaHei',sans-serif" font-size="19" font-weight="700" fill="#294f96">上下文压缩</text><path d="M550 198V215" stroke="#9aa8bd" stroke-width="2"/><text x="550" y="242" text-anchor="middle" font-family="Arial,'Microsoft YaHei',sans-serif" font-size="16" fill="#526078">早期消息 → 结构化摘要</text><text x="550" y="278" text-anchor="middle" font-family="Arial,'Microsoft YaHei',sans-serif" font-size="16" fill="#526078">最近消息 → 保留原文</text>
+<path d="M710 230H770" stroke="#4969a8" stroke-width="3" marker-end="url(#arrow)"/>
+<rect x="770" y="180" width="330" height="100" rx="12" fill="#4969a8"/><text x="935" y="222" text-anchor="middle" font-family="Arial,'Microsoft YaHei',sans-serif" font-size="19" font-weight="700" fill="#fff">组装节点上下文</text><text x="935" y="252" text-anchor="middle" font-family="Arial,'Microsoft YaHei',sans-serif" font-size="15" fill="#e8eefb">摘要 + 最近消息</text>
+<path d="M935 280V350" stroke="#4969a8" stroke-width="3" marker-end="url(#arrow)"/>
+<rect x="770" y="350" width="330" height="80" rx="12" fill="#f5f7fb" stroke="#dce3ef" stroke-width="2"/><text x="935" y="398" text-anchor="middle" font-family="Arial,'Microsoft YaHei',sans-serif" font-size="19" font-weight="700" fill="#172033">LangGraph 工作流</text>
+<path d="M550 315V390H390" stroke="#9aa8bd" stroke-width="2" stroke-dasharray="6 6" fill="none"/><text x="285" y="404" font-family="Arial,'Microsoft YaHei',sans-serif" font-size="14" fill="#7a879d">摘要持久化，后续请求复用</text>
+</svg>

@@ -55,4 +55,12 @@ public class RagIngestionController {
     public void cancelTask(@PathVariable long taskId) {
         application.cancel(taskId);
     }
+
+    @PostMapping("/import/tasks/{taskId}/retry")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(summary = "重试导入任务", description = "重新写入 Outbox，由 Canal Kafka Connector 重新投递")
+    @ApiResponse(responseCode = "204", description = "任务已重新排队")
+    public void retryTask(@PathVariable long taskId) {
+        application.retry(taskId);
+    }
 }
