@@ -16,8 +16,8 @@ RUN npm run build
 
 FROM docker.m.daocloud.io/library/node:22-alpine AS agent-web-build
 WORKDIR /workspace
-COPY agent-web/package.json ./
-RUN npm install
+COPY agent-web/package.json agent-web/package-lock.json ./
+RUN npm ci
 COPY agent-web ./
 RUN npm run build
 
