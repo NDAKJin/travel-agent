@@ -32,6 +32,7 @@ CREATE TABLE IF NOT EXISTS agent_conversation_session (
     title VARCHAR(120) NOT NULL,
     preview VARCHAR(240) NOT NULL,
     message_count INT NOT NULL,
+    summary MEDIUMTEXT,
     created_at TIMESTAMP NOT NULL,
     updated_at TIMESTAMP NOT NULL,
     CONSTRAINT uk_agent_session_user_session UNIQUE (user_id, session_id)

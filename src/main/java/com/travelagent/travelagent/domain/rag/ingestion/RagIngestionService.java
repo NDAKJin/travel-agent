@@ -19,6 +19,7 @@ import java.util.Map;
 import java.util.function.BiConsumer;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
+import java.util.Base64;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.tika.metadata.Metadata;
 import org.apache.tika.parser.AutoDetectParser;
@@ -58,6 +59,26 @@ public class RagIngestionService {
     public RagIngestionResult process(String fileName, String contentType, byte[] bytes,
             Consumer<String> stageListener) {
         return process(fileName, contentType, bytes, (stage, ignored) -> stageListener.accept(stage));
+    }
+
+    /** Executes exactly one pipeline stage and returns a serializable hand-off artifact. */
+    public RagStageArtifact processStage(String stage, RagStageArtifact artifact) throws Exception {
+        byte[] bytes = Base64.getDecoder().decode(artifact.bytesBase64());
+        RagIngestionContext context = new RagIngestionContext(artifact.fileName(), artifact.contentType(), bytes);
+        context.text(artifact.text());
+        context.mediaType(artifact.mediaType());
+        context.documentMetadata(artifact.documentMetadata());
+        context.chunks(artifact.chunks() == null ? new java.util.ArrayList<>() : new java.util.ArrayList<>(artifact.chunks()));
+        context.writtenCount(artifact.writtenCount());
+        RagIngestionNode node = nodes.stream().filter(candidate -> candidate.stage().equals(stage)).findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Unknown RAG stage: " + stage));
+        node.execute(context);
+        return new RagStageArtifact(context.fileName(), context.contentType(), Base64.getEncoder().encodeToString(context.bytes()),
+                context.text(), context.mediaType(), context.documentMetadata(), context.chunks(), context.writtenCount());
+    }
+
+    public RagStageArtifact initialArtifact(String fileName, String contentType, byte[] bytes) {
+        return new RagStageArtifact(fileName, contentType, Base64.getEncoder().encodeToString(bytes), null, null, null, List.of(), 0);
     }
 
     public RagIngestionResult process(String fileName, String contentType, byte[] bytes,

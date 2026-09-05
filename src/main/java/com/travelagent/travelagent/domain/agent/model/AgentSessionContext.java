@@ -6,5 +6,9 @@ import java.util.List;
 public record AgentSessionContext(String sessionId,
                                   List<AgentMessage> messages,
                                   Instant createdAt,
-                                  Instant updatedAt) {
+                                  Instant updatedAt,
+                                  String summary) {
+    public AgentSessionContext(String sessionId, List<AgentMessage> messages, Instant createdAt, Instant updatedAt) {
+        this(sessionId, messages, createdAt, updatedAt, "");
+    }
 }

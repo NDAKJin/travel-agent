@@ -12,6 +12,8 @@ import com.travelagent.travelagent.domain.agent.dto.AgentSessionSummaryResponse;
 import com.travelagent.travelagent.domain.auth.model.AuthenticatedUser;
 import com.travelagent.travelagent.infrastructure.config.AgentProperties;
 import com.travelagent.travelagent.infrastructure.langgraph.LangGraphTravelAgent;
+import com.travelagent.travelagent.infrastructure.ai.TokenCounter;
+import org.springframework.ai.chat.client.ChatClient;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -28,6 +30,9 @@ class DefaultReactAgentServiceTest {
         @Mock
         private LangGraphTravelAgent agentGraph;
 
+        @Mock
+        private ChatClient summaryChatClient;
+
         private DefaultReactAgentService reactAgentService;
 
         @BeforeEach
@@ -36,7 +41,7 @@ class DefaultReactAgentServiceTest {
                 properties.getProfile().setName("Travel Buddy");
                 reactAgentService = new DefaultReactAgentService(
                                 properties, agentGraph, new InMemoryAgentConversationStore(), event -> {
-                                }, "qwen-plus");
+                                }, summaryChatClient, new TokenCounter(), "qwen-plus");
         }
 
         @Test

@@ -1,7 +1,7 @@
 package com.travelagent.travelagent.domain.rag.ingestion;
 
 import com.alibaba.fastjson2.JSON;
-import com.travelagent.travelagent.domain.rag.model.RagIngestionMessage;
+import com.travelagent.travelagent.domain.rag.model.RagStageMessage;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -53,7 +53,9 @@ public class RagIngestionTaskService {
                 Path path = dir.resolve(name);
                 Files.write(path, file.getBytes());
                 log.info("RAG ingestion file stored: taskId={}, path={}, bytes={}", taskId, path, file.getSize());
-                String payload = JSON.toJSONString(new RagIngestionMessage(taskId, path.toString(), file.getContentType(), name));
+                Path artifact = dir.resolve("stage-INITIAL.json");
+                Files.writeString(artifact, JSON.toJSONString(ingestionService.initialArtifact(name, file.getContentType(), file.getBytes())));
+                String payload = JSON.toJSONString(new RagStageMessage(taskId, "PARSING", artifact.toString(), name, file.getContentType()));
                 enqueue(taskId, payload);
                 log.info("RAG ingestion task queued: taskId={}, fileName={}, bytes={}, contentType={}",
                         taskId, name, file.getSize(), file.getContentType());
@@ -68,6 +70,7 @@ public class RagIngestionTaskService {
         return result;
     }
 
+    /*
     public void process(RagIngestionMessage message) {
         log.info("RAG ingestion task processing started: taskId={}, fileName={}, path={}",
                 message.taskId(), message.fileName(), message.path());
@@ -109,6 +112,7 @@ public class RagIngestionTaskService {
         }
     }
 
+    */
     public List<RagIngestionTaskResponse> list() {
         return jdbc.query("SELECT id,file_name,status,chunk_count,written_count,error_message,created_at,updated_at FROM rag_ingestion_task ORDER BY id DESC",
                 (rs, n) -> new RagIngestionTaskResponse(rs.getLong("id"), rs.getString("file_name"), rs.getString("status"),
@@ -132,6 +136,21 @@ public class RagIngestionTaskService {
 
     public void markFailed(long taskId, String error) {
         updateStatus(taskId, "FAILED", error, 0, 0);
+    }
+
+    public RagIngestionService ingestionService() { return ingestionService; }
+
+    public void markStageRunning(long taskId) {
+        jdbc.update("UPDATE rag_ingestion_task SET status='RUNNING', error_message=NULL, updated_at=CURRENT_TIMESTAMP WHERE id=? AND status NOT IN ('SUCCESS','CANCELLED')", taskId);
+    }
+
+    public void markStageCompleted(long taskId, String stage, RagStageArtifact artifact) {
+        if ("PERSISTING".equals(stage)) {
+            updateStatus(taskId, "SUCCESS", null, artifact.chunks() == null ? 0 : artifact.chunks().size(), artifact.writtenCount());
+        } else {
+            jdbc.update("UPDATE rag_ingestion_task SET status='RUNNING', chunk_count=?, written_count=?, updated_at=CURRENT_TIMESTAMP WHERE id=? AND status <> 'CANCELLED'",
+                    artifact.chunks() == null ? 0 : artifact.chunks().size(), artifact.writtenCount(), taskId);
+        }
     }
 
     /** Re-emits an ingestion outbox INSERT so a failed task can be replayed. */

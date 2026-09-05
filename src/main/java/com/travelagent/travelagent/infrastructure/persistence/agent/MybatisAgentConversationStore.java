@@ -39,6 +39,7 @@ public class MybatisAgentConversationStore implements ConversationStorePort {
         session.setTitle(buildTitle(sessionContext.messages()));
         session.setPreview(buildPreview(sessionContext.messages()));
         session.setMessageCount(sessionContext.messages().size());
+        session.setSummary(sessionContext.summary());
         session.setCreatedAt(sessionContext.createdAt());
         session.setUpdatedAt(sessionContext.updatedAt());
         if (session.getId() == null) {
@@ -68,6 +69,7 @@ public class MybatisAgentConversationStore implements ConversationStorePort {
             session.setTitle(buildTitle(sessionContext.messages()));
             session.setCreatedAt(sessionContext.createdAt());
             session.setMessageCount(0);
+            session.setSummary(sessionContext.summary());
             session.setPreview("");
             session.setUpdatedAt(sessionContext.updatedAt());
             mapper.insert(session);
@@ -82,6 +84,7 @@ public class MybatisAgentConversationStore implements ConversationStorePort {
         session.setPreview(buildPreview(messages));
         session.setMessageCount(firstSequenceNo + messages.size());
         session.setUpdatedAt(sessionContext.updatedAt());
+        session.setSummary(sessionContext.summary());
         mapper.update(session);
         return entities.stream().map(AgentConversationMessage::getId).toList();
     }
@@ -112,7 +115,8 @@ public class MybatisAgentConversationStore implements ConversationStorePort {
                         .map(message -> new AgentMessage(message.getRole(), message.getContent()))
                         .toList(),
                 session.getCreatedAt(),
-                session.getUpdatedAt());
+                session.getUpdatedAt(),
+                session.getSummary());
     }
 
     private List<AgentConversationMessage> toMessageEntities(long sessionId, int firstSequenceNo,

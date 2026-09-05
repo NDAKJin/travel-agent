@@ -3,26 +3,15 @@ package com.travelagent.travelagent.infrastructure.cache;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
 import com.travelagent.travelagent.infrastructure.planning.port.RoutePlanSemanticCache;
-import io.lettuce.core.api.sync.RedisCommands;
-import io.lettuce.core.search.SearchReply;
-import io.lettuce.core.search.arguments.CreateArgs;
-import io.lettuce.core.search.arguments.FieldArgs;
-import io.lettuce.core.search.arguments.NumericFieldArgs;
-import io.lettuce.core.search.arguments.SearchArgs;
-import io.lettuce.core.search.arguments.TagFieldArgs;
-import io.lettuce.core.search.arguments.VectorFieldArgs;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
-import java.util.Arrays;
 import java.util.HexFormat;
 import java.time.Duration;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.function.Function;
 import java.util.concurrent.Executor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,6 +19,7 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
+import org.springframework.data.redis.connection.RedisConnection;
 import org.springframework.stereotype.Component;
 
 /** Redis Stack vector cache. TTL is applied to every route entry. */
@@ -67,18 +57,31 @@ public class RedisRoutePlanSemanticCache implements RoutePlanSemanticCache {
         byte[] query = vector(requirements);
         return withCommands(redis -> {
             ensureIndex(redis, query.length / Float.BYTES);
-            SearchArgs<byte[], byte[]> args = SearchArgs.<byte[], byte[]>builder()
-                    .withScores().limit(0, 1).returnField(bytes(PLAN)).returnField(bytes(REQUIREMENTS))
-                    .param(bytes("query_vector"), query).dialect(io.lettuce.core.search.arguments.QueryDialects.DIALECT2).build();
-            SearchReply<byte[], byte[]> reply = redis.ftSearch(bytes(INDEX), bytes("*=>[KNN 1 @vector $query_vector AS score]"), args);
-            if (reply.isEmpty()) return Optional.empty();
-            SearchReply.SearchResult<byte[], byte[]> result = reply.getResults().getFirst();
+            Object raw = redis.commands().execute("FT.SEARCH", bytes(INDEX),
+                    bytes("*=>[KNN 1 @vector $query_vector AS score]"),
+                    bytes("PARAMS"), bytes("2"), bytes("query_vector"), query,
+                    bytes("SORTBY"), bytes("score"), bytes("ASC"),
+                    bytes("RETURN"), bytes("3"), bytes("routePlan"), bytes("requirements"), bytes("score"),
+                    bytes("DIALECT"), bytes("2"));
+            List<?> resultList = raw instanceof List<?> list ? list : List.of();
+            if (resultList.size() < 3) return Optional.empty();
+            List<?> fields = resultList.get(2) instanceof List<?> list ? list : List.of();
+            String cachedRequirements = null;
+            String plan = null;
+            Double distance = null;
+            for (int i = 0; i + 1 < fields.size(); i += 2) {
+                String name = text(fields.get(i));
+                String value = text(fields.get(i + 1));
+                if (PLAN.equals(name)) plan = value;
+                else if (REQUIREMENTS.equals(name)) cachedRequirements = value;
+                else if ("score".equals(name)) {
+                    try { distance = Double.valueOf(value); } catch (RuntimeException ignored) { }
+                }
+            }
             // RediSearch returns cosine distance (0 = identical), not similarity.
-            double similarity = 1d - (result.getScore() == null ? 1d : result.getScore());
+            double similarity = 1d - (distance == null ? 1d : distance);
             if (similarity < threshold) return Optional.empty();
-            String cachedRequirements = text(field(result, REQUIREMENTS));
             if (!matchesMandatoryRequirements(requirements, cachedRequirements)) return Optional.empty();
-            String plan = text(field(result, PLAN));
             return plan == null ? Optional.empty() : Optional.of(new Hit(plan, similarity));
         });
     }
@@ -95,8 +98,11 @@ public class RedisRoutePlanSemanticCache implements RoutePlanSemanticCache {
             withCommands(redis -> {
                 ensureIndex(redis, query.length / Float.BYTES);
                 byte[] key = bytes(new String(PREFIX, StandardCharsets.UTF_8) + sha256(canonical(requirements)));
-                redis.hset(key, Map.of(bytes(VECTOR), query, bytes(PLAN), bytes(routePlan), bytes(REQUIREMENTS), bytes(requirements), bytes(EXPIRES_AT), bytes(Long.toString(System.currentTimeMillis() + ttl.toMillis()))));
-                redis.expire(key, ttl);
+                redis.hashCommands().hSet(key, bytes(VECTOR), query);
+                redis.hashCommands().hSet(key, bytes(PLAN), bytes(routePlan));
+                redis.hashCommands().hSet(key, bytes(REQUIREMENTS), bytes(requirements));
+                redis.hashCommands().hSet(key, bytes(EXPIRES_AT), bytes(Long.toString(System.currentTimeMillis() + ttl.toMillis())));
+                redis.keyCommands().expire(key, ttl);
                 return null;
             });
         } catch (RuntimeException exception) {
@@ -114,18 +120,17 @@ public class RedisRoutePlanSemanticCache implements RoutePlanSemanticCache {
         return value == null ? requirements : JSON.toJSONString(value);
     }
 
-    private void ensureIndex(RedisCommands<byte[], byte[]> redis, int dimensions) {
+    private void ensureIndex(RedisConnection redis, int dimensions) {
         if (this.dimensions == dimensions) return;
         synchronized (this) {
             if (this.dimensions == dimensions) return;
-            List<FieldArgs<byte[]>> fields = List.of(
-                    VectorFieldArgs.<byte[]>builder().hnsw().type(VectorFieldArgs.VectorType.FLOAT32)
-                            .dimensions(dimensions).distanceMetric(VectorFieldArgs.DistanceMetric.COSINE)
-                            .attribute("M", 16).attribute("EF_CONSTRUCTION", 200).as(bytes(VECTOR)).build(),
-                    TagFieldArgs.<byte[]>builder().as(bytes(REQUIREMENTS)).build(),
-                    NumericFieldArgs.<byte[]>builder().as(bytes(EXPIRES_AT)).build());
             try {
-                redis.ftCreate(bytes(INDEX), CreateArgs.<byte[], byte[]>builder().on(CreateArgs.TargetType.HASH).withPrefix(PREFIX).build(), fields);
+                redis.commands().execute("FT.CREATE", bytes(INDEX), bytes("ON"), bytes("HASH"),
+                        bytes("PREFIX"), bytes("1"), PREFIX, bytes("SCHEMA"),
+                        bytes(VECTOR), bytes("VECTOR"), bytes("HNSW"), bytes("6"),
+                        bytes("TYPE"), bytes("FLOAT32"), bytes("DIM"), bytes(Integer.toString(dimensions)),
+                        bytes("DISTANCE_METRIC"), bytes("COSINE"), bytes("M"), bytes("16"), bytes("EF_CONSTRUCTION"), bytes("200"),
+                        bytes(REQUIREMENTS), bytes("TAG"), bytes(EXPIRES_AT), bytes("NUMERIC"));
             } catch (RuntimeException exception) {
                 String message = exception.getMessage();
                 if (message == null || !message.toLowerCase().contains("index already exists")) throw exception;
@@ -150,15 +155,6 @@ public class RedisRoutePlanSemanticCache implements RoutePlanSemanticCache {
         return true;
     }
 
-    private byte[] field(SearchReply.SearchResult<byte[], byte[]> result, String name) {
-        byte[] expected = bytes(name);
-        return result.getFields().entrySet().stream()
-                .filter(entry -> Arrays.equals(entry.getKey(), expected))
-                .map(Map.Entry::getValue)
-                .findFirst()
-                .orElse(null);
-    }
-
     private String normalize(String value) {
         return value == null ? "" : value.trim().toLowerCase();
     }
@@ -172,16 +168,9 @@ public class RedisRoutePlanSemanticCache implements RoutePlanSemanticCache {
         }
     }
 
-    private <T> T withCommands(Function<RedisCommands<byte[], byte[]>, T> callback) {
+    private <T> T withCommands(java.util.function.Function<RedisConnection, T> callback) {
         try (var connection = connectionFactory.getConnection()) {
-            Object nativeConnection = connection.getNativeConnection();
-            if (!(nativeConnection instanceof RedisCommands<?, ?>)) {
-                throw new IllegalStateException("Redis native connection does not expose synchronous commands: "
-                        + nativeConnection.getClass().getName());
-            }
-            @SuppressWarnings("unchecked")
-            RedisCommands<byte[], byte[]> commands = (RedisCommands<byte[], byte[]>) nativeConnection;
-            return callback.apply(commands);
+            return callback.apply(connection);
         }
     }
 
@@ -193,4 +182,7 @@ public class RedisRoutePlanSemanticCache implements RoutePlanSemanticCache {
 
     private static byte[] bytes(String value) { return value.getBytes(StandardCharsets.UTF_8); }
     private static String text(byte[] value) { return value == null ? null : new String(value, StandardCharsets.UTF_8); }
+    private static String text(Object value) {
+        return value == null ? null : value instanceof byte[] bytes ? text(bytes) : value.toString();
+    }
 }

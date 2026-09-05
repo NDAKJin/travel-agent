@@ -342,6 +342,22 @@ input {
     box-shadow: 0 8px 24px #1d7d4d0b
 }
 
+.plan-card { width: min(760px, 100%); border: 1px solid #dcecdf; border-radius: 18px; background: #fff; padding: 18px; box-shadow: 0 8px 24px #1d7d4d0b; color: #2f2f34; }
+.plan-intro { margin: 0 0 16px; color: #536b5b; line-height: 1.7; white-space: pre-wrap; }
+.plan-days { display: grid; gap: 12px; }
+.plan-day { border: 1px solid #e5eee7; border-radius: 14px; overflow: hidden; }
+.plan-day-title { display: flex; align-items: baseline; gap: 10px; padding: 12px 14px; background: #f2faf3; color: #1d7d4d; }
+.plan-day-title span { font-size: 10px; font-weight: 800; letter-spacing: .12em; }
+.plan-day-title b { font-size: 14px; }
+.plan-item { display: grid; grid-template-columns: 58px 1fr; gap: 12px; padding: 13px 14px; border-top: 1px solid #edf3ee; }
+.plan-time { color: #1d7d4d; font-size: 11px; font-weight: 700; }
+.plan-item strong { display: block; color: #294534; font-size: 13px; }
+.plan-item p { margin: 4px 0 0; color: #657c6c; font-size: 12px; line-height: 1.6; }
+.plan-item small { display: block; margin-top: 4px; color: #8aa092; font-size: 11px; }
+.plan-summary, .plan-notes { display: flex; gap: 12px; margin-top: 14px; padding: 12px 14px; border-radius: 11px; background: #f7fbf7; color: #597361; font-size: 12px; }
+.plan-summary b, .plan-notes b { color: #1d7d4d; white-space: nowrap; }
+.plan-notes { flex-wrap: wrap; }
+
 .message {
     display: flex;
     flex-direction: column;

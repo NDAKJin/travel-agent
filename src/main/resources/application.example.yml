@@ -78,6 +78,7 @@ travel-agent:
     ttl: ${TRAVEL_AGENT_ROUTE_CACHE_TTL:PT24H}
     similarity-threshold: ${TRAVEL_AGENT_ROUTE_CACHE_SIMILARITY_THRESHOLD:0.92}
   route-expert:
+    timeout-seconds: ${TRAVEL_AGENT_ROUTE_EXPERT_TIMEOUT_SECONDS:20}
     core-pool-size: ${TRAVEL_AGENT_ROUTE_EXPERT_CORE_POOL_SIZE:8}
     max-pool-size: ${TRAVEL_AGENT_ROUTE_EXPERT_MAX_POOL_SIZE:16}
     queue-capacity: ${TRAVEL_AGENT_ROUTE_EXPERT_QUEUE_CAPACITY:32}

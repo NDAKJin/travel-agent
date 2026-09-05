@@ -1,7 +1,7 @@
 package com.travelagent.travelagent.infrastructure.messaging;
 
 import com.travelagent.travelagent.domain.rag.ingestion.RagIngestionTaskService;
-import com.travelagent.travelagent.domain.rag.model.RagIngestionMessage;
+import com.travelagent.travelagent.domain.rag.model.RagStageMessage;
 import com.travelagent.travelagent.infrastructure.messaging.rag.CanalFlatMessageParser;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
@@ -49,12 +49,17 @@ public class KafkaRetryConfiguration {
                 record.topic(), record.partition(), record.offset(), exception);
         if (ingestionTopic.equals(record.topic()) && record.value() instanceof String raw) {
             try {
+                if (raw.trim().startsWith("{\"taskId\"")) {
+                    RagStageMessage stage = JSON.parseObject(raw, RagStageMessage.class);
+                    if (stage != null) ingestionTasks.markFailed(stage.taskId(), exception.getMessage());
+                    return;
+                }
                 List<JSONObject> rows = CanalFlatMessageParser.insertedRows(raw);
                 for (JSONObject row : rows) {
                     String payload = row.getString("payload");
                     if (payload == null || payload.isBlank()) continue;
-                    RagIngestionMessage message = JSON.parseObject(payload, RagIngestionMessage.class);
-                    if (message != null) ingestionTasks.markFailed(message.taskId(), exception.getMessage());
+                    RagStageMessage stage = JSON.parseObject(payload, RagStageMessage.class);
+                    if (stage != null && stage.stage() != null) ingestionTasks.markFailed(stage.taskId(), exception.getMessage());
                 }
             } catch (RuntimeException parseError) {
                 log.warn("Unable to mark failed RAG ingestion task from Kafka record", parseError);

@@ -22,7 +22,9 @@ import java.util.HashSet;
 import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.Executor;
+import java.util.concurrent.TimeUnit;
 import org.bsc.langgraph4j.CompiledGraph;
 import org.bsc.langgraph4j.CompileConfig;
 import org.bsc.langgraph4j.GraphInput;
@@ -43,6 +45,7 @@ import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
+import org.springframework.beans.factory.annotation.Value;
 import java.time.Instant;
 import java.util.HashMap;
 
@@ -51,6 +54,7 @@ public class LangGraphTravelAgent implements TravelWorkflowPort {
 
     private static final Set<String> ROUTE_EXPERTS = Set.of("KNOWLEDGE", "ROUTE", "BUDGET");
     private static final int MAX_ROUTE_REVISIONS = 2;
+    private static final int DEFAULT_ROUTE_EXPERT_TIMEOUT_SECONDS = 20;
     private static final Map<String, Channel<?>> STATE_SCHEMA = Map.ofEntries(
             Map.entry("history", Channels.<List<AgentMessage>>base(() -> List.of())),
             Map.entry("intent", Channels.base(() -> "")),
@@ -77,6 +81,8 @@ public class LangGraphTravelAgent implements TravelWorkflowPort {
     private final RouteExpertGateway routeExpertGateway;
     private final RoutePlanSemanticCache routePlanSemanticCache;
     private final Executor routeExpertExecutor;
+    @Value("${travel-agent.route-expert.timeout-seconds:20}")
+    private int routeExpertTimeoutSeconds = DEFAULT_ROUTE_EXPERT_TIMEOUT_SECONDS;
     private final CompileConfig compileConfig;
     private final StateGraph<WorkflowState> workflow;
     private final CompiledGraph<WorkflowState> graph;
@@ -269,14 +275,34 @@ public class LangGraphTravelAgent implements TravelWorkflowPort {
             String selectedExpert = expert;
             futures.add(CompletableFuture.runAsync(() -> {
                 try (AgentObservationContextHolder.Scope ignored = AgentObservationContextHolder.open(state.observation())) {
-                    String output = routeExpertGateway.execute(selectedExpert, payload);
-                    synchronized (results) {
-                        results.put(resultKey, jsonOrText(output));
+                    try {
+                        String output = routeExpertGateway.execute(selectedExpert, payload);
+                        synchronized (results) {
+                            results.put(resultKey, jsonOrText(output));
+                        }
+                    } catch (RuntimeException exception) {
+                        synchronized (results) {
+                            results.put(resultKey, Map.of("error", "专家暂时不可用"));
+                        }
                     }
                 }
             }, routeExpertExecutor));
         }
-        CompletableFuture.allOf(futures.toArray(CompletableFuture[]::new)).join();
+        if (!futures.isEmpty()) {
+            try {
+                CompletableFuture.allOf(futures.toArray(CompletableFuture[]::new))
+                        .orTimeout(Math.max(1, routeExpertTimeoutSeconds), TimeUnit.SECONDS)
+                        .join();
+            } catch (CompletionException exception) {
+                // A slow external expert must not block route planning indefinitely.
+                synchronized (results) {
+                    for (String expert : scheduled) {
+                        String resultKey = expert.toLowerCase(Locale.ROOT);
+                        results.putIfAbsent(resultKey, Map.of("error", "专家响应超时"));
+                    }
+                }
+            }
+        }
         return Map.of("expertResults", JSON.toJSONString(results, JSONWriter.Feature.WriteMapNullValue));
     }
 

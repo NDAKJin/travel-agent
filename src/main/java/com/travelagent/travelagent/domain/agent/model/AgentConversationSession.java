@@ -14,6 +14,7 @@ public class AgentConversationSession {
     private String title;
     private String preview;
     private int messageCount;
+    private String summary;
     private Instant createdAt;
     private Instant updatedAt;
 }

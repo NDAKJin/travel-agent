@@ -20,7 +20,7 @@ class AgentPropertiesBindingTest {
                     "travel-agent.agent.profile.name=Travel Buddy",
                     "travel-agent.agent.max-message-chars=123",
                     "travel-agent.agent.max-session-id-chars=45",
-                    "travel-agent.agent.max-history-messages=6");
+                    "travel-agent.agent.max-history-tokens=6");
 
     @Test
     void bindsNestedAgentProperties() {
@@ -29,7 +29,7 @@ class AgentPropertiesBindingTest {
             assertThat(properties.getProfile().getName()).isEqualTo("Travel Buddy");
             assertThat(properties.getMaxMessageChars()).isEqualTo(123);
             assertThat(properties.getMaxSessionIdChars()).isEqualTo(45);
-            assertThat(properties.getMaxHistoryMessages()).isEqualTo(6);
+            assertThat(properties.getMaxHistoryTokens()).isEqualTo(6);
         });
     }
 
