@@ -1,30 +1,16 @@
 package com.travelagent.travelagent.infrastructure.langgraph;
 
 import com.alibaba.fastjson2.JSON;
-import com.alibaba.fastjson2.JSONArray;
 import com.alibaba.fastjson2.JSONObject;
 import com.alibaba.fastjson2.JSONWriter;
 import com.travelagent.travelagent.domain.agent.model.AgentMessage;
 import com.travelagent.travelagent.domain.observability.model.AgentObservationContext;
 import com.travelagent.travelagent.infrastructure.observability.agent.AgentObservationContextHolder;
 import com.travelagent.travelagent.infrastructure.ai.prompt.PromptResourceLoader;
-import com.travelagent.travelagent.infrastructure.ai.agent.BudgetAgent;
-import com.travelagent.travelagent.infrastructure.ai.agent.KnowledgePlanningAgent;
-import com.travelagent.travelagent.infrastructure.ai.agent.RoutePlanningAgent;
-import com.travelagent.travelagent.infrastructure.planning.port.RouteExpertGateway;
 import com.travelagent.travelagent.infrastructure.planning.port.RoutePlanSemanticCache;
 import com.travelagent.travelagent.infrastructure.planning.port.TravelWorkflowPort;
-import com.travelagent.travelagent.infrastructure.planning.agent.SpringAiRouteExpertGateway;
 import java.util.List;
 import java.util.Map;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.Locale;
-import java.util.Set;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
-import java.util.concurrent.Executor;
-import java.util.concurrent.TimeUnit;
 import org.bsc.langgraph4j.CompiledGraph;
 import org.bsc.langgraph4j.CompileConfig;
 import org.bsc.langgraph4j.GraphInput;
@@ -45,32 +31,53 @@ import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
-import org.springframework.beans.factory.annotation.Value;
 import java.time.Instant;
 import java.util.HashMap;
 
 @Service
 public class LangGraphTravelAgent implements TravelWorkflowPort {
 
-    private static final Set<String> ROUTE_EXPERTS = Set.of("KNOWLEDGE", "ROUTE", "BUDGET");
     private static final int MAX_ROUTE_REVISIONS = 2;
-    private static final int DEFAULT_ROUTE_EXPERT_TIMEOUT_SECONDS = 20;
+    private static final String EMPTY_JSON = "{}";
+    private static final String EMPTY_TEXT = "";
+    private static final String ROUTE_INTENT = "route";
+    private static final String NORMAL_INTENT = "normal";
+    private static final String NODE_SUPERVISOR = "supervisor";
+    private static final String NODE_REQUIREMENTS = "requirements";
+    private static final String NODE_ROUTE_PLANNING = "routePlanning";
+    private static final String NODE_ROUTE_PLANNER = "routePlanner";
+    private static final String NODE_ROUTE_REVIEWER = "routeReviewer";
+    private static final String NODE_NORMAL_SERVICE = "normalService";
+    private static final String NODE_FINALIZE = "finalize";
+    private static final String NODE_AWAIT_USER_INPUT = "awaitUserInput";
+    private static final String STATE_HISTORY = "history";
+    private static final String STATE_INTENT = "intent";
+    private static final String STATE_CURRENT_LOCATION = "currentUserLocation";
+    private static final String STATE_REQUIREMENTS = "requirements";
+    private static final String STATE_ROUTE_PLAN = "routePlan";
+    private static final String STATE_REVIEW = "review";
+    private static final String STATE_REVIEW_APPROVED = "reviewApproved";
+    private static final String STATE_REVIEW_ATTEMPTS = "reviewAttempts";
+    private static final String STATE_ROUTE_NEXT = "routeNext";
+    private static final String STATE_CACHE_HIT = "routeCacheHit";
+    private static final String STATE_CACHE_SCORE = "routeCacheScore";
+    private static final String STATE_NORMAL_REPLY = "normalReply";
+    private static final String STATE_REPLY = "reply";
+    private static final String QUESTIONS_PREFIX = "questions:";
     private static final Map<String, Channel<?>> STATE_SCHEMA = Map.ofEntries(
-            Map.entry("history", Channels.<List<AgentMessage>>base(() -> List.of())),
-            Map.entry("intent", Channels.base(() -> "")),
-            Map.entry("currentUserLocation", Channels.base(() -> "{}")),
-            Map.entry("requirements", Channels.base(() -> "{}")),
-            Map.entry("routePlan", Channels.base(() -> "")),
-            Map.entry("review", Channels.base(() -> "")),
-            Map.entry("reviewApproved", Channels.base(() -> false)),
-            Map.entry("reviewAttempts", Channels.base(() -> 0)),
-            Map.entry("routeNext", Channels.base(() -> "routeReviewer")),
-            Map.entry("expertTasks", Channels.base(() -> "[]")),
-            Map.entry("expertResults", Channels.base(() -> "{}")),
-            Map.entry("routeCacheHit", Channels.base(() -> false)),
-            Map.entry("routeCacheScore", Channels.base(() -> 0.0d)),
-            Map.entry("normalReply", Channels.base(() -> "")),
-            Map.entry("reply", Channels.base(() -> "")));
+            Map.entry(STATE_HISTORY, Channels.<List<AgentMessage>>base(() -> List.of())),
+            Map.entry(STATE_INTENT, Channels.base(() -> EMPTY_TEXT)),
+            Map.entry(STATE_CURRENT_LOCATION, Channels.base(() -> EMPTY_JSON)),
+            Map.entry(STATE_REQUIREMENTS, Channels.base(() -> EMPTY_JSON)),
+            Map.entry(STATE_ROUTE_PLAN, Channels.base(() -> EMPTY_TEXT)),
+            Map.entry(STATE_REVIEW, Channels.base(() -> EMPTY_TEXT)),
+            Map.entry(STATE_REVIEW_APPROVED, Channels.base(() -> false)),
+            Map.entry(STATE_REVIEW_ATTEMPTS, Channels.base(() -> 0)),
+            Map.entry(STATE_ROUTE_NEXT, Channels.base(() -> NODE_ROUTE_REVIEWER)),
+            Map.entry(STATE_CACHE_HIT, Channels.base(() -> false)),
+            Map.entry(STATE_CACHE_SCORE, Channels.base(() -> 0.0d)),
+            Map.entry(STATE_NORMAL_REPLY, Channels.base(() -> EMPTY_TEXT)),
+            Map.entry(STATE_REPLY, Channels.base(() -> EMPTY_TEXT)));
 
     private final ChatClient orchestrationChatClient;
     private final ChatClient routePlannerChatClient;
@@ -78,11 +85,7 @@ public class LangGraphTravelAgent implements TravelWorkflowPort {
     private final ChatClient finalizerChatClient;
     private final PromptResourceLoader promptResourceLoader;
     private final BaseCheckpointSaver checkpointSaver;
-    private final RouteExpertGateway routeExpertGateway;
     private final RoutePlanSemanticCache routePlanSemanticCache;
-    private final Executor routeExpertExecutor;
-    @Value("${travel-agent.route-expert.timeout-seconds:20}")
-    private int routeExpertTimeoutSeconds = DEFAULT_ROUTE_EXPERT_TIMEOUT_SECONDS;
     private final CompileConfig compileConfig;
     private final StateGraph<WorkflowState> workflow;
     private final CompiledGraph<WorkflowState> graph;
@@ -94,23 +97,17 @@ public class LangGraphTravelAgent implements TravelWorkflowPort {
                                 @Qualifier("finalizerChatClient") ChatClient finalizerChatClient,
                                 PromptResourceLoader promptResourceLoader,
                                 BaseCheckpointSaver checkpointSaver,
-                                KnowledgePlanningAgent knowledgeAgent,
-                                RoutePlanningAgent routeAgent,
-                                BudgetAgent budgetAgent,
-                                RoutePlanSemanticCache routePlanSemanticCache,
-                                @Qualifier("routeExpertExecutor") Executor routeExpertExecutor) {
+                                RoutePlanSemanticCache routePlanSemanticCache) {
         this.orchestrationChatClient = orchestrationChatClient;
         this.routePlannerChatClient = routePlannerChatClient;
         this.normalServiceChatClient = normalServiceChatClient;
         this.finalizerChatClient = finalizerChatClient;
         this.promptResourceLoader = promptResourceLoader;
         this.checkpointSaver = checkpointSaver;
-        this.routeExpertGateway = new SpringAiRouteExpertGateway(knowledgeAgent, routeAgent, budgetAgent);
         this.routePlanSemanticCache = routePlanSemanticCache;
-        this.routeExpertExecutor = routeExpertExecutor;
         this.compileConfig = CompileConfig.builder()
                 .checkpointSaver(checkpointSaver)
-                .interruptBefore("awaitUserInput")
+                .interruptBefore(NODE_AWAIT_USER_INPUT)
                 .build();
         this.workflow = buildWorkflow();
         this.graph = compile(workflow);
@@ -135,7 +132,7 @@ public class LangGraphTravelAgent implements TravelWorkflowPort {
                 .threadId(conversationId)
                 .build();
         Map<String, Object> input = new HashMap<>();
-        input.put("history", history);
+        input.put(STATE_HISTORY, history);
         if (StringUtils.hasText(currentUserLocation)) {
             input.put("currentUserLocation", currentUserLocation);
         }
@@ -170,20 +167,20 @@ public class LangGraphTravelAgent implements TravelWorkflowPort {
     private StateGraph<WorkflowState> buildWorkflow() {
         try {
             return new StateGraph<WorkflowState>(STATE_SCHEMA, WorkflowState::new)
-                    .addNode("supervisor", AsyncNodeAction.node_async(this::supervise))
-                    .addNode("requirements", AsyncNodeAction.node_async(this::collectRequirements))
-                    .addSubgraph("routePlanning", buildRoutePlanningSubgraph())
-                    .addNode("normalService", AsyncNodeAction.node_async(this::serveNormally))
-                    .addNode("finalize", AsyncNodeAction.node_async(this::finalizeReply))
-                    .addNode("awaitUserInput", AsyncNodeAction.node_async(state -> Map.of()))
-                    .addEdge(StateGraph.START, "supervisor")
-                    .addConditionalEdges("supervisor", AsyncEdgeAction.edge_async(this::afterSupervisor), edges("requirements", "normalService"))
-                    .addConditionalEdges("requirements", AsyncEdgeAction.edge_async(this::afterRequirements), edges("routePlanning", "finalize"))
-                    .addEdge("routePlanning", "finalize")
-                    .addEdge("normalService", "finalize")
-                    .addConditionalEdges("finalize", AsyncEdgeAction.edge_async(this::afterFinalize),
-                            edges("awaitUserInput", StateGraph.END))
-                    .addEdge("awaitUserInput", "requirements");
+                    .addNode(NODE_SUPERVISOR, AsyncNodeAction.node_async(this::supervise))
+                    .addNode(NODE_REQUIREMENTS, AsyncNodeAction.node_async(this::collectRequirements))
+                    .addSubgraph(NODE_ROUTE_PLANNING, buildRoutePlanningSubgraph())
+                    .addNode(NODE_NORMAL_SERVICE, AsyncNodeAction.node_async(this::serveNormally))
+                    .addNode(NODE_FINALIZE, AsyncNodeAction.node_async(this::finalizeReply))
+                    .addNode(NODE_AWAIT_USER_INPUT, AsyncNodeAction.node_async(state -> Map.of()))
+                    .addEdge(StateGraph.START, NODE_SUPERVISOR)
+                    .addConditionalEdges(NODE_SUPERVISOR, AsyncEdgeAction.edge_async(this::afterSupervisor), edges(NODE_REQUIREMENTS, NODE_NORMAL_SERVICE))
+                    .addConditionalEdges(NODE_REQUIREMENTS, AsyncEdgeAction.edge_async(this::afterRequirements), edges(NODE_ROUTE_PLANNING, NODE_FINALIZE))
+                    .addEdge(NODE_ROUTE_PLANNING, NODE_FINALIZE)
+                    .addEdge(NODE_NORMAL_SERVICE, NODE_FINALIZE)
+                    .addConditionalEdges(NODE_FINALIZE, AsyncEdgeAction.edge_async(this::afterFinalize),
+                            edges(NODE_AWAIT_USER_INPUT, StateGraph.END))
+                    .addEdge(NODE_AWAIT_USER_INPUT, NODE_REQUIREMENTS);
         } catch (GraphStateException exception) {
             throw new IllegalStateException("Unable to build travel agent graph", exception);
         }
@@ -191,15 +188,13 @@ public class LangGraphTravelAgent implements TravelWorkflowPort {
 
     private StateGraph<WorkflowState> buildRoutePlanningSubgraph() throws GraphStateException {
         return new StateGraph<WorkflowState>(STATE_SCHEMA, WorkflowState::new)
-                .addNode("routePlanner", AsyncNodeAction.node_async(this::planRoute))
-                .addNode("expertsParallel", AsyncNodeAction.node_async(this::runExpertsParallel))
-                .addNode("routeReviewer", AsyncNodeAction.node_async(this::reviewRoute))
-                .addEdge(StateGraph.START, "routePlanner")
-                .addConditionalEdges("routePlanner", AsyncEdgeAction.edge_async(this::afterRoutePlanner),
-                        edges("expertsParallel", "routeReviewer"))
-                .addEdge("expertsParallel", "routePlanner")
-                .addConditionalEdges("routeReviewer", AsyncEdgeAction.edge_async(this::afterReview),
-                        edges("routePlanner", StateGraph.END));
+                .addNode(NODE_ROUTE_PLANNER, AsyncNodeAction.node_async(this::planRoute))
+                .addNode(NODE_ROUTE_REVIEWER, AsyncNodeAction.node_async(this::reviewRoute))
+                .addEdge(StateGraph.START, NODE_ROUTE_PLANNER)
+                .addConditionalEdges(NODE_ROUTE_PLANNER, AsyncEdgeAction.edge_async(this::afterRoutePlanner),
+                        edges(NODE_ROUTE_REVIEWER))
+                .addConditionalEdges(NODE_ROUTE_REVIEWER, AsyncEdgeAction.edge_async(this::afterReview),
+                        edges(NODE_ROUTE_PLANNER, StateGraph.END));
     }
 
     private CompiledGraph<WorkflowState> compile(StateGraph<WorkflowState> workflow) {
@@ -215,19 +210,19 @@ public class LangGraphTravelAgent implements TravelWorkflowPort {
         String systemPrompt = prompt("intent-supervisor");
         String decision = call("supervisor", systemPrompt + "\n\n" + input,
                 orchestrationChatClient.prompt().system(systemPrompt).user(input).call(),
-                state.observation(), output -> "route".equals(WorkflowOutputParser.intent(output))
-                        ? "requirements" : "normalService");
-        return Map.of("intent", "route".equals(WorkflowOutputParser.intent(decision)) ? "route" : "normal");
+                state.observation(), output -> ROUTE_INTENT.equals(WorkflowOutputParser.intent(output))
+                        ? NODE_REQUIREMENTS : NODE_NORMAL_SERVICE);
+        return Map.of(STATE_INTENT, ROUTE_INTENT.equals(WorkflowOutputParser.intent(decision)) ? ROUTE_INTENT : NORMAL_INTENT);
     }
 
     private Map<String, Object> collectRequirements(WorkflowState state) {
         String input = conversationJson(state);
         String systemPrompt = prompt("route-requirements");
-        String raw = call("requirements", systemPrompt + "\n\n" + input,
+        String raw = call(NODE_REQUIREMENTS, systemPrompt + "\n\n" + input,
                 orchestrationChatClient.prompt().system(systemPrompt).user(input).call(),
-                state.observation(), output -> WorkflowOutputParser.requirements(output).confirmed() ? "routePlanner" : "finalize");
+                state.observation(), output -> WorkflowOutputParser.requirements(output).confirmed() ? NODE_ROUTE_PLANNER : NODE_FINALIZE);
         WorkflowOutputParser.RequirementDecision decision = WorkflowOutputParser.requirements(raw);
-        return Map.of("requirements", decision.structuredOutput());
+        return Map.of(STATE_REQUIREMENTS, decision.structuredOutput());
     }
 
     private Map<String, Object> planRoute(WorkflowState state) {
@@ -236,129 +231,73 @@ public class LangGraphTravelAgent implements TravelWorkflowPort {
                 String requirements = requirementData(state.requirements());
                 var hit = routePlanSemanticCache.find(requirements);
                 if (hit.isPresent()) {
-                    return Map.of("routePlan", hit.get().routePlan(), "routeNext", "routeReviewer",
-                            "routeCacheHit", true, "routeCacheScore", hit.get().score());
+                    return Map.of(STATE_ROUTE_PLAN, hit.get().routePlan(), STATE_ROUTE_NEXT, NODE_ROUTE_REVIEWER,
+                            STATE_CACHE_HIT, true, STATE_CACHE_SCORE, hit.get().score());
                 }
             }
             String systemPrompt = prompt("route-planner");
             String input = routePlanningInput(state);
-            String raw = call("routePlanner", systemPrompt + "\n\n" + input,
+            String raw = call(NODE_ROUTE_PLANNER, systemPrompt + "\n\n" + input,
                     routePlannerChatClient.prompt().system(systemPrompt).user(input).call(),
                     state.observation(), output -> WorkflowOutputParser.planner(output).next());
             WorkflowOutputParser.PlannerDecision decision = WorkflowOutputParser.planner(raw);
-            if (!decision.delegates()) {
-                return Map.of("routePlan", decision.plan(), "routeNext", "routeReviewer");
-            }
-            return Map.of("routeNext", decision.next(), "expertTasks", decision.tasks());
+            return Map.of(STATE_ROUTE_PLAN, decision.plan(), STATE_ROUTE_NEXT, NODE_ROUTE_REVIEWER);
         }
-    }
-
-    private Map<String, Object> runExpertsParallel(WorkflowState state) {
-        JSONObject parsedResults = WorkflowOutputParser.parseJson(state.expertResults());
-        final JSONObject results = parsedResults == null ? new JSONObject() : parsedResults;
-        JSONArray tasks = JSON.parseArray(state.expertTasks());
-        List<CompletableFuture<Void>> futures = new ArrayList<>();
-        Set<String> scheduled = new HashSet<>();
-        for (Object item : tasks == null ? List.of() : tasks) {
-            JSONObject task = item instanceof JSONObject json ? json : null;
-            if (task == null) continue;
-            String expert = task.getString("expert");
-            if (!StringUtils.hasText(expert)) continue;
-            expert = expert.trim().toUpperCase(Locale.ROOT);
-            if (!ROUTE_EXPERTS.contains(expert)) continue;
-            if (task.get("task") == null) continue;
-            String payload = JSON.toJSONString(task.get("task"), JSONWriter.Feature.WriteMapNullValue);
-            // 每轮每个专家只保留一个任务，避免结果按专家键覆盖并浪费并行调用。
-            if (!scheduled.add(expert)) continue;
-            String resultKey = expert.toLowerCase(Locale.ROOT);
-            if (results.containsKey(resultKey)) continue;
-            String selectedExpert = expert;
-            futures.add(CompletableFuture.runAsync(() -> {
-                try (AgentObservationContextHolder.Scope ignored = AgentObservationContextHolder.open(state.observation())) {
-                    try {
-                        String output = routeExpertGateway.execute(selectedExpert, payload);
-                        synchronized (results) {
-                            results.put(resultKey, jsonOrText(output));
-                        }
-                    } catch (RuntimeException exception) {
-                        synchronized (results) {
-                            results.put(resultKey, Map.of("error", "专家暂时不可用"));
-                        }
-                    }
-                }
-            }, routeExpertExecutor));
-        }
-        if (!futures.isEmpty()) {
-            try {
-                CompletableFuture.allOf(futures.toArray(CompletableFuture[]::new))
-                        .orTimeout(Math.max(1, routeExpertTimeoutSeconds), TimeUnit.SECONDS)
-                        .join();
-            } catch (CompletionException exception) {
-                // A slow external expert must not block route planning indefinitely.
-                synchronized (results) {
-                    for (String expert : scheduled) {
-                        String resultKey = expert.toLowerCase(Locale.ROOT);
-                        results.putIfAbsent(resultKey, Map.of("error", "专家响应超时"));
-                    }
-                }
-            }
-        }
-        return Map.of("expertResults", JSON.toJSONString(results, JSONWriter.Feature.WriteMapNullValue));
     }
 
     private Map<String, Object> reviewRoute(WorkflowState state) {
         String input = routeReviewInput(state);
         String systemPrompt = prompt("route-reviewer");
-        String raw = call("routeReviewer", systemPrompt + "\n\n" + input,
+        String raw = call(NODE_ROUTE_REVIEWER, systemPrompt + "\n\n" + input,
                 orchestrationChatClient.prompt().system(systemPrompt).user(input).call(),
                 state.observation(), output -> WorkflowOutputParser.review(output).approved()
                         || state.reviewAttempts() + 1 > MAX_ROUTE_REVISIONS
-                        ? "finalize" : "routePlanner");
+                        ? NODE_FINALIZE : NODE_ROUTE_PLANNER);
         WorkflowOutputParser.ReviewDecision decision = WorkflowOutputParser.review(raw);
         if (decision.approved() && routePlanSemanticCache != null && !state.routeCacheHit()
                 && StringUtils.hasText(state.routePlan())) {
             routePlanSemanticCache.put(requirementData(state.requirements()), state.routePlan());
         }
         return Map.of(
-                "review", decision.structuredOutput(),
-                "reviewApproved", decision.approved(),
-                "reviewAttempts", state.reviewAttempts() + 1);
+                STATE_REVIEW, decision.structuredOutput(),
+                STATE_REVIEW_APPROVED, decision.approved(),
+                STATE_REVIEW_ATTEMPTS, state.reviewAttempts() + 1);
     }
 
     private Map<String, Object> serveNormally(WorkflowState state) {
         try (AgentObservationContextHolder.Scope ignored = AgentObservationContextHolder.open(state.observation())) {
             String systemPrompt = prompt("normal-service");
             String input = normalServiceInput(state);
-            String raw = call("normalService", systemPrompt + "\n\n" + input,
+            String raw = call(NODE_NORMAL_SERVICE, systemPrompt + "\n\n" + input,
                     normalServiceChatClient.prompt().system(systemPrompt).user(input).call(),
-                    state.observation(), output -> "finalize");
-            return Map.of("normalReply", normalAnswer(raw));
+                    state.observation(), output -> NODE_FINALIZE);
+            return Map.of(STATE_NORMAL_REPLY, normalAnswer(raw));
         }
     }
 
     private Map<String, Object> finalizeReply(WorkflowState state) {
-        if ("route".equals(state.intent()) && !state.requirementsConfirmed()) {
+        if (ROUTE_INTENT.equals(state.intent()) && !state.requirementsConfirmed()) {
             String question = requirementQuestion(state.requirements());
             String systemPrompt = prompt("finalize");
             String input = finalRequirementInput(state.requirements());
             List<Message> messages = List.of(new SystemMessage(systemPrompt), new UserMessage(input));
             String raw = call("finalize", systemPrompt + "\n\n" + input,
-                    finalizerChatClient.prompt().messages(messages).call(), state.observation(), output -> "awaitUserInput");
-            return Map.of("reply", formatRequirementQuestion(finalReply(raw), question));
+                    finalizerChatClient.prompt().messages(messages).call(), state.observation(), output -> NODE_AWAIT_USER_INPUT);
+            return Map.of(STATE_REPLY, formatRequirementQuestion(finalReply(raw), question));
         }
         String result = finalResponseInput(state);
         List<Message> messages = List.of(new SystemMessage(prompt("finalize")), new UserMessage(result));
         String raw = call("finalize", prompt("finalize") + "\n\n" + result,
                 finalizerChatClient.prompt().messages(messages).call(), state.observation(), output -> StateGraph.END);
-        return Map.of("reply", finalReply(raw));
+        return Map.of(STATE_REPLY, finalReply(raw));
     }
 
     private String afterSupervisor(WorkflowState state) {
-        return "route".equals(state.intent()) ? "requirements" : "normalService";
+        return ROUTE_INTENT.equals(state.intent()) ? NODE_REQUIREMENTS : NODE_NORMAL_SERVICE;
     }
 
     private String afterRequirements(WorkflowState state) {
-        return state.requirementsConfirmed() ? "routePlanning" : "finalize";
+        return state.requirementsConfirmed() ? NODE_ROUTE_PLANNING : NODE_FINALIZE;
     }
 
     private String afterRoutePlanner(WorkflowState state) {
@@ -367,15 +306,15 @@ public class LangGraphTravelAgent implements TravelWorkflowPort {
 
     private String afterReview(WorkflowState state) {
         return !state.reviewApproved() && state.reviewAttempts() <= MAX_ROUTE_REVISIONS
-                ? "routePlanner" : StateGraph.END;
+                ? NODE_ROUTE_PLANNER : StateGraph.END;
     }
 
     private String afterFinalize(WorkflowState state) {
-        return waitingForUser(state) ? "awaitUserInput" : StateGraph.END;
+        return waitingForUser(state) ? NODE_AWAIT_USER_INPUT : StateGraph.END;
     }
 
     private boolean waitingForUser(WorkflowState state) {
-        return "route".equals(state.intent()) && !state.requirementsConfirmed();
+        return ROUTE_INTENT.equals(state.intent()) && !state.requirementsConfirmed();
     }
 
     private void releaseCompletedThread(RunnableConfig config, WorkflowState state) {
@@ -401,19 +340,19 @@ public class LangGraphTravelAgent implements TravelWorkflowPort {
     }
 
     private String formatRequirementQuestion(String reply, String fallback) {
-        String question = stripPrefix(reply, "questions:");
+        String question = stripPrefix(reply, QUESTIONS_PREFIX);
         return StringUtils.hasText(question) ? question : fallback;
     }
 
     private String requirementData(String requirements) {
         JSONObject result = WorkflowOutputParser.parseJson(requirements);
-        JSONObject data = result == null ? null : result.getJSONObject("requirements");
+        JSONObject data = result == null ? null : result.getJSONObject(STATE_REQUIREMENTS);
         return data == null ? "{}" : JSON.toJSONString(data, JSONWriter.Feature.WriteMapNullValue);
     }
 
     private String requirementQuestion(String requirements) {
         JSONObject result = WorkflowOutputParser.parseJson(requirements);
-        return result == null ? "" : result.getString("question");
+        return result == null ? EMPTY_TEXT : result.getString("question");
     }
 
     private String conversationJson(WorkflowState state) {
@@ -429,7 +368,6 @@ public class LangGraphTravelAgent implements TravelWorkflowPort {
         input.put("currentUserLocation", jsonOrText(state.currentUserLocation()));
         input.put("requirements", jsonOrText(requirementData(state.requirements())));
         input.put("review", state.review().isBlank() ? null : jsonOrText(state.review()));
-        input.put("expertResults", jsonOrText(state.expertResults()));
         return json(input);
     }
 
@@ -450,7 +388,7 @@ public class LangGraphTravelAgent implements TravelWorkflowPort {
     private String finalResponseInput(WorkflowState state) {
         JSONObject input = new JSONObject();
         input.put("taskType", "FINAL_RESPONSE");
-        if ("route".equals(state.intent())) {
+        if (ROUTE_INTENT.equals(state.intent())) {
             input.put("routePlan", jsonOrText(state.routePlan()));
             input.put("review", jsonOrText(state.review()));
         } else {
@@ -514,31 +452,29 @@ public class LangGraphTravelAgent implements TravelWorkflowPort {
             super(data);
         }
 
-        List<AgentMessage> history() { return this.<List<AgentMessage>>value("history").orElse(List.of()); }
+        List<AgentMessage> history() { return this.<List<AgentMessage>>value(STATE_HISTORY).orElse(List.of()); }
         AgentObservationContext observation() {
             AgentObservationContext current = AgentObservationContextHolder.current();
             return current == null ? AgentObservationContext.disabled() : current;
         }
-        String intent() { return this.<String>value("intent").orElse(""); }
+        String intent() { return this.<String>value(STATE_INTENT).orElse(EMPTY_TEXT); }
         String currentUserLocation() { return this.<String>value("currentUserLocation").orElse("{}"); }
-        String requirements() { return this.<String>value("requirements").orElse("{}"); }
+        String requirements() { return this.<String>value(STATE_REQUIREMENTS).orElse(EMPTY_JSON); }
         boolean requirementsConfirmed() {
             JSONObject result = WorkflowOutputParser.parseJson(requirements());
             return result != null && "confirmed".equalsIgnoreCase(result.getString("status"));
         }
-        String routePlan() { return this.<String>value("routePlan").orElse(""); }
-        String review() { return this.<String>value("review").orElse(""); }
-        boolean reviewApproved() { return this.<Boolean>value("reviewApproved").orElse(false); }
-        int reviewAttempts() { return this.<Integer>value("reviewAttempts").orElse(0); }
-        String routeNext() { return this.<String>value("routeNext").orElse("routeReviewer"); }
-        String expertTasks() { return this.<String>value("expertTasks").orElse("[]"); }
-        String expertResults() { return this.<String>value("expertResults").orElse("{}"); }
-        boolean routeCacheHit() { return this.<Boolean>value("routeCacheHit").orElse(false); }
+        String routePlan() { return this.<String>value(STATE_ROUTE_PLAN).orElse(EMPTY_TEXT); }
+        String review() { return this.<String>value(STATE_REVIEW).orElse(EMPTY_TEXT); }
+        boolean reviewApproved() { return this.<Boolean>value(STATE_REVIEW_APPROVED).orElse(false); }
+        int reviewAttempts() { return this.<Integer>value(STATE_REVIEW_ATTEMPTS).orElse(0); }
+        String routeNext() { return this.<String>value(STATE_ROUTE_NEXT).orElse(NODE_ROUTE_REVIEWER); }
+        boolean routeCacheHit() { return this.<Boolean>value(STATE_CACHE_HIT).orElse(false); }
         boolean initialRoutePlanning() {
-            return !StringUtils.hasText(routePlan()) && "[]".equals(expertTasks()) && "{}".equals(expertResults());
+            return !StringUtils.hasText(routePlan()) && reviewAttempts() == 0 && !StringUtils.hasText(review());
         }
-        String normalReply() { return this.<String>value("normalReply").orElse(""); }
-        String reply() { return this.<String>value("reply").orElse(""); }
+        String normalReply() { return this.<String>value(STATE_NORMAL_REPLY).orElse(EMPTY_TEXT); }
+        String reply() { return this.<String>value(STATE_REPLY).orElse(EMPTY_TEXT); }
     }
 
 }

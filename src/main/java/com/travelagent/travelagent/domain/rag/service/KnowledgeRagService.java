@@ -15,11 +15,13 @@ import org.springframework.ai.document.Document;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.travelagent.travelagent.infrastructure.rag.qdrant.QdrantHybridClient;
-import org.springframework.beans.factory.annotation.Autowired;
 
 @Service
 public class KnowledgeRagService {
+    private static final Logger log = LoggerFactory.getLogger(KnowledgeRagService.class);
 
     private final int topK;
     private final double similarityThreshold;
@@ -27,7 +29,6 @@ public class KnowledgeRagService {
     private final QwenRerankService rerankService;
     private final QdrantHybridClient hybridClient;
 
-    @Autowired
     public KnowledgeRagService(
             @Value("${travel-agent.rag.top-k:5}") int topK,
             @Value("${travel-agent.rag.similarity-threshold:0.65}") double similarityThreshold,
@@ -42,8 +43,9 @@ public class KnowledgeRagService {
     }
 
     public String enrich(String task) {
-        if (!StringUtils.hasText(task))
+        if (!StringUtils.hasText(task)) {
             return task;
+        }
         List<Document> dense;
         dense = hybridClient.query(task);
         List<Document> documents = dense;
@@ -57,8 +59,9 @@ public class KnowledgeRagService {
     }
 
     private List<RankedDocument> rerank(String query, List<Document> documents) {
-        if (documents.isEmpty())
+        if (documents.isEmpty()) {
             return List.of();
+        }
         List<RerankCandidate> candidates = documents.stream()
                 .map(document -> new RerankCandidate(document.getId(), document.getText()))
                 .toList();
@@ -90,7 +93,8 @@ public class KnowledgeRagService {
     private Object parseOrText(String value) {
         try {
             return JSON.parse(value);
-        } catch (RuntimeException ignored) {
+        } catch (RuntimeException exception) {
+            log.debug("Unable to parse RAG task as JSON; treating it as plain text", exception);
             return value;
         }
     }

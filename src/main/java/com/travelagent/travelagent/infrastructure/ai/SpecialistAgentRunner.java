@@ -40,7 +40,7 @@ public class SpecialistAgentRunner {
     private static Object jsonOrText(String task) {
         try {
             return JSON.parse(task);
-        } catch (RuntimeException ignored) {
+        } catch (RuntimeException exception) {
             return task;
         }
     }

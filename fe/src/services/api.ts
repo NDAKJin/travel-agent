@@ -12,6 +12,13 @@ import type {
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
 const DEBUG_LOGGING = import.meta.env.DEV || import.meta.env.VITE_DEBUG_LOGGING === "true";
 const SESSION_KEY = "travel-agent-session";
+const HTTP_UNAUTHORIZED = 401;
+const HTTP_NO_CONTENT = 204;
+const HTTP_METHOD_GET = "GET";
+const HTTP_METHOD_POST = "POST";
+const HTTP_HEADER_AUTHORIZATION = "Authorization";
+const HTTP_HEADER_CONTENT_TYPE = "Content-Type";
+const JSON_CONTENT_TYPE = "application/json";
 export const AUTH_EXPIRED_EVENT = "travel-agent-auth-expired";
 export const AUTH_UPDATED_EVENT = "travel-agent-auth-updated";
 let refreshPromise: Promise<AuthSession> | null = null;
@@ -70,7 +77,7 @@ const refreshStoredSession = async (): Promise<AuthSession> => {
   }
   if (!session?.token.refreshToken) {
     emitAuthExpired();
-    throw new ApiError("登录已过期，请重新登录", 401);
+    throw new ApiError("登录已过期，请重新登录", HTTP_UNAUTHORIZED);
   }
   try {
     const next = await request<AuthSession>("/api/auth/refresh", {
@@ -95,7 +102,7 @@ const refreshSession = () => {
 };
 
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const method = options.method ?? "GET";
+  const method = options.method ?? HTTP_METHOD_GET;
   const requestId = createRequestId();
   const startedAt = performance.now();
   if (DEBUG_LOGGING) console.info("[api] request", { requestId, method, path });
@@ -104,8 +111,8 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     response = await fetch(resolveUrl(path), {
       method,
     headers: {
-        ...(options.body instanceof FormData ? {} : { "Content-Type": "application/json" }),
-        ...(options.accessToken ? { Authorization: `Bearer ${options.accessToken}` } : {})
+        ...(options.body instanceof FormData ? {} : { [HTTP_HEADER_CONTENT_TYPE]: JSON_CONTENT_TYPE }),
+        ...(options.accessToken ? { [HTTP_HEADER_AUTHORIZATION]: `Bearer ${options.accessToken}` } : {})
       },
       body: options.body instanceof FormData ? options.body : options.body == null ? undefined : JSON.stringify(options.body)
     });
@@ -138,14 +145,19 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
       message = "登录已过期，请重新登录";
     }
     if (DEBUG_LOGGING) console.warn("[api] request failed", { requestId, status: response.status, code, message });
-    if (response.status === 401 && options.accessToken && options.allowRefresh !== false) {
+    if (response.status === HTTP_UNAUTHORIZED && options.accessToken && options.allowRefresh !== false) {
       const next = await refreshSession();
-      return request<T>(path, { ...options, accessToken: next.token.accessToken, allowRefresh: false });
+      try {
+        return await request<T>(path, { ...options, accessToken: next.token.accessToken, allowRefresh: false });
+      } catch (retryError) {
+        if (retryError instanceof ApiError && retryError.status === HTTP_UNAUTHORIZED) emitAuthExpired();
+        throw retryError;
+      }
     }
     throw new ApiError(message, response.status, code);
   }
 
-  if (response.status === 204) {
+  if (response.status === HTTP_NO_CONTENT) {
     return undefined as T;
   }
 
@@ -154,14 +166,14 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
 
 export const api = {
   sendEmailCode(email: string) {
-    return request<void>("/api/auth/email/send-code", { method: "POST", body: { email } });
+    return request<void>("/api/auth/email/send-code", { method: HTTP_METHOD_POST, body: { email } });
   },
   verifyEmailCode(email: string, code: string) {
     return request<{ valid: boolean }>("/api/auth/email/verify-code", { method: "POST", body: { email, code } });
   },
   loginAdmin(payload: AdminLoginPayload) {
     return request<AuthSession>("/api/auth/admin/login", {
-      method: "POST",
+      method: HTTP_METHOD_POST,
       body: payload
     });
   },

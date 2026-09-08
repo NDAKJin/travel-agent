@@ -23,6 +23,13 @@ import org.springframework.web.multipart.MultipartFile;
 @Slf4j
 @Service
 public class RagIngestionTaskService {
+    private static final String STATUS_PENDING = "PENDING";
+    private static final String STATUS_RUNNING = "RUNNING";
+    private static final String STATUS_SUCCESS = "SUCCESS";
+    private static final String STATUS_FAILED = "FAILED";
+    private static final String STATUS_CANCELLED = "CANCELLED";
+    private static final String PERSISTING_STAGE = "PERSISTING";
+    private static final String PROCESSING_TIMEOUT = "PROCESSING_TIMEOUT";
     private final RagIngestionService ingestionService;
     private final JdbcTemplate jdbc;
     private final String topic;
@@ -135,7 +142,7 @@ public class RagIngestionTaskService {
     }
 
     public void markFailed(long taskId, String error) {
-        updateStatus(taskId, "FAILED", error, 0, 0);
+        updateStatus(taskId, STATUS_FAILED, error, 0, 0);
     }
 
     public RagIngestionService ingestionService() { return ingestionService; }
@@ -145,8 +152,8 @@ public class RagIngestionTaskService {
     }
 
     public void markStageCompleted(long taskId, String stage, RagStageArtifact artifact) {
-        if ("PERSISTING".equals(stage)) {
-            updateStatus(taskId, "SUCCESS", null, artifact.chunks() == null ? 0 : artifact.chunks().size(), artifact.writtenCount());
+        if (PERSISTING_STAGE.equals(stage)) {
+            updateStatus(taskId, STATUS_SUCCESS, null, artifact.chunks() == null ? 0 : artifact.chunks().size(), artifact.writtenCount());
         } else {
             jdbc.update("UPDATE rag_ingestion_task SET status='RUNNING', chunk_count=?, written_count=?, updated_at=CURRENT_TIMESTAMP WHERE id=? AND status <> 'CANCELLED'",
                     artifact.chunks() == null ? 0 : artifact.chunks().size(), artifact.writtenCount(), taskId);
@@ -192,7 +199,7 @@ public class RagIngestionTaskService {
     }
 
     private RagIngestionTaskResponse response(long id, String name) {
-        return new RagIngestionTaskResponse(id, name, "PENDING", 0, 0, null, Instant.now(), Instant.now());
+        return new RagIngestionTaskResponse(id, name, STATUS_PENDING, 0, 0, null, Instant.now(), Instant.now());
     }
 
     private void fail(long id, String error) { updateStatus(id, "FAILED", error, 0, 0); }
@@ -208,7 +215,7 @@ public class RagIngestionTaskService {
         // claimable for the next redelivery, but do not create another
         // outbox row; Kafka redelivery owns the retry schedule.
         log.warn("RAG ingestion task failed and will be retried by Kafka: taskId={}, error={}", taskId, error);
-        updateTaskStatus(taskId, "PENDING", error);
+        updateTaskStatus(taskId, STATUS_PENDING, error);
         throw new IllegalStateException(error == null ? "RAG ingestion failed" : error);
     }
 

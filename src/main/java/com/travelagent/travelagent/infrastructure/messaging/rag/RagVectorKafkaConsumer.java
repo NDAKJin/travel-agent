@@ -18,6 +18,9 @@ import org.springframework.stereotype.Component;
 @Component
 @RequiredArgsConstructor
 public class RagVectorKafkaConsumer {
+    private static final String OPERATION_DELETE = "DELETE";
+    private static final String OPERATION_DISABLE = "DISABLE";
+    private static final String OPERATION_UPSERT = "UPSERT";
     private final QdrantHybridClient qdrant;
     private final RagVectorDeliveryService delivery;
 
@@ -37,12 +40,12 @@ public class RagVectorKafkaConsumer {
         try {
             log.debug("Applying RAG vector event eventId={} operation={} chunkKey={}",
                     message.eventId(), message.operation(), message.chunkKey());
-            if ("DELETE".equalsIgnoreCase(message.operation())) {
+            if (OPERATION_DELETE.equalsIgnoreCase(message.operation())) {
                 qdrant.delete(List.of(message.chunkKey()));
-            } else if ("DISABLE".equalsIgnoreCase(message.operation())) {
+            } else if (OPERATION_DISABLE.equalsIgnoreCase(message.operation())) {
                 qdrant.setEnabled(List.of(message.chunkKey()), false);
             } else {
-                if (!"UPSERT".equalsIgnoreCase(message.operation())) {
+                if (!OPERATION_UPSERT.equalsIgnoreCase(message.operation())) {
                     throw new IllegalArgumentException("Unsupported RAG vector operation: " + message.operation());
                 }
                 JSONObject payload = JSON.parseObject(message.payload());

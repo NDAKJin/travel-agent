@@ -12,9 +12,20 @@ import org.springframework.http.MediaType;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Component
 public class QdrantHybridClient {
+    private static final Logger log = LoggerFactory.getLogger(QdrantHybridClient.class);
+    private static final String COLLECTION_PATH = "/collections/{collection}";
+    private static final String POINTS_PATH = "/collections/{collection}/points";
+    private static final String DELETE_POINTS_PATH = "/collections/{collection}/points/delete";
+    private static final String PAYLOAD_PATH = "/collections/{collection}/points/payload";
+    private static final String IDF_MODIFIER = "idf";
+    private static final String DENSE_VECTOR = "dense";
+    private static final String SPARSE_VECTOR = "sparse";
+    private static final String ENABLED_FIELD = "enabled";
     private final RestClient client;
     private final EmbeddingModel embeddingModel;
     private final LexicalSparseEncoder sparseEncoder;
@@ -42,8 +53,8 @@ public class QdrantHybridClient {
         List<Float> dense = floats(embeddingModel.embed(text));
         LexicalSparseEncoder.SparseVector sparse = sparseEncoder.encode(text);
         ensureCollection(dense.size());
-        Map<String, Object> vector = Map.of("dense", dense,
-                "sparse", Map.of("indices", sparse.indices(), "values", sparse.values()));
+        Map<String, Object> vector = Map.of(DENSE_VECTOR, dense,
+                SPARSE_VECTOR, Map.of("indices", sparse.indices(), "values", sparse.values()));
         Map<String, Object> point = Map.of("id", id, "vector", vector, "payload", payload);
         upsertPoints(List.of(point));
     }
@@ -56,8 +67,8 @@ public class QdrantHybridClient {
             List<Float> dense = floats(embeddingModel.embed(document.getText()));
             dimensions = dense.size();
             LexicalSparseEncoder.SparseVector sparse = sparseEncoder.encode(document.getText());
-            Map<String, Object> vector = Map.of("dense", dense,
-                    "sparse", Map.of("indices", sparse.indices(), "values", sparse.values()));
+            Map<String, Object> vector = Map.of(DENSE_VECTOR, dense,
+                    SPARSE_VECTOR, Map.of("indices", sparse.indices(), "values", sparse.values()));
             points.add(Map.of("id", document.getId(), "vector", vector, "payload", document.getMetadata()));
         }
         ensureCollection(dimensions);
@@ -65,19 +76,19 @@ public class QdrantHybridClient {
     }
 
     private void upsertPoints(List<Map<String, Object>> points) {
-        client.put().uri("/collections/{collection}/points", collection).contentType(MediaType.APPLICATION_JSON)
+        client.put().uri(POINTS_PATH, collection).contentType(MediaType.APPLICATION_JSON)
                 .body(Map.of("points", points, "wait", true)).retrieve().toBodilessEntity();
     }
 
     public void delete(List<String> ids) {
         if (ids == null || ids.isEmpty()) return;
-        client.post().uri("/collections/{collection}/points/delete", collection).contentType(MediaType.APPLICATION_JSON)
+        client.post().uri(DELETE_POINTS_PATH, collection).contentType(MediaType.APPLICATION_JSON)
                 .body(Map.of("points", ids, "wait", true)).retrieve().toBodilessEntity();
     }
 
     public void setEnabled(List<String> ids, boolean enabled) {
         if (ids == null || ids.isEmpty()) return;
-        client.put().uri("/collections/{collection}/points/payload", collection)
+        client.put().uri(PAYLOAD_PATH, collection)
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(Map.of("payload", Map.of("enabled", enabled), "points", ids, "wait", true))
                 .retrieve().toBodilessEntity();
@@ -88,10 +99,14 @@ public class QdrantHybridClient {
         LexicalSparseEncoder.SparseVector sparse = sparseEncoder.encode(text);
         ensureCollection(dense.size());
         Map<String, Object> body = new LinkedHashMap<>();
-        body.put("prefetch", List.of(
-                Map.of("query", dense, "using", "dense", "limit", recallTopK, "filter", enabledFilter()),
-                Map.of("query", Map.of("indices", sparse.indices(), "values", sparse.values()), "using", "sparse", "limit", recallTopK, "filter", enabledFilter())));
-        body.put("query", Map.of("fusion", "rrf"));
+        Map<String, Object> densePrefetch = Map.of("query", dense, "using", DENSE_VECTOR, "limit", recallTopK, "filter", enabledFilter());
+        if (sparse.indices().length == 0) {
+            body.put("prefetch", List.of(densePrefetch));
+        } else {
+            body.put("prefetch", List.of(densePrefetch,
+                    Map.of("query", Map.of("indices", sparse.indices(), "values", sparse.values()), "using", SPARSE_VECTOR, "limit", recallTopK, "filter", enabledFilter())));
+        }
+        body.put("query", sparse.indices().length == 0 ? dense : Map.of("fusion", "rrf"));
         body.put("limit", recallTopK);
         body.put("with_payload", true);
         Map<String, Object> response = client.post().uri("/collections/{collection}/points/query", collection)
@@ -129,13 +144,15 @@ public class QdrantHybridClient {
     private synchronized void ensureCollection(int dimensions) {
         if (initialized) return;
         try {
-            client.get().uri("/collections/{collection}", collection).retrieve().toBodilessEntity();
+            client.get().uri(COLLECTION_PATH, collection).retrieve().toBodilessEntity();
             initialized = true;
             return;
-        } catch (RuntimeException ignored) { }
+        } catch (RuntimeException exception) {
+            log.debug("Qdrant collection lookup failed; attempting creation: collection={}", collection, exception);
+        }
         Map<String, Object> body = Map.of("vectors", Map.of("dense", Map.of("size", dimensions, "distance", "Cosine")),
-                "sparse_vectors", Map.of("sparse", Map.of("modifier", "idf")));
-        client.put().uri("/collections/{collection}", collection).contentType(MediaType.APPLICATION_JSON)
+                "sparse_vectors", Map.of(SPARSE_VECTOR, Map.of("modifier", IDF_MODIFIER)));
+        client.put().uri(COLLECTION_PATH, collection).contentType(MediaType.APPLICATION_JSON)
                 .body(body).retrieve().toBodilessEntity();
         initialized = true;
     }
@@ -147,6 +164,6 @@ public class QdrantHybridClient {
     }
 
     private Map<String, Object> enabledFilter() {
-        return Map.of("must", List.of(Map.of("key", "enabled", "match", Map.of("value", true))));
+        return Map.of("must", List.of(Map.of("key", ENABLED_FIELD, "match", Map.of("value", true))));
     }
 }

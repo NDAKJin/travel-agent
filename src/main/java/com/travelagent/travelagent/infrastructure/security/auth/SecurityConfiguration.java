@@ -16,6 +16,12 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 @Configuration
 public class SecurityConfiguration {
+    private static final String ADMIN_ROLE = "ADMIN";
+    private static final List<String> CORS_ALLOWED_ORIGINS = List.of(
+            "http://localhost:5173", "http://127.0.0.1:5173",
+            "http://localhost:4173", "http://127.0.0.1:4173");
+    private static final List<String> CORS_ALLOWED_METHODS = List.of(
+            "GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS");
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http,
@@ -35,7 +41,7 @@ public class SecurityConfiguration {
                                 "/api/auth/email/**",
                                 "/api/auth/refresh",
                                 "/api/auth/logout").permitAll()
-                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                        .requestMatchers("/api/admin/**").hasRole(ADMIN_ROLE)
                         .requestMatchers("/api/**").authenticated()
                         .anyRequest().permitAll())
                 .addFilterBefore(accessTokenAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
@@ -46,12 +52,8 @@ public class SecurityConfiguration {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(List.of(
-                "http://localhost:5173",
-                "http://127.0.0.1:5173",
-                "http://localhost:4173",
-                "http://127.0.0.1:4173"));
-        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+        configuration.setAllowedOrigins(CORS_ALLOWED_ORIGINS);
+        configuration.setAllowedMethods(CORS_ALLOWED_METHODS);
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setExposedHeaders(List.of("Authorization"));
         configuration.setAllowCredentials(true);

@@ -10,15 +10,9 @@ import static org.mockito.Mockito.when;
 import com.travelagent.travelagent.domain.agent.model.AgentMessage;
 import com.travelagent.travelagent.domain.observability.model.AgentObservationContext;
 import com.travelagent.travelagent.infrastructure.ai.prompt.PromptResourceLoader;
-import com.travelagent.travelagent.infrastructure.ai.agent.BudgetAgent;
-import com.travelagent.travelagent.infrastructure.ai.agent.KnowledgePlanningAgent;
-import com.travelagent.travelagent.infrastructure.ai.agent.RoutePlanningAgent;
 import java.util.ArrayDeque;
 import java.util.List;
 import java.util.Queue;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ForkJoinPool;
-import java.util.concurrent.TimeUnit;
 import org.bsc.langgraph4j.checkpoint.MemorySaver;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.client.ChatClient;
@@ -118,62 +112,6 @@ class LangGraphTravelAgentTest {
         }
 
         @Test
-        void delegatesExpertsInParallelInsideRoutePlanningSubgraph() {
-                CountDownLatch started = new CountDownLatch(2);
-                KnowledgePlanningAgent knowledge = mock(KnowledgePlanningAgent.class);
-                when(knowledge.planKnowledge(anyString()))
-                                .thenAnswer(ignored -> parallelResult(started, "{\"facts\":[]}"));
-                BudgetAgent budget = mock(BudgetAgent.class);
-                when(budget.estimateBudget(anyString()))
-                                .thenAnswer(ignored -> parallelResult(started, "{\"budget\":{}}"));
-                LangGraphTravelAgent graph = new LangGraphTravelAgent(
-                                client(route(), confirmed(), approved()),
-                                client(delegate("KNOWLEDGE", "BUDGET"), plan()), client(),
-                                client(finalReply("Final itinerary")),
-                                new PromptResourceLoader(), new MemorySaver(), knowledge,
-                                mock(RoutePlanningAgent.class), budget, null, ForkJoinPool.commonPool());
-
-                assertThat(graph.run(List.of(new AgentMessage("user", "Plan a one-day trip"))))
-                                .isEqualTo("Final itinerary");
-                verify(knowledge).planKnowledge(anyString());
-                verify(budget).estimateBudget(anyString());
-        }
-
-        @Test
-        void skipsDuplicateExpertTasksInOnePlannerDecision() {
-                KnowledgePlanningAgent knowledge = mock(KnowledgePlanningAgent.class);
-                when(knowledge.planKnowledge(anyString())).thenReturn("{\"facts\":[]}");
-                LangGraphTravelAgent graph = new LangGraphTravelAgent(
-                                client(route(), confirmed(), approved()),
-                                client(delegate("KNOWLEDGE", "KNOWLEDGE"), plan()), client(),
-                                client(finalReply("Final itinerary")),
-                                new PromptResourceLoader(), new MemorySaver(), knowledge,
-                                mock(RoutePlanningAgent.class), mock(BudgetAgent.class), null,
-                                ForkJoinPool.commonPool());
-
-                assertThat(graph.run(List.of(new AgentMessage("user", "Plan a one-day trip"))))
-                                .isEqualTo("Final itinerary");
-                verify(knowledge).planKnowledge(anyString());
-        }
-
-        @Test
-        void doesNotReinvokeExpertWhenPlannerRepeatsCompletedTask() {
-                KnowledgePlanningAgent knowledge = mock(KnowledgePlanningAgent.class);
-                when(knowledge.planKnowledge(anyString())).thenReturn("{\"facts\":[]}");
-                LangGraphTravelAgent graph = new LangGraphTravelAgent(
-                                client(route(), confirmed(), approved()),
-                                client(delegate("KNOWLEDGE"), delegate("KNOWLEDGE"), plan()), client(),
-                                client(finalReply("Final itinerary")), new PromptResourceLoader(), new MemorySaver(),
-                                knowledge,
-                                mock(RoutePlanningAgent.class), mock(BudgetAgent.class), null,
-                                ForkJoinPool.commonPool());
-
-                assertThat(graph.run(List.of(new AgentMessage("user", "Plan a one-day trip"))))
-                                .isEqualTo("Final itinerary");
-                verify(knowledge).planKnowledge(anyString());
-        }
-
-        @Test
         void normalRequestUsesNormalServiceThenFinalizer() {
                 LangGraphTravelAgent graph = graph(
                                 client(normal()), client(), client(normalAnswer("Service answer")),
@@ -186,9 +124,7 @@ class LangGraphTravelAgentTest {
         private LangGraphTravelAgent graph(ChatClient supervisor, ChatClient planner,
                         ChatClient normalService, ChatClient finalizer) {
                 return new LangGraphTravelAgent(supervisor, planner, normalService, finalizer,
-                                new PromptResourceLoader(), new MemorySaver(), mock(KnowledgePlanningAgent.class),
-                                mock(RoutePlanningAgent.class), mock(BudgetAgent.class), null,
-                                ForkJoinPool.commonPool());
+                                new PromptResourceLoader(), new MemorySaver(), null);
         }
 
         private static String route() {
@@ -215,22 +151,6 @@ class LangGraphTravelAgentTest {
         private static String plan() {
                 return "{\"itinerary\":[],\"budget\":{\"knownItems\":[],\"unknownItems\":[],\"summary\":\"\"},"
                                 + "\"notes\":[],\"pending\":[]}";
-        }
-
-        private static String delegate(String... experts) {
-                return "{\"action\":\"DELEGATE\",\"tasks\":["
-                                + java.util.Arrays.stream(experts)
-                                                .map(expert -> "{\"expert\":\"" + expert
-                                                                + "\",\"task\":{\"requirements\":{}}}")
-                                                .collect(java.util.stream.Collectors.joining(","))
-                                + "]}";
-        }
-
-        private static String parallelResult(CountDownLatch started, String result) throws InterruptedException {
-                started.countDown();
-                if (!started.await(1, TimeUnit.SECONDS))
-                        throw new AssertionError("Experts did not run in parallel");
-                return result;
         }
 
         private static String approved() {

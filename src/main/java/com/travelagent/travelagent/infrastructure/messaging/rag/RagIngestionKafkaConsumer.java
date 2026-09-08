@@ -15,6 +15,8 @@ import org.springframework.stereotype.Component;
 @Slf4j
 @Component
 public class RagIngestionKafkaConsumer {
+    private static final String TASK_MESSAGE_PREFIX = "{\"taskId\"";
+    private static final String PERSISTING_STAGE = "PERSISTING";
     private final RagIngestionTaskService tasks;
     private final KafkaTemplate<String, String> kafka;
     private final String topic;
@@ -29,16 +31,22 @@ public class RagIngestionKafkaConsumer {
     @KafkaListener(topics = "${travel-agent.rag.ingestion-topic:rag-ingestion}",
             groupId = "${travel-agent.rag.ingestion-consumer-group:travel-agent-rag-ingestion}")
     public void consume(String raw) {
-        if (raw != null && raw.trim().startsWith("{\"taskId\"")) {
+        if (raw != null && raw.trim().startsWith(TASK_MESSAGE_PREFIX)) {
             RagStageMessage stage = JSON.parseObject(raw, RagStageMessage.class);
-            if (stage != null && stage.stage() != null) { processStage(stage); return; }
+            if (stage != null && stage.stage() != null) {
+                processStage(stage);
+                return;
+            }
         }
         for (JSONObject row : CanalFlatMessageParser.insertedRows(raw)) {
             String payload = row.getString("payload");
             if (payload == null || payload.isBlank()) continue;
-            if (payload.trim().startsWith("{\"taskId\"")) {
+            if (payload.trim().startsWith(TASK_MESSAGE_PREFIX)) {
                 RagStageMessage stage = JSON.parseObject(payload, RagStageMessage.class);
-                if (stage != null && stage.stage() != null) { processStage(stage); continue; }
+                if (stage != null && stage.stage() != null) {
+                    processStage(stage);
+                    continue;
+                }
             }
             throw new IllegalArgumentException("Invalid RAG stage payload");
         }
@@ -50,7 +58,7 @@ public class RagIngestionKafkaConsumer {
             RagStageArtifact input = JSON.parseObject(Files.readString(Path.of(message.artifactPath())), RagStageArtifact.class);
             RagStageArtifact output = tasks.ingestionService().processStage(message.stage(), input);
             tasks.markStageCompleted(message.taskId(), message.stage(), output);
-            if ("PERSISTING".equals(message.stage())) return;
+            if (PERSISTING_STAGE.equals(message.stage())) return;
             String next = switch (message.stage()) {
                 case "PARSING" -> "DOC_ENRICHING";
                 case "DOC_ENRICHING" -> "CHUNKING";

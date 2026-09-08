@@ -9,7 +9,13 @@ type SessionSummary = { sessionId: string; title: string; preview: string; messa
 const API = import.meta.env.VITE_API_BASE_URL ?? "";
 const KEY = "agent-web-session";
 class ApiError extends Error { constructor(public status: number, message: string) { super(message); } }
-function clearSessionAndRedirect(): never { localStorage.removeItem(KEY); window.location.assign(window.location.pathname); throw new ApiError(401, "SESSION_EXPIRED"); }
+function clearSessionAndRedirect(): never {
+  localStorage.removeItem(KEY);
+  window.dispatchEvent(new CustomEvent("agent-session-expired"));
+  const target = `${window.location.pathname}${window.location.search}`;
+  if (window.location.pathname !== "/") window.location.replace(target);
+  throw new ApiError(401, "SESSION_EXPIRED");
+}
 let refreshPromise: Promise<string> | null = null;
 async function refreshAccessToken(): Promise<string> {
   if (refreshPromise) return refreshPromise;
@@ -20,14 +26,18 @@ async function refreshAccessTokenOnce(): Promise<string> {
   let current: Session | null = null;
   try { current = JSON.parse(localStorage.getItem(KEY) ?? "null"); } catch { current = null; }
   if (!current?.token.refreshToken) return clearSessionAndRedirect();
-  const response = await fetch(`${API}/api/auth/refresh`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ refreshToken: current.token.refreshToken }) });
-  if (!response.ok) return clearSessionAndRedirect();
-  const payload = await response.json() as { token?: Session["token"] };
-  if (!payload.token?.accessToken) return clearSessionAndRedirect();
-  const token = payload.token;
-  const next = { ...current, token };
-  localStorage.setItem(KEY, JSON.stringify(next));
-  return token.accessToken;
+  try {
+    const response = await fetch(`${API}/api/auth/refresh`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ refreshToken: current.token.refreshToken }) });
+    if (!response.ok) return clearSessionAndRedirect();
+    const payload = await response.json() as { token?: Session["token"] };
+    if (!payload.token?.accessToken) return clearSessionAndRedirect();
+    const token = payload.token;
+    const next = { ...current, token };
+    localStorage.setItem(KEY, JSON.stringify(next));
+    return token.accessToken;
+  } catch {
+    return clearSessionAndRedirect();
+  }
 }
 async function authorizedFetch(path: string, init: RequestInit, token?: string): Promise<Response> {
   const headers = new Headers(init.headers); if (token) headers.set("Authorization", `Bearer ${token}`);
@@ -35,6 +45,7 @@ async function authorizedFetch(path: string, init: RequestInit, token?: string):
   if (response.status === 401 && token) {
     const accessToken = await refreshAccessToken(); headers.set("Authorization", `Bearer ${accessToken}`);
     response = await fetch(`${API}${path}`, { ...init, headers });
+    if (response.status === 401) return clearSessionAndRedirect();
   }
   return response;
 }
@@ -71,6 +82,11 @@ function App() {
   const [session, setSession] = useState<Session | null>(() => { try { return JSON.parse(localStorage.getItem(KEY) ?? "null"); } catch { return null; } });
   const [mode, setMode] = useState<"login" | "register">("login"); const [phone, setPhone] = useState(""); const [email, setEmail] = useState(""); const [code, setCode] = useState(""); const [cooldown, setCooldown] = useState(0); const [tip, setTip] = useState(""); const [input, setInput] = useState(""); const [messages, setMessages] = useState<Message[]>([]); const [sessions, setSessions] = useState<SessionSummary[]>([]); const [sessionId, setSessionId] = useState<string | null>(null); const [sending, setSending] = useState(false); const sendingRef = useRef(false);
   useEffect(() => { if (!cooldown) return; const timer = window.setInterval(() => setCooldown(v => Math.max(0, v - 1)), 1000); return () => window.clearInterval(timer); }, [cooldown]);
+  useEffect(() => {
+    const onExpired = () => { setSession(null); setMessages([]); setSessions([]); setSessionId(null); setSending(false); setTip("登录已失效，请重新登录"); };
+    window.addEventListener("agent-session-expired", onExpired);
+    return () => window.removeEventListener("agent-session-expired", onExpired);
+  }, []);
   useEffect(() => { if (!session) return; void getRequest<SessionSummary[]>("/api/agent/sessions", session.token.accessToken).then(setSessions).catch(e => setTip(e instanceof Error ? e.message : "历史会话加载失败")); }, [session]);
   const sendCode = async () => { if (cooldown > 0) return; try { await request("/api/auth/email/send-code", { email }); setCooldown(60); setTip("验证码已发送，请查收邮箱"); } catch (e) { setTip(e instanceof Error ? e.message : "验证码发送失败"); } };
   const auth = async () => { if (mode === "register" && !/^1[3-9]\d{9}$/.test(phone)) { setTip("请输入正确的手机号"); return; } try { const next = await request<Session>(`/api/auth/email/${mode}`, { email, phone: mode === "register" ? phone : undefined, code }); localStorage.setItem(KEY, JSON.stringify(next)); setTip(""); setSession(next); } catch (e) { setTip(e instanceof Error ? e.message : "登录失败"); } };

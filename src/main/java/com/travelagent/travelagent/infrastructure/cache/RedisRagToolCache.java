@@ -10,10 +10,13 @@ import java.util.Optional;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** Exact-query cache for the RAG tool result. Redis failures are handled by the caller. */
 @Component
 public class RedisRagToolCache {
+    private static final Logger log = LoggerFactory.getLogger(RedisRagToolCache.class);
     private static final String PREFIX = "rag:tool:";
 
     private final StringRedisTemplate redis;
@@ -48,8 +51,9 @@ public class RedisRagToolCache {
         try {
             JSONObject json = JSON.parseObject(task);
             if (json != null) return JSON.toJSONString(json);
-        } catch (RuntimeException ignored) {
+        } catch (RuntimeException exception) {
             // Plain-text tool calls are also valid; normalize insignificant whitespace.
+            log.debug("Unable to parse RAG cache task as JSON; normalizing plain text", exception);
         }
         return task.trim().replaceAll("\\s+", " ");
     }

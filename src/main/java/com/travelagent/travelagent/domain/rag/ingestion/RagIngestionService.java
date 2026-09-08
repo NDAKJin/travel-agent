@@ -35,13 +35,23 @@ import org.springframework.util.StringUtils;
 @Service
 public class RagIngestionService {
     private static final int MAX_LLM_INPUT_CHARS = 20_000;
+    private static final int CHUNK_SIZE = 800;
+    private static final int CHUNK_OVERLAP = 100;
+    private static final int MAX_KEYWORDS = 10;
+    private static final int MAX_QUESTIONS = 5;
+    private static final String INITIAL_STAGE = "INITIALIZING";
+    private static final String PARSING_STAGE = "PARSING";
+    private static final String DOCUMENT_ENRICHING_STAGE = "DOC_ENRICHING";
+    private static final String CHUNKING_STAGE = "CHUNKING";
+    private static final String CHUNK_ENRICHING_STAGE = "CHUNK_ENRICHING";
+    private static final String PERSISTING_STAGE = "PERSISTING";
 
     private final ChatClient chatClient;
     private final PromptResourceLoader promptResourceLoader;
     private final RagKnowledgePersistenceService persistence;
     private final List<RagIngestionNode> nodes;
     private final RagTextChunker chunker = new RagTextChunker(
-            800, 100, List.of("\n\n", "\n", ".", ",", "!", "?", "。", "，", "！", "？"));
+            CHUNK_SIZE, CHUNK_OVERLAP, List.of("\n\n", "\n", ".", ",", "!", "?", "。", "，", "！", "？"));
 
     public RagIngestionService(@Qualifier("finalizerChatClient") ChatClient chatClient,
             PromptResourceLoader promptResourceLoader, RagKnowledgePersistenceService persistence) {
@@ -90,7 +100,7 @@ public class RagIngestionService {
             BiConsumer<String, RagIngestionContext> stageListener, BooleanSupplier cancellationCheck) {
         RagIngestionContext context = new RagIngestionContext(fileName, contentType, bytes);
         context.cancellationCheck(cancellationCheck);
-        String stage = "INITIALIZING";
+        String stage = INITIAL_STAGE;
         log.info("RAG ingestion started: fileName={}, contentType={}, bytes={}", fileName, contentType, bytes.length);
         try {
             for (RagIngestionNode node : nodes) {
@@ -109,7 +119,7 @@ public class RagIngestionService {
     }
 
     private final class ParseNode implements RagIngestionNode {
-        public String stage() { return "PARSING"; }
+        public String stage() { return PARSING_STAGE; }
         public void execute(RagIngestionContext context) throws Exception {
             ParsedFile parsed = parse(context.bytes(), context.fileName(), context.contentType());
             if (!StringUtils.hasText(parsed.text())) throw new IllegalStateException("No text extracted");
@@ -119,21 +129,21 @@ public class RagIngestionService {
     }
 
     private final class DocumentMetadataNode implements RagIngestionNode {
-        public String stage() { return "DOC_ENRICHING"; }
+        public String stage() { return DOCUMENT_ENRICHING_STAGE; }
         public void execute(RagIngestionContext context) {
             context.documentMetadata(extractDocumentMetadata(context.text()));
         }
     }
 
     private final class ChunkNode implements RagIngestionNode {
-        public String stage() { return "CHUNKING"; }
+        public String stage() { return CHUNKING_STAGE; }
         public void execute(RagIngestionContext context) {
             context.chunks(chunker.split(context.text(), context.documentMetadata()));
         }
     }
 
     private final class ChunkMetadataNode implements RagIngestionNode {
-        public String stage() { return "CHUNK_ENRICHING"; }
+        public String stage() { return CHUNK_ENRICHING_STAGE; }
         public void execute(RagIngestionContext context) {
             List<EmbeddingChunk> chunks = context.chunks();
             for (int i = 0; i < chunks.size(); i++) {
@@ -145,7 +155,7 @@ public class RagIngestionService {
     }
 
     private final class PersistNode implements RagIngestionNode {
-        public String stage() { return "PERSISTING"; }
+        public String stage() { return PERSISTING_STAGE; }
         public void execute(RagIngestionContext context) {
             String documentKey = sha256(context.bytes());
             List<Document> vectors = buildVectorDocuments(context.fileName(), context.mediaType(), documentKey,
@@ -169,8 +179,8 @@ public class RagIngestionService {
         JSONObject json = callJson("rag-document-metadata",
                 JSON.toJSONString(Map.of("text", limit(text)), JSONWriter.Feature.WriteMapNullValue));
         return new DocumentMetadata(text(json.getString("title")), text(json.getString("author")),
-                strings(json.getJSONArray("keywords"), 10), text(json.getString("summary")),
-                strings(json.getJSONArray("questions"), 5));
+                strings(json.getJSONArray("keywords"), MAX_KEYWORDS), text(json.getString("summary")),
+                strings(json.getJSONArray("questions"), MAX_QUESTIONS));
     }
 
     private ChunkMetadata extractChunkMetadata(DocumentMetadata documentMetadata, EmbeddingChunk chunk) {
@@ -179,8 +189,8 @@ public class RagIngestionService {
         input.put("chunk", Map.of("index", chunk.index(), "startOffset", chunk.startOffset(),
                 "endOffset", chunk.endOffset(), "content", chunk.content()));
         JSONObject json = callJson("rag-chunk-metadata", JSON.toJSONString(input, JSONWriter.Feature.WriteMapNullValue));
-        return new ChunkMetadata(strings(json.getJSONArray("keywords"), 10), text(json.getString("summary")),
-                strings(json.getJSONArray("questions"), 5));
+        return new ChunkMetadata(strings(json.getJSONArray("keywords"), MAX_KEYWORDS), text(json.getString("summary")),
+                strings(json.getJSONArray("questions"), MAX_QUESTIONS));
     }
 
     private JSONObject callJson(String promptName, String input) {

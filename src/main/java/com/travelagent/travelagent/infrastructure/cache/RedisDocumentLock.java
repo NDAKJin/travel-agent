@@ -26,11 +26,17 @@ import org.springframework.stereotype.Component;
 @Component
 public class RedisDocumentLock {
     private static final String PREFIX = "rag:document-lock:";
+    private static final String FILE_IDENTITY_PREFIX = "file:";
+    private static final String DOCUMENT_IDENTITY_PREFIX = "document:";
+    private static final String WATCHDOG_THREAD_NAME = "rag-document-lock-watchdog";
+    private static final long MIN_RENEWAL_INTERVAL_MILLIS = 1_000L;
+    private static final long RENEWAL_DIVISOR = 3L;
+    private static final long LOCK_RETRY_DELAY_MILLIS = 100L;
     private static final ScheduledExecutorService WATCHDOG = Executors.newScheduledThreadPool(1,
             new ThreadFactory() {
                 @Override
                 public Thread newThread(Runnable runnable) {
-                    Thread thread = new Thread(runnable, "rag-document-lock-watchdog");
+                    Thread thread = new Thread(runnable, WATCHDOG_THREAD_NAME);
                     thread.setDaemon(true);
                     return thread;
                 }
@@ -67,8 +73,8 @@ public class RedisDocumentLock {
             throw new IllegalArgumentException("RAG document key must not be blank");
         }
         Set<String> identities = new TreeSet<>();
-        identities.add("file:" + fileName.trim().toLowerCase(Locale.ROOT));
-        identities.add("document:" + documentKey.trim().toLowerCase(Locale.ROOT));
+        identities.add(FILE_IDENTITY_PREFIX + fileName.trim().toLowerCase(Locale.ROOT));
+        identities.add(DOCUMENT_IDENTITY_PREFIX + documentKey.trim().toLowerCase(Locale.ROOT));
         List<String> keys = identities.stream().map(this::key).toList();
         String token = UUID.randomUUID().toString();
         long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(waitMillis);
@@ -83,7 +89,7 @@ public class RedisDocumentLock {
             throw exception;
         }
         AtomicBoolean closed = new AtomicBoolean();
-        long interval = Math.max(1_000L, lease.toMillis() / 3L);
+        long interval = Math.max(MIN_RENEWAL_INTERVAL_MILLIS, lease.toMillis() / RENEWAL_DIVISOR);
         ScheduledFuture<?> renewal = WATCHDOG.scheduleAtFixedRate(() -> {
             if (closed.get()) return;
             for (String lockKey : keys) {
@@ -104,7 +110,7 @@ public class RedisDocumentLock {
         if (fileName == null || fileName.isBlank()) {
             throw new IllegalArgumentException("RAG document file name must not be blank");
         }
-        Set<String> identities = Set.of("file:" + fileName.trim().toLowerCase(Locale.ROOT));
+        Set<String> identities = Set.of(FILE_IDENTITY_PREFIX + fileName.trim().toLowerCase(Locale.ROOT));
         return acquireIdentities(identities, fileName);
     }
 
@@ -123,7 +129,7 @@ public class RedisDocumentLock {
             throw exception;
         }
         AtomicBoolean closed = new AtomicBoolean();
-        long interval = Math.max(1_000L, lease.toMillis() / 3L);
+        long interval = Math.max(MIN_RENEWAL_INTERVAL_MILLIS, lease.toMillis() / RENEWAL_DIVISOR);
         ScheduledFuture<?> renewal = WATCHDOG.scheduleAtFixedRate(() -> {
             if (closed.get()) return;
             for (String lockKey : keys) {
@@ -147,7 +153,7 @@ public class RedisDocumentLock {
                 throw new IllegalStateException("Timed out acquiring RAG document lock: " + displayName);
             }
             try {
-                Thread.sleep(100L);
+                Thread.sleep(LOCK_RETRY_DELAY_MILLIS);
             } catch (InterruptedException ex) {
                 Thread.currentThread().interrupt();
                 throw new IllegalStateException("Interrupted acquiring RAG document lock: " + displayName, ex);

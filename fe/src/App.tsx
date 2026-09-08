@@ -38,6 +38,9 @@ export default function App() {
     const expire = () => {
       localStorage.removeItem(STORAGE_KEY);
       setSession(null);
+      setUsers(null);
+      setConversations(null);
+      setSelectedUser(null);
       setDetail(null);
       setPage("dashboard");
       setLoading(false);

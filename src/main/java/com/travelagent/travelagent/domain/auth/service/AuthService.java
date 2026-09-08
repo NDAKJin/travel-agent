@@ -33,6 +33,15 @@ import org.springframework.transaction.annotation.Transactional;
 @Slf4j
 @RequiredArgsConstructor
 public class AuthService {
+    private static final String ACCOUNT_TYPE_WX = "wx";
+    private static final String ACCOUNT_TYPE_ADMIN = "admin";
+    private static final String REFRESH_TOKEN_TYPE = "refresh";
+    private static final String TOKEN_TYPE_CLAIM = "token_type";
+    private static final String USER_ID_CLAIM = "uid";
+    private static final String USER_TYPE_CLAIM = "userType";
+    private static final String TOKEN_ID_CLAIM = "jti";
+    private static final String DEFAULT_WEB_NICKNAME = "旅行用户";
+    private static final String DEFAULT_WX_NICKNAME = "wx-user";
 
     private final WxUserMapper wxUserMapper;
     private final AdminUserMapper adminUserMapper;
@@ -70,7 +79,7 @@ public class AuthService {
             throw new AuthException("Wx user is disabled");
         }
         log.info("WX login succeeded: userId={}, openId={}", user.getId(), user.getOpenId());
-        return issueTokenResponse(new AuthenticatedAccount(user.getId(), "wx", user.getOpenId(), user.getNickname()));
+        return issueTokenResponse(new AuthenticatedAccount(user.getId(), ACCOUNT_TYPE_WX, user.getOpenId(), user.getNickname()));
     }
 
     public AuthResponse loginAdmin(AdminLoginRequest request) {
@@ -86,16 +95,16 @@ public class AuthService {
             throw new AuthException("Invalid admin credentials");
         }
         log.info("Admin login succeeded: userId={}, username={}", user.getId(), user.getUsername());
-        return issueTokenResponse(new AuthenticatedAccount(user.getId(), "admin", user.getUsername(), user.getDisplayName()));
+        return issueTokenResponse(new AuthenticatedAccount(user.getId(), ACCOUNT_TYPE_ADMIN, user.getUsername(), user.getDisplayName()));
     }
 
     public AuthResponse refresh(RefreshTokenRequest request) {
         log.info("Refreshing auth token");
         DecodedToken decodedToken = jwtTokenService.decodeAndVerify(request.refreshToken());
         requireRefreshToken(decodedToken);
-        long userId = decodedToken.longClaim("uid");
-        String userType = decodedToken.stringClaim("userType");
-        String currentTokenId = decodedToken.stringClaim("jti");
+        long userId = decodedToken.longClaim(USER_ID_CLAIM);
+        String userType = decodedToken.stringClaim(USER_TYPE_CLAIM);
+        String currentTokenId = decodedToken.stringClaim(TOKEN_ID_CLAIM);
         if (!refreshTokenStore.consumeToken(userId, currentTokenId)) {
             log.warn("Refresh token validation failed: userId={}, userType={}, tokenId={}", userId, userType, currentTokenId);
             throw new AuthException("Refresh token is not active");
@@ -112,8 +121,8 @@ public class AuthService {
         log.info("Log out.");
         DecodedToken decodedToken = jwtTokenService.decodeAndVerify(request.refreshToken());
         requireRefreshToken(decodedToken);
-        long userId = decodedToken.longClaim("uid");
-        String tokenId = decodedToken.stringClaim("jti");
+        long userId = decodedToken.longClaim(USER_ID_CLAIM);
+        String tokenId = decodedToken.stringClaim(TOKEN_ID_CLAIM);
         log.info("Revoking refresh token: userId={}, tokenId={}", userId, tokenId);
         refreshTokenStore.revokeToken(userId, tokenId);
     }
@@ -131,10 +140,10 @@ public class AuthService {
 
     private AuthenticatedAccount loadAccount(String userType, long userId) {
         return switch (userType) {
-            case "wx" -> Optional.ofNullable(wxUserMapper.findById(userId))
+            case ACCOUNT_TYPE_WX -> Optional.ofNullable(wxUserMapper.findById(userId))
                     .map(this::toWxAccount)
                     .orElseThrow(() -> new AuthException("Wx user not found"));
-            case "admin" -> Optional.ofNullable(adminUserMapper.findById(userId))
+            case ACCOUNT_TYPE_ADMIN -> Optional.ofNullable(adminUserMapper.findById(userId))
                     .map(this::toAdminAccount)
                     .orElseThrow(() -> new AuthException("Admin user not found"));
             default -> throw new AuthException("Unsupported account type");
@@ -144,8 +153,8 @@ public class AuthService {
     private AuthenticatedAccount loadEnabledAccount(String userType, long userId) {
         AuthenticatedAccount account = loadAccount(userType, userId);
         boolean enabled = switch (userType) {
-            case "wx" -> wxUserMapper.findById(userId).isEnabled();
-            case "admin" -> adminUserMapper.findById(userId).isEnabled();
+            case ACCOUNT_TYPE_WX -> wxUserMapper.findById(userId).isEnabled();
+            case ACCOUNT_TYPE_ADMIN -> adminUserMapper.findById(userId).isEnabled();
             default -> false;
         };
         if (!enabled) {
@@ -158,7 +167,7 @@ public class AuthService {
         Instant now = clock.instant();
         WxUser user = new WxUser();
         user.setOpenId(openId);
-        user.setNickname(request.nickname() == null || request.nickname().isBlank() ? "wx-user" : request.nickname());
+        user.setNickname(request.nickname() == null || request.nickname().isBlank() ? DEFAULT_WX_NICKNAME : request.nickname());
         user.setAvatarUrl(request.avatarUrl());
         user.setEnabled(true);
         user.setCreatedAt(now);
@@ -169,8 +178,8 @@ public class AuthService {
     }
 
     private void requireRefreshToken(DecodedToken decodedToken) {
-        String tokenType = decodedToken.stringClaim("token_type");
-        if (!Objects.equals("refresh", tokenType)) {
+        String tokenType = decodedToken.stringClaim(TOKEN_TYPE_CLAIM);
+        if (!Objects.equals(REFRESH_TOKEN_TYPE, tokenType)) {
             log.warn("Rejected token because tokenType is not refresh: tokenType={}", tokenType);
             throw new AuthException("Token type must be refresh");
         }

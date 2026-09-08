@@ -26,6 +26,9 @@ import org.springframework.util.Assert;
 @Slf4j
 @RequiredArgsConstructor
 public class JwtTokenService {
+    private static final String ACCESS_TOKEN_TYPE = "access";
+    private static final String REFRESH_TOKEN_TYPE = "refresh";
+    private static final String JWT_TYPE = "JWT";
     private static final String CLAIM_USER_ID = "uid";
     private static final String CLAIM_USER_TYPE = "userType";
     private static final String CLAIM_DISPLAY_NAME = "displayName";
@@ -39,8 +42,8 @@ public class JwtTokenService {
     public TokenPair issueTokenPair(long userId, String userType, String subject, String displayName) {
         Instant issuedAt = clock.instant();
         String refreshTokenId = UUID.randomUUID().toString();
-        String accessToken = encode(buildClaims(userId, userType, subject, displayName, "access", UUID.randomUUID().toString(), issuedAt));
-        String refreshToken = encode(buildClaims(userId, userType, subject, displayName, "refresh", refreshTokenId, issuedAt));
+        String accessToken = encode(buildClaims(userId, userType, subject, displayName, ACCESS_TOKEN_TYPE, UUID.randomUUID().toString(), issuedAt));
+        String refreshToken = encode(buildClaims(userId, userType, subject, displayName, REFRESH_TOKEN_TYPE, refreshTokenId, issuedAt));
         log.debug("Issued JWT token pair: userId={}, userType={}, issuedAt={}", userId, userType, issuedAt);
         return new TokenPair(
                 accessToken,
@@ -81,7 +84,7 @@ public class JwtTokenService {
                                      String tokenType,
                                      String tokenId,
                                      Instant issuedAt) {
-        Instant expiresAt = issuedAt.plus("access".equals(tokenType) ? properties.getAccessTokenTtl() : properties.getRefreshTokenTtl());
+        Instant expiresAt = issuedAt.plus(ACCESS_TOKEN_TYPE.equals(tokenType) ? properties.getAccessTokenTtl() : properties.getRefreshTokenTtl());
         JwtClaimsSet.Builder builder = JwtClaimsSet.builder()
                 .issuer(properties.getIssuer())
                 .subject(subject)
@@ -100,7 +103,7 @@ public class JwtTokenService {
     private String encode(JwtClaimsSet claims) {
         try {
             JwsHeader header = JwsHeader.with(MacAlgorithm.HS256)
-                    .type("JWT")
+                    .type(JWT_TYPE)
                     .build();
             return jwtEncoder.encode(JwtEncoderParameters.from(header, claims)).getTokenValue();
         } catch (JwtException ex) {
