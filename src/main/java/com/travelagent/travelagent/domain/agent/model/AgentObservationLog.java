@@ -8,6 +8,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+/** Agent 工作流观测日志的持久化模型。 */
 @Getter
 @Setter
 @Builder

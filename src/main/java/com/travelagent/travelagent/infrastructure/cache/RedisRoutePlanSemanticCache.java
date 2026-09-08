@@ -32,6 +32,12 @@ public class RedisRoutePlanSemanticCache implements RoutePlanSemanticCache {
     private static final String PLAN = "routePlan";
     private static final String REQUIREMENTS = "requirements";
     private static final String EXPIRES_AT = "expiresAt";
+    private static final int SEARCH_RESULT_MIN_SIZE = 3;
+    private static final int SEARCH_PARAM_COUNT = 2;
+    private static final int SEARCH_RETURN_FIELD_COUNT = 3;
+    private static final int VECTOR_ALGORITHM_ARGS = 6;
+    private static final int HNSW_M = 16;
+    private static final int HNSW_EF_CONSTRUCTION = 200;
 
     private final RedisConnectionFactory connectionFactory;
     private final EmbeddingModel embeddingModel;
@@ -59,12 +65,12 @@ public class RedisRoutePlanSemanticCache implements RoutePlanSemanticCache {
             ensureIndex(redis, query.length / Float.BYTES);
             Object raw = redis.commands().execute("FT.SEARCH", bytes(INDEX),
                     bytes("*=>[KNN 1 @vector $query_vector AS score]"),
-                    bytes("PARAMS"), bytes("2"), bytes("query_vector"), query,
+                    bytes("PARAMS"), bytes(Integer.toString(SEARCH_PARAM_COUNT)), bytes("query_vector"), query,
                     bytes("SORTBY"), bytes("score"), bytes("ASC"),
-                    bytes("RETURN"), bytes("3"), bytes("routePlan"), bytes("requirements"), bytes("score"),
+                    bytes("RETURN"), bytes(Integer.toString(SEARCH_RETURN_FIELD_COUNT)), bytes("routePlan"), bytes("requirements"), bytes("score"),
                     bytes("DIALECT"), bytes("2"));
             List<?> resultList = raw instanceof List<?> list ? list : List.of();
-            if (resultList.size() < 3) return Optional.empty();
+            if (resultList.size() < SEARCH_RESULT_MIN_SIZE) return Optional.empty();
             List<?> fields = resultList.get(2) instanceof List<?> list ? list : List.of();
             String cachedRequirements = null;
             String plan = null;
@@ -127,9 +133,9 @@ public class RedisRoutePlanSemanticCache implements RoutePlanSemanticCache {
             try {
                 redis.commands().execute("FT.CREATE", bytes(INDEX), bytes("ON"), bytes("HASH"),
                         bytes("PREFIX"), bytes("1"), PREFIX, bytes("SCHEMA"),
-                        bytes(VECTOR), bytes("VECTOR"), bytes("HNSW"), bytes("6"),
+                        bytes(VECTOR), bytes("VECTOR"), bytes("HNSW"), bytes(Integer.toString(VECTOR_ALGORITHM_ARGS)),
                         bytes("TYPE"), bytes("FLOAT32"), bytes("DIM"), bytes(Integer.toString(dimensions)),
-                        bytes("DISTANCE_METRIC"), bytes("COSINE"), bytes("M"), bytes("16"), bytes("EF_CONSTRUCTION"), bytes("200"),
+                        bytes("DISTANCE_METRIC"), bytes("COSINE"), bytes("M"), bytes(Integer.toString(HNSW_M)), bytes("EF_CONSTRUCTION"), bytes(Integer.toString(HNSW_EF_CONSTRUCTION)),
                         bytes(REQUIREMENTS), bytes("TAG"), bytes(EXPIRES_AT), bytes("NUMERIC"));
             } catch (RuntimeException exception) {
                 String message = exception.getMessage();

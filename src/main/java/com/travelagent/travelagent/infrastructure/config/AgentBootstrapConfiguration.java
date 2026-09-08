@@ -1,6 +1,8 @@
 package com.travelagent.travelagent.infrastructure.config;
 
 import com.travelagent.travelagent.infrastructure.ai.agent.KnowledgePlanningAgent;
+import com.travelagent.travelagent.infrastructure.ai.agent.RoutePlanningAgent;
+import com.travelagent.travelagent.infrastructure.ai.agent.BudgetAgent;
 import org.bsc.langgraph4j.checkpoint.BaseCheckpointSaver;
 import org.bsc.langgraph4j.checkpoint.RedisSaver;
 import org.springframework.ai.chat.client.ChatClient;
@@ -17,6 +19,9 @@ import java.util.concurrent.TimeUnit;
 
 @Configuration
 public class AgentBootstrapConfiguration {
+    private static final int ROUTE_CACHE_AWAIT_TERMINATION_SECONDS = 10;
+    private static final String ROUTE_CACHE_THREAD_PREFIX = "route-cache-";
+    private static final String REJECTION_CALLER_RUNS = "caller-runs";
 
     @Bean
     @Primary
@@ -75,9 +80,9 @@ public class AgentBootstrapConfiguration {
         executor.setCorePoolSize(corePoolSize);
         executor.setMaxPoolSize(maxPoolSize);
         executor.setQueueCapacity(queueCapacity);
-        executor.setThreadNamePrefix("route-cache-");
+        executor.setThreadNamePrefix(ROUTE_CACHE_THREAD_PREFIX);
         executor.setWaitForTasksToCompleteOnShutdown(true);
-        executor.setAwaitTerminationSeconds(10);
+        executor.setAwaitTerminationSeconds(ROUTE_CACHE_AWAIT_TERMINATION_SECONDS);
         executor.setRejectedExecutionHandler(new ThreadPoolExecutor.DiscardPolicy());
         executor.initialize();
         return executor;
@@ -85,7 +90,7 @@ public class AgentBootstrapConfiguration {
 
     private RejectedExecutionHandler rejectionHandler(String policy) {
         return switch (policy.trim().toLowerCase(Locale.ROOT)) {
-            case "caller-runs" -> new ThreadPoolExecutor.CallerRunsPolicy();
+            case REJECTION_CALLER_RUNS -> new ThreadPoolExecutor.CallerRunsPolicy();
             case "discard" -> new ThreadPoolExecutor.DiscardPolicy();
             case "discard-oldest" -> new ThreadPoolExecutor.DiscardOldestPolicy();
             case "abort" -> new ThreadPoolExecutor.AbortPolicy();
@@ -99,8 +104,13 @@ public class AgentBootstrapConfiguration {
     }
 
     @Bean("routePlannerChatClient")
-    ChatClient routePlannerChatClient(ChatModel chatModel) {
-        return ChatClient.builder(chatModel).build();
+    ChatClient routePlannerChatClient(ChatModel chatModel,
+                                      KnowledgePlanningAgent knowledgeAgent,
+                                      RoutePlanningAgent routeAgent,
+                                      BudgetAgent budgetAgent) {
+        return ChatClient.builder(chatModel)
+                .defaultTools(knowledgeAgent, routeAgent, budgetAgent)
+                .build();
     }
 
     @Bean("normalServiceChatClient")

@@ -20,6 +20,8 @@ import org.springframework.util.StringUtils;
 public class RagAdminService {
 
     private static final int MAX_BATCH_SIZE = 500;
+    private static final int ENABLED_FLAG = 1;
+    private static final int DISABLED_FLAG = 0;
 
     private final JdbcTemplate jdbcTemplate;
     private final RagVectorOutboxService vectorOutbox;
@@ -63,12 +65,12 @@ public class RagAdminService {
     @Transactional
     public void toggleDocument(long documentId, boolean enabled) {
         DocumentRow document = document(documentId);
-        int target = enabled ? 1 : 0;
+        int target = enabled ? ENABLED_FLAG : DISABLED_FLAG;
         List<ChunkRow> chunks = chunkRows(documentId);
         if (enabled) {
             // 启用文档时补回所有未进入向量库的 Chunk；文档本身已启用时也要修复被单独禁用的 Chunk。
-            List<ChunkRow> chunksToAdd = document.enabled() == 1
-                    ? chunks.stream().filter(chunk -> chunk.enabled() != 1).toList()
+            List<ChunkRow> chunksToAdd = document.enabled() == ENABLED_FLAG
+                    ? chunks.stream().filter(chunk -> chunk.enabled() != ENABLED_FLAG).toList()
                     : chunks;
             addVectors(document, chunksToAdd);
         } else {
@@ -81,9 +83,9 @@ public class RagAdminService {
     @Transactional
     public void toggleChunk(long chunkId, boolean enabled) {
         ChunkWithDocument row = chunkWithDocument(chunkId);
-        int target = enabled ? 1 : 0;
+        int target = enabled ? ENABLED_FLAG : DISABLED_FLAG;
         if (row.chunk().enabled() == target) return;
-        if (enabled && row.document().enabled() != 1) throw new IllegalArgumentException("文档未启用，请先启用文档");
+        if (enabled && row.document().enabled() != ENABLED_FLAG) throw new IllegalArgumentException("文档未启用，请先启用文档");
         if (enabled) {
             Document document = toVectorDocument(row.document(), row.chunk());
             vectorOutbox.enqueueUpsert(document);
@@ -103,12 +105,12 @@ public class RagAdminService {
         ChunkWithDocument row = chunkWithDocument(chunkId);
         String nextContent = content.trim();
         if (nextContent.equals(row.chunk().content())) return;
-        if (row.chunk().enabled() == 1) {
+        if (row.chunk().enabled() == ENABLED_FLAG) {
             vectorOutbox.enqueueDelete(row.chunk().chunkKey());
         }
         jdbcTemplate.update("UPDATE rag_chunk SET content = ?, end_offset = start_offset + CHAR_LENGTH(?) WHERE id = ?",
                 nextContent, nextContent, chunkId);
-        if (row.chunk().enabled() == 1) {
+        if (row.chunk().enabled() == ENABLED_FLAG) {
             ChunkRow updated = new ChunkRow(row.chunk().id(), row.chunk().chunkKey(), row.chunk().chunkIndex(),
                     row.chunk().startOffset(), row.chunk().startOffset() + nextContent.length(), nextContent,
                     row.chunk().keywords(), row.chunk().summary(), row.chunk().questions(), row.chunk().enabled());

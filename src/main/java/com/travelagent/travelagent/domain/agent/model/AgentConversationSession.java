@@ -4,6 +4,7 @@ import java.time.Instant;
 import lombok.Getter;
 import lombok.Setter;
 
+/** 数据库中的 Agent 会话实体。 */
 @Getter
 @Setter
 public class AgentConversationSession {

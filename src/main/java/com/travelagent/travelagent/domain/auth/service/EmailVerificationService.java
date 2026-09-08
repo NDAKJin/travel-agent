@@ -12,6 +12,10 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 @Service
 @RequiredArgsConstructor
 public class EmailVerificationService {
+    private static final String SEND_LOCK_PREFIX = "auth:email:send-lock:";
+    private static final String CODE_KEY_PREFIX = "auth:email:code:";
+    private static final String LOCK_VALUE = "1";
+    private static final int CODE_BOUND = 1_000_000;
     private final JavaMailSender mailSender;
     private final StringRedisTemplate redisTemplate;
     private final SecureRandom random = new SecureRandom();
@@ -21,10 +25,10 @@ public class EmailVerificationService {
 
     public void send(String email) {
         String normalized = email.trim().toLowerCase();
-        Boolean acquired = redisTemplate.opsForValue().setIfAbsent("auth:email:send-lock:" + normalized, "1", SEND_INTERVAL);
+        Boolean acquired = redisTemplate.opsForValue().setIfAbsent(SEND_LOCK_PREFIX + normalized, LOCK_VALUE, SEND_INTERVAL);
         if (Boolean.FALSE.equals(acquired)) throw new IllegalArgumentException("验证码获取过于频繁，请一分钟后再试");
-        String code = "%06d".formatted(random.nextInt(1_000_000));
-        redisTemplate.opsForValue().set("auth:email:code:" + normalized, code, ttl);
+        String code = "%06d".formatted(random.nextInt(CODE_BOUND));
+        redisTemplate.opsForValue().set(CODE_KEY_PREFIX + normalized, code, ttl);
         if (sender == null || sender.isBlank()) return; // allow local development without SMTP
         SimpleMailMessage message = new SimpleMailMessage();
         message.setFrom(sender); message.setTo(normalized); message.setSubject("Travel Agent 邮箱验证码");
@@ -34,10 +38,10 @@ public class EmailVerificationService {
 
     public boolean verify(String email, String code) {
         String normalized = email.trim().toLowerCase();
-        String stored = redisTemplate.opsForValue().get("auth:email:code:" + normalized);
+        String stored = redisTemplate.opsForValue().get(CODE_KEY_PREFIX + normalized);
         if (stored == null) return false;
         boolean valid = stored.equals(code.trim());
-        if (valid) redisTemplate.delete("auth:email:code:" + normalized);
+        if (valid) redisTemplate.delete(CODE_KEY_PREFIX + normalized);
         return valid;
     }
 }

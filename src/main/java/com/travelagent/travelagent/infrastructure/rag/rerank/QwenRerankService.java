@@ -17,6 +17,15 @@ import org.springframework.web.client.RestClient;
 
 @Service
 public class QwenRerankService {
+    private static final String AUTHORIZATION_HEADER = "Authorization";
+    private static final String CONTENT_TYPE_HEADER = "Content-Type";
+    private static final String JSON_CONTENT_TYPE = "application/json";
+    private static final String BEARER_PREFIX = "Bearer ";
+    private static final String RESULTS_FIELD = "results";
+    private static final String OUTPUT_FIELD = "output";
+    private static final String INDEX_FIELD = "index";
+    private static final String SCORE_FIELD = "relevance_score";
+    private static final int INVALID_INDEX = -1;
 
     private final RerankProperties properties;
     private final RestClient restClient;
@@ -52,8 +61,8 @@ public class QwenRerankService {
 
         String raw = restClient.post()
                 .uri(properties.getEndpoint())
-                .header("Authorization", "Bearer " + properties.getApiKey())
-                .header("Content-Type", "application/json")
+                .header(AUTHORIZATION_HEADER, BEARER_PREFIX + properties.getApiKey())
+                .header(CONTENT_TYPE_HEADER, JSON_CONTENT_TYPE)
                 .body(JSON.toJSONString(body))
                 .retrieve()
                 .body(String.class);
@@ -62,9 +71,9 @@ public class QwenRerankService {
 
     private List<RerankResult> parseResults(String raw, List<RerankCandidate> candidates) {
         JSONObject response = JSON.parseObject(raw);
-        JSONArray results = response == null ? null : response.getJSONArray("results");
-        if (results == null && response != null && response.getJSONObject("output") != null) {
-            results = response.getJSONObject("output").getJSONArray("results");
+        JSONArray results = response == null ? null : response.getJSONArray(RESULTS_FIELD);
+        if (results == null && response != null && response.getJSONObject(OUTPUT_FIELD) != null) {
+            results = response.getJSONObject(OUTPUT_FIELD).getJSONArray(RESULTS_FIELD);
         }
         if (results == null) {
             throw new IllegalStateException("Qwen Rerank response does not contain results");
@@ -72,8 +81,8 @@ public class QwenRerankService {
         List<RerankResult> output = new ArrayList<>();
         for (int rank = 0; rank < results.size(); rank++) {
             JSONObject result = results.getJSONObject(rank);
-            int index = result.getIntValue("index", -1);
-            Number scoreValue = result.get("relevance_score") instanceof Number number ? number : null;
+            int index = result.getIntValue(INDEX_FIELD, INVALID_INDEX);
+            Number scoreValue = result.get(SCORE_FIELD) instanceof Number number ? number : null;
             double score = scoreValue == null ? Double.NaN : scoreValue.doubleValue();
             if (index < 0 || index >= candidates.size() || Double.isNaN(score)) {
                 throw new IllegalStateException("Qwen Rerank response contains invalid result");

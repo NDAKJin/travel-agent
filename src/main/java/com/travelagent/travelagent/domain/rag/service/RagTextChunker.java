@@ -7,6 +7,7 @@ import java.util.List;
 
 /** 纯文本分块规则，不依赖 Tika、LLM、数据库或向量库。 */
 public final class RagTextChunker {
+    private static final String INVALID_CHUNK_RANGE_MESSAGE = "chunkSize/overlap is invalid";
 
     private final int chunkSize;
     private final int overlap;
@@ -14,7 +15,7 @@ public final class RagTextChunker {
 
     public RagTextChunker(int chunkSize, int overlap, List<String> separators) {
         if (chunkSize <= 0 || overlap < 0 || overlap >= chunkSize) {
-            throw new IllegalArgumentException("chunkSize/overlap is invalid");
+            throw new IllegalArgumentException(INVALID_CHUNK_RANGE_MESSAGE);
         }
         this.chunkSize = chunkSize;
         this.overlap = overlap;

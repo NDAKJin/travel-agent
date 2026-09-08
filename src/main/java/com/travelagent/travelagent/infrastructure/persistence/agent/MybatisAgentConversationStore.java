@@ -4,6 +4,7 @@ import com.travelagent.travelagent.infrastructure.planning.port.ConversationStor
 import com.travelagent.travelagent.domain.agent.model.AgentConversationMessage;
 import com.travelagent.travelagent.domain.agent.model.AgentConversationSession;
 import com.travelagent.travelagent.domain.agent.model.AgentMessage;
+import com.travelagent.travelagent.domain.agent.model.AgentMessageRole;
 import com.travelagent.travelagent.domain.agent.model.AgentSessionContext;
 import com.travelagent.travelagent.domain.agent.model.AgentSessionSummary;
 import java.time.Instant;
@@ -136,7 +137,7 @@ public class MybatisAgentConversationStore implements ConversationStorePort {
 
     private String buildTitle(List<AgentMessage> messages) {
         return messages.stream()
-                .filter(message -> "user".equalsIgnoreCase(message.role()))
+                .filter(message -> AgentMessageRole.USER.matches(message.role()))
                 .map(AgentMessage::content)
                 .map(this::compact)
                 .filter(text -> !text.isBlank())

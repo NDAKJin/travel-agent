@@ -7,28 +7,43 @@ import com.travelagent.travelagent.domain.agent.dto.AgentChatResponse;
 import com.travelagent.travelagent.domain.agent.dto.AgentConversationMessageResponse;
 import com.travelagent.travelagent.domain.agent.dto.AgentSessionDetailResponse;
 import com.travelagent.travelagent.domain.agent.dto.AgentSessionSummaryResponse;
+import com.travelagent.travelagent.domain.agent.model.AgentLocationPayload;
 import com.travelagent.travelagent.domain.agent.model.AgentMessage;
+import com.travelagent.travelagent.domain.agent.model.AgentMessageRole;
 import com.travelagent.travelagent.domain.agent.model.AgentSessionContext;
-import com.travelagent.travelagent.domain.observability.model.AgentObservationContext;
-import com.travelagent.travelagent.infrastructure.observability.agent.AgentObservationPort;
 import com.travelagent.travelagent.domain.auth.exception.AuthException;
 import com.travelagent.travelagent.domain.auth.model.AuthenticatedUser;
-import com.travelagent.travelagent.infrastructure.planning.port.TravelWorkflowPort;
-import com.travelagent.travelagent.infrastructure.planning.port.ConversationStorePort;
-import com.travelagent.travelagent.infrastructure.config.AgentProperties;
+import com.travelagent.travelagent.domain.observability.model.AgentObservationContext;
+import com.travelagent.travelagent.infrastructure.observability.agent.AgentObservationPort;
 import com.travelagent.travelagent.infrastructure.ai.TokenCounter;
-import org.springframework.ai.chat.client.ChatClient;
+import com.travelagent.travelagent.infrastructure.config.AgentProperties;
+import com.travelagent.travelagent.infrastructure.planning.port.ConversationStorePort;
+import com.travelagent.travelagent.infrastructure.planning.port.TravelWorkflowPort;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.springframework.beans.factory.annotation.Value;
 
+/**
+ * Agent 对话领域服务，负责聊天编排以及会话的查询和维护。
+ *
+ * 该服务同时协调会话存储、旅行工作流、上下文裁剪和摘要生成，
+ * 对外提供稳定的 Agent 会话操作入口。
+ */
 @Service
 @Slf4j
 public class DefaultReactAgentService {
+    private static final String NEW_CHAT_TITLE = "new-chat";
+    private static final String QUESTIONS_PREFIX = "questions:";
+    private static final String SUMMARY_PREFIX = "Conversation summary:\n";
+    private static final int MESSAGE_TOKEN_OVERHEAD = 4;
 
     private final AgentProperties agentProperties;
     private final TravelWorkflowPort agentGraph;
@@ -38,12 +53,11 @@ public class DefaultReactAgentService {
     private final TokenCounter tokenCounter;
     private final ChatClient summaryChatClient;
 
-    @org.springframework.beans.factory.annotation.Autowired
     public DefaultReactAgentService(AgentProperties agentProperties,
                                     TravelWorkflowPort agentGraph,
                                     ConversationStorePort conversationStore,
                                     AgentObservationPort observationPublisher,
-                                    @org.springframework.beans.factory.annotation.Qualifier("finalizerChatClient") ChatClient summaryChatClient,
+                                    @Qualifier("finalizerChatClient") ChatClient summaryChatClient,
                                     TokenCounter tokenCounter,
                                     @Value("${SPRING_AI_DASHSCOPE_CHAT_OPTIONS_MODEL:qwen3.7-flash}") String model) {
         this.agentProperties = agentProperties;
@@ -55,67 +69,87 @@ public class DefaultReactAgentService {
         this.model = model;
     }
 
+    /**
+     * 处理一次用户对话请求，并持久化用户消息和 Agent 回复。
+     *
+     * @param user 当前认证用户
+     * @param request 对话请求，包含消息、会话标识和可选位置
+     * @return Agent 回复及会话信息
+     */
     public AgentChatResponse chat(AuthenticatedUser user, AgentChatRequest request) {
-        if (request.message().length() > agentProperties.getMaxMessageChars()) {
-            throw new IllegalArgumentException("message exceeds the configured maximum length");
-        }
-        if (request.sessionId() != null && request.sessionId().length() > agentProperties.getMaxSessionIdChars()) {
-            throw new IllegalArgumentException("sessionId exceeds the configured maximum length");
-        }
+        validateRequest(request);
         String sessionId = normalizeSessionId(request.sessionId());
         log.info("Starting react-agent chat: sessionId={}, requestedSessionId={}",
                 sessionId,
                 request.sessionId());
-            AgentSessionContext existingSession = conversationStore.load(user.userId(), sessionId).orElse(null);
-            List<AgentMessage> fullHistory = new ArrayList<>(existingSession == null ? List.of() : existingSession.messages());
-            String summary = existingSession == null ? "" : existingSession.summary();
-            List<AgentMessage> history = new ArrayList<>(fullHistory);
-            log.debug("Loaded conversation history: sessionId={}, existingMessageCount={}", sessionId, history.size());
-            history.add(new AgentMessage("user", request.message()));
-            fullHistory.add(new AgentMessage("user", request.message()));
-            if (summaryChatClient != null && shouldSummarize(fullHistory)) {
-                summary = summarize(fullHistory, summary);
-                history = new ArrayList<>(contextHistory(summary, fullHistory));
-            } else {
-                history = boundedHistory(fullHistory);
-            }
-            history = new ArrayList<>(history);
+        Optional<AgentSessionContext> existingSession = conversationStore.load(user.userId(), sessionId);
+        List<AgentMessage> fullHistory = new ArrayList<>(
+                existingSession.map(AgentSessionContext::messages).orElseGet(List::of));
+        String summary = existingSession.map(AgentSessionContext::summary).orElse("");
+        log.debug("Loaded conversation history: sessionId={}, existingMessageCount={}",
+                sessionId, fullHistory.size());
 
-            Instant startedAt = Instant.now();
-            Instant createdAt = existingSession == null ? startedAt : existingSession.createdAt();
-            List<AgentMessage> userHistory = boundedHistory(history);
-            long messageId = conversationStore.append(user.userId(),
-                    new AgentSessionContext(sessionId, userHistory, createdAt, startedAt, summary),
-                    List.of(new AgentMessage("user", request.message()))).getLast();
+        fullHistory.add(new AgentMessage(AgentMessageRole.USER, request.message()));
+        List<AgentMessage> history = boundedHistory(fullHistory);
+        if (summaryChatClient != null && shouldSummarize(fullHistory)) {
+            summary = summarize(fullHistory, summary);
+            history = contextHistory(summary, fullHistory);
+        }
+        history = new ArrayList<>(history);
 
-            AgentObservationContext observation = new AgentObservationContext(messageId, observationPublisher);
-            String reply = callModel(history, user.userId() + ":" + sessionId, observation, request.location());
-            String userReply = userFacingReply(reply);
-            history.add(new AgentMessage("assistant", userReply));
-            fullHistory.add(new AgentMessage("assistant", userReply));
-            Instant now = Instant.now();
-            conversationStore.append(user.userId(),
-                    new AgentSessionContext(sessionId, boundedHistory(fullHistory), createdAt, now, summary),
-                    List.of(new AgentMessage("assistant", userReply)));
-            conversationStore.save(user.userId(), new AgentSessionContext(sessionId, fullHistory, createdAt, now, summary));
-            log.info("Completed react-agent chat: sessionId={}, totalMessageCount={}, replyLength={}",
-                    sessionId,
-                    history.size(),
-                    userReply.length());
-            return new AgentChatResponse(
-                    sessionId,
-                    userReply,
-                    agentProperties.getProfile().getName(),
-                    model);
+        Instant startedAt = Instant.now();
+        Instant createdAt = existingSession.map(AgentSessionContext::createdAt).orElse(startedAt);
+        long messageId = conversationStore.append(user.userId(),
+                new AgentSessionContext(sessionId, boundedHistory(history), createdAt, startedAt, summary),
+                List.of(new AgentMessage(AgentMessageRole.USER, request.message()))).getLast();
+
+        AgentObservationContext observation = new AgentObservationContext(messageId, observationPublisher);
+        String reply = callModel(history, user.userId() + ":" + sessionId, observation, request.location());
+        String userReply = userFacingReply(reply);
+        history.add(new AgentMessage(AgentMessageRole.ASSISTANT, userReply));
+        fullHistory.add(new AgentMessage(AgentMessageRole.ASSISTANT, userReply));
+        Instant now = Instant.now();
+        AgentSessionContext updatedSession = new AgentSessionContext(
+                sessionId, boundedHistory(fullHistory), createdAt, now, summary);
+        conversationStore.append(user.userId(), updatedSession,
+                List.of(new AgentMessage(AgentMessageRole.ASSISTANT, userReply)));
+        conversationStore.save(user.userId(), new AgentSessionContext(
+                sessionId, fullHistory, createdAt, now, summary));
+        log.info("Completed react-agent chat: sessionId={}, totalMessageCount={}, replyLength={}",
+                sessionId, history.size(), userReply.length());
+        return new AgentChatResponse(sessionId, userReply,
+                agentProperties.getProfile().getName(), model);
     }
 
+    private void validateRequest(AgentChatRequest request) {
+        if (request.message().length() > agentProperties.getMaxMessageChars()) {
+            throw new IllegalArgumentException("message exceeds the configured maximum length");
+        }
+        if (request.sessionId() != null
+                && request.sessionId().length() > agentProperties.getMaxSessionIdChars()) {
+            throw new IllegalArgumentException("sessionId exceeds the configured maximum length");
+        }
+    }
+
+    /**
+     * 为用户创建一个空的对话会话。
+     *
+     * @param user 当前认证用户
+     * @return 新会话摘要
+     */
     public AgentSessionSummaryResponse createSession(AuthenticatedUser user) {
         Instant now = Instant.now();
         String sessionId = UUID.randomUUID().toString();
         conversationStore.save(user.userId(), new AgentSessionContext(sessionId, List.of(), now, now));
-        return new AgentSessionSummaryResponse(sessionId, "new-chat", "", 0, now);
+        return new AgentSessionSummaryResponse(sessionId, NEW_CHAT_TITLE, "", 0, now);
     }
 
+    /**
+     * 查询当前用户拥有的全部对话会话。
+     *
+     * @param user 当前认证用户
+     * @return 会话摘要列表
+     */
     public List<AgentSessionSummaryResponse> listSessions(AuthenticatedUser user) {
         return conversationStore.list(user.userId()).stream()
                 .map(session -> new AgentSessionSummaryResponse(
@@ -127,6 +161,14 @@ public class DefaultReactAgentService {
                 .toList();
     }
 
+    /**
+     * 查询指定会话的详细消息记录。
+     *
+     * @param user 当前认证用户
+     * @param sessionId 会话标识
+     * @return 会话详情
+     * @throws AuthException 会话不存在或不属于当前用户时抛出
+     */
     public AgentSessionDetailResponse getSession(AuthenticatedUser user, String sessionId) {
         AgentSessionContext sessionContext = conversationStore.load(user.userId(), sessionId)
                 .orElseThrow(() -> new AuthException("Conversation session not found"));
@@ -140,6 +182,12 @@ public class DefaultReactAgentService {
                 sessionContext.updatedAt());
     }
 
+    /**
+     * 删除用户会话及其对应的工作流状态。
+     *
+     * @param user 当前认证用户
+     * @param sessionId 会话标识
+     */
     public void deleteSession(AuthenticatedUser user, String sessionId) {
         String normalizedSessionId = normalizeSessionId(sessionId);
         agentGraph.clear(user.userId() + ":" + normalizedSessionId);
@@ -159,12 +207,9 @@ public class DefaultReactAgentService {
 
     private String locationJson(AgentChatRequest.Location location) {
         if (location == null) return null;
-        java.util.Map<String, Object> value = new java.util.LinkedHashMap<>();
-        value.put("latitude", location.latitude());
-        value.put("longitude", location.longitude());
-        value.put("accuracy", location.accuracy());
-        value.put("updatedAt", Instant.now().toString());
-        return JSON.toJSONString(value, JSONWriter.Feature.WriteMapNullValue);
+        return JSON.toJSONString(AgentLocationPayload.from(
+                location.latitude(), location.longitude(), location.accuracy()),
+                JSONWriter.Feature.WriteMapNullValue);
     }
 
     private String normalizeSessionId(String sessionId) {
@@ -177,8 +222,8 @@ public class DefaultReactAgentService {
     private String userFacingReply(String reply) {
         if (reply == null) return null;
         String trimmed = reply.trim();
-        return trimmed.regionMatches(true, 0, "questions:", 0, "questions:".length())
-                ? trimmed.substring("questions:".length()).trim() : reply;
+        return trimmed.regionMatches(true, 0, QUESTIONS_PREFIX, 0, QUESTIONS_PREFIX.length())
+                ? trimmed.substring(QUESTIONS_PREFIX.length()).trim() : reply;
     }
 
     /**
@@ -190,7 +235,7 @@ public class DefaultReactAgentService {
     private List<AgentMessage> boundedHistory(List<AgentMessage> messages) {
         int budget = Math.max(256, agentProperties.getMaxHistoryTokens());
         int used = 0;
-        java.util.LinkedList<AgentMessage> result = new java.util.LinkedList<>();
+        LinkedList<AgentMessage> result = new LinkedList<>();
         for (int index = messages.size() - 1; index >= 0; index--) {
             AgentMessage message = messages.get(index);
             int messageTokens = estimateTokens(message);
@@ -205,7 +250,7 @@ public class DefaultReactAgentService {
     }
 
     private int estimateTokens(AgentMessage message) {
-        return message == null ? 4 : tokenCounter.count(message.content()) + 4;
+        return message == null ? MESSAGE_TOKEN_OVERHEAD : tokenCounter.count(message.content()) + MESSAGE_TOKEN_OVERHEAD;
     }
 
     private boolean shouldSummarize(List<AgentMessage> messages) {
@@ -235,16 +280,16 @@ public class DefaultReactAgentService {
         List<AgentMessage> recent = boundedHistory(messages);
         if (summary == null || summary.isBlank()) return recent;
         List<AgentMessage> result = new ArrayList<>();
-        result.add(new AgentMessage("system", "Conversation summary:\n" + summary));
+        result.add(new AgentMessage(AgentMessageRole.SYSTEM, SUMMARY_PREFIX + summary));
         result.addAll(recent);
         return boundedHistory(result);
     }
 
     private String buildTitle(List<AgentMessage> messages) {
         return messages.stream()
-                .filter(message -> "user".equalsIgnoreCase(message.role()))
+                .filter(message -> AgentMessageRole.USER.matches(message.role()))
                 .map(AgentMessage::content)
                 .findFirst()
-                .orElse("new-chat");
+                .orElse(NEW_CHAT_TITLE);
     }
 }
